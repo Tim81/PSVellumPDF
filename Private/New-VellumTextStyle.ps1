@@ -7,6 +7,8 @@ function New-VellumTextStyle {
         and alignment handling stays in one place. Returns $null when no styling
         was requested, letting callers fall back to the document's default font.
     #>
+    [Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSUseShouldProcessForStateChangingFunctions', '',
+        Justification = 'Returns a new in-memory TextStyle object; performs no external/system state change.')]
     [CmdletBinding()]
     [OutputType([VellumPdf.Layout.Core.TextStyle])]
     param(
