@@ -1,0 +1,25 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    This project exists only to acquire the VellumPdf .NET 10 assemblies that the
+    PSVellumPDF PowerShell module loads at import time. It produces no shipping code.
+    `build.ps1` publishes it and copies the runtime assemblies into ../lib.
+  -->
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <IsPackable>false</IsPackable>
+    <!-- Keep the publish output flat and self-contained so lib/ holds plain DLLs. -->
+    <CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies>
+    <EnableDynamicLoading>true</EnableDynamicLoading>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="VellumPdf.Layout" Version="1.0.0" />
+    <!-- VellumPdf.Kernel comes in transitively via VellumPdf.Layout. -->
+    <!-- Uncomment to wrap digital signing (PAdES) cmdlets later:
+    <PackageReference Include="VellumPdf.Signing" Version="1.0.0" /> -->
+  </ItemGroup>
+
+</Project>
