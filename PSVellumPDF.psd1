@@ -3,7 +3,7 @@
     ModuleVersion     = '0.1.0'
     GUID              = 'e51842c7-ddb1-4700-8ade-77055baa4f3a'
     Author            = 'Timothy van der Ham (@Tim81)'
-    Copyright         = '(c) Timothy van der Ham. Licensed under Apache-2.0.'
+    Copyright         = '© Timothy van der Ham. Licensed under Apache-2.0.'
     Description       = 'PowerShell module for generating PDFs with the VellumPdf .NET 10 library.'
 
     # VellumPdf targets .NET 10; PowerShell 7.6 is the first release on .NET 10.
