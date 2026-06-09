@@ -100,6 +100,16 @@ embedding (`LoadTrueTypeFont`), and encryption — none are wrapped yet. The
   begins with the `%PDF-` magic bytes, which is the cheapest real proof the
   wrapper produced a valid file.
 
+## Roadmap
+
+The path to 1.0 is tracked in the epic
+[#16 "Roadmap to PSVellumPDF 1.0"](https://github.com/Tim81/PSVellumPDF/issues/16)
+(milestone `v1.0.0`): feature-parity wrappers (#1–#9 — tables, lists, images,
+TrueType fonts, headers/footers, metadata, rich text, outline/links, encryption)
+and release engineering (#10–#15 — PSScriptAnalyzer, Pester coverage, GitHub
+Actions CI, PSGallery publishing, docs, manifest hardening). Start with #4
+(TrueType embedding) — Unicode/PDF-A correctness underpins the rest.
+
 ## Repo-specific git conventions
 
 - Module author metadata is **Timothy van der Ham (@Tim81)**; there is no
