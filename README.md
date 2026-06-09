@@ -1,5 +1,7 @@
 # PSVellumPDF
 
+[![CI](https://github.com/Tim81/PSVellumPDF/actions/workflows/ci.yml/badge.svg)](https://github.com/Tim81/PSVellumPDF/actions/workflows/ci.yml)
+
 PowerShell module for generating PDFs with the
 [VellumPdf](https://github.com/Tim81/VellumPDF) .NET 10 library — a modern,
 zero-dependency PDF engine with PDF/A archival support.

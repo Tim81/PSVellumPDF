@@ -16,6 +16,8 @@ function New-VellumPdfDocument {
     .OUTPUTS
         VellumPdf.Layout.Document
     #>
+    [Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSUseShouldProcessForStateChangingFunctions', '',
+        Justification = 'Returns a new in-memory document object; performs no external/system state change.')]
     [CmdletBinding()]
     [OutputType([VellumPdf.Layout.Document])]
     param(

@@ -1,4 +1,4 @@
-@{
+﻿@{
     RootModule        = 'PSVellumPDF.psm1'
     ModuleVersion     = '0.1.0'
     GUID              = 'e51842c7-ddb1-4700-8ade-77055baa4f3a'
@@ -25,7 +25,10 @@
 
     PrivateData = @{
         PSData = @{
-            Tags         = @('PDF', 'VellumPdf', 'PDFA', 'Document', 'Reporting')
+            Tags         = @(
+                'PDF', 'VellumPdf', 'PDFA', 'Document', 'Reporting',
+                'PSEdition_Core', 'Windows', 'Linux', 'MacOS'
+            )
             LicenseUri   = 'https://www.apache.org/licenses/LICENSE-2.0'
             ProjectUri   = 'https://github.com/Tim81/PSVellumPDF'
             ReleaseNotes = 'Initial scaffold: document creation, headings, paragraphs, save.'

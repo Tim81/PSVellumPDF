@@ -1,0 +1,70 @@
+name: CI
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        # All three run PowerShell 7.6 — the module is Core-only because the
+        # bundled VellumPdf assemblies target .NET 10. No Windows PowerShell 5.1.
+        os: [ ubuntu-latest, windows-latest, macos-latest ]
+
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Set up .NET 10 SDK
+        uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: '10.0.x'
+
+      # PowerShell 7.6 is the first release on .NET 10, so it is the only host
+      # that can load the net10.0 VellumPdf assemblies. Install it as a global
+      # tool to be independent of whatever pwsh the runner image ships.
+      - name: Install PowerShell 7.6
+        shell: bash
+        run: dotnet tool install --global PowerShell --version '7.6.*'
+
+      - name: Put the .NET tools PowerShell first on PATH
+        shell: pwsh
+        run: Add-Content -Path $env:GITHUB_PATH -Value (Join-Path $HOME '.dotnet/tools')
+
+      - name: Report versions
+        shell: bash
+        run: |
+          dotnet --version
+          pwsh -NoProfile -Command '$PSVersionTable.PSVersion.ToString()'
+
+      - name: Restore VellumPdf assemblies
+        shell: bash
+        run: pwsh -NoProfile -File ./build.ps1 Restore
+
+      - name: Lint (PSScriptAnalyzer)
+        shell: bash
+        run: pwsh -NoProfile -File ./build.ps1 Lint
+
+      - name: Test (Pester + coverage)
+        shell: bash
+        run: pwsh -NoProfile -File ./build.ps1 Test
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: test-results-${{ matrix.os }}
+          path: testResults/
+          if-no-files-found: ignore

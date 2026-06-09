@@ -12,7 +12,8 @@
 
 .PARAMETER Task
     Restore  - publish dependencies/Dependencies.csproj and copy the assemblies to ./lib.
-    Test     - Restore (if lib is missing) then run Pester.
+    Lint     - run PSScriptAnalyzer with PSScriptAnalyzerSettings.psd1 (fails on any finding).
+    Test     - Restore (if lib is missing) then run Pester with code coverage (fails below target).
     Clean    - remove ./lib and dependencies build output.
 
 .EXAMPLE
@@ -23,7 +24,7 @@
 #>
 [CmdletBinding()]
 param(
-    [ValidateSet('Restore', 'Test', 'Clean')]
+    [ValidateSet('Restore', 'Lint', 'Test', 'Clean')]
     [string]$Task = 'Restore'
 )
 
@@ -34,6 +35,10 @@ $root = $PSScriptRoot
 $libDir = Join-Path $root 'lib'
 $depProj = Join-Path $root 'dependencies' 'Dependencies.csproj'
 $publishDir = Join-Path $root 'dependencies' 'bin' 'publish'
+
+# Code-coverage floor enforced by the Test task (and CI). Raise toward 100 as
+# feature cmdlets and their tests land (see issue #11).
+$script:CoverageTarget = 70
 
 function Invoke-Restore {
     Write-Host '==> Publishing VellumPdf dependencies...' -ForegroundColor Cyan
@@ -53,14 +58,62 @@ function Invoke-Restore {
     if (-not $copied) { throw 'No VellumPdf assemblies were copied into lib/.' }
 }
 
+function Invoke-Lint {
+    if (-not (Get-Module -ListAvailable PSScriptAnalyzer)) {
+        Write-Host '==> Installing PSScriptAnalyzer...' -ForegroundColor Cyan
+        Install-Module PSScriptAnalyzer -Scope CurrentUser -Force -SkipPublisherCheck
+    }
+    Import-Module PSScriptAnalyzer
+    Write-Host '==> Running PSScriptAnalyzer...' -ForegroundColor Cyan
+    $settings = Join-Path $root 'PSScriptAnalyzerSettings.psd1'
+    $findings = Invoke-ScriptAnalyzer -Path $root -Recurse -Settings $settings
+    if ($findings) {
+        $findings | Format-Table Severity, RuleName, ScriptName, Line, Message -AutoSize | Out-Host
+        throw "PSScriptAnalyzer reported $($findings.Count) issue(s)."
+    }
+    Write-Host '==> Lint clean.' -ForegroundColor Green
+}
+
 function Invoke-Test {
     if (-not (Test-Path $libDir)) { Invoke-Restore }
     if (-not (Get-Module -ListAvailable Pester | Where-Object Version -ge '5.0')) {
         Write-Host '==> Installing Pester...' -ForegroundColor Cyan
         Install-Module Pester -MinimumVersion 5.0 -Scope CurrentUser -Force -SkipPublisherCheck
     }
+    Import-Module Pester -MinimumVersion 5.0
+
+    $resultsDir = Join-Path $root 'testResults'
+    New-Item -ItemType Directory -Path $resultsDir -Force | Out-Null
+
+    # Coverage instruments the PowerShell wrappers (not the VellumPdf DLL).
+    $covered = @(
+        Get-ChildItem (Join-Path $root 'Public') -Filter '*.ps1' -ErrorAction SilentlyContinue
+        Get-ChildItem (Join-Path $root 'Private') -Filter '*.ps1' -ErrorAction SilentlyContinue
+    ).FullName
+
+    $cfg = New-PesterConfiguration
+    $cfg.Run.Path = Join-Path $root 'tests'
+    $cfg.Run.PassThru = $true
+    $cfg.Output.Verbosity = 'Detailed'
+    $cfg.TestResult.Enabled = $true
+    $cfg.TestResult.OutputFormat = 'NUnitXml'
+    $cfg.TestResult.OutputPath = Join-Path $resultsDir 'testResults.xml'
+    $cfg.CodeCoverage.Enabled = $true
+    $cfg.CodeCoverage.Path = $covered
+    $cfg.CodeCoverage.OutputPath = Join-Path $resultsDir 'coverage.xml'
+    $cfg.CodeCoverage.CoveragePercentTarget = $script:CoverageTarget
+
     Write-Host '==> Running Pester...' -ForegroundColor Cyan
-    Invoke-Pester -Path (Join-Path $root 'tests') -Output Detailed
+    $result = Invoke-Pester -Configuration $cfg
+
+    if ($result.Result -ne 'Passed') {
+        throw "Pester run failed: $($result.FailedCount) test(s) failed."
+    }
+    $pct = [math]::Round($result.CodeCoverage.CoveragePercent, 1)
+    Write-Host "==> Code coverage: $pct% (target $script:CoverageTarget%)" -ForegroundColor Cyan
+    if ($result.CodeCoverage.CoveragePercent -lt $script:CoverageTarget) {
+        throw "Code coverage $pct% is below the $script:CoverageTarget% target."
+    }
 }
 
 function Invoke-Clean {
@@ -71,6 +124,7 @@ function Invoke-Clean {
 
 switch ($Task) {
     'Restore' { Invoke-Restore }
+    'Lint'    { Invoke-Lint }
     'Test'    { Invoke-Test }
     'Clean'   { Invoke-Clean }
 }

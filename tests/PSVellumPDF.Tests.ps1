@@ -47,4 +47,33 @@ Describe 'PDF generation pipeline' {
 
         (Get-Item $script:outPath).Length | Should -BeGreaterThan 0
     }
+
+    It 'honours per-element styling and a tagged document' {
+        New-VellumPdfDocument -Tagged |
+            Add-VellumPdfHeading   -Text 'Styled' -Level 2 -Alignment Center -BookmarkTitle 'Bk' |
+            Add-VellumPdfParagraph -Text 'Custom run.' -Font Courier -FontSize 9 -Alignment Justify |
+            Save-VellumPdfDocument -Path $script:outPath
+
+        (Get-Item $script:outPath).Length | Should -BeGreaterThan 0
+    }
+
+    It 'keeps the document open with -KeepOpen' {
+        $doc = New-VellumPdfDocument | Add-VellumPdfParagraph -Text 'Reusable.'
+        $doc | Save-VellumPdfDocument -Path $script:outPath -KeepOpen
+        # Still usable after save, then dispose ourselves.
+        { $doc | Add-VellumPdfParagraph -Text 'More.' | Out-Null } | Should -Not -Throw
+        $doc.Dispose()
+    }
+}
+
+Describe 'New-VellumTextStyle (private helper)' {
+    It 'returns $null when neither font nor size is requested' {
+        InModuleScope PSVellumPDF { New-VellumTextStyle } | Should -BeNullOrEmpty
+    }
+
+    It 'builds a TextStyle with the requested font and size' {
+        $style = InModuleScope PSVellumPDF { New-VellumTextStyle -Font Helvetica -FontSize 14 }
+        $style | Should -Not -BeNullOrEmpty
+        $style.FontSize | Should -Be 14
+    }
 }
