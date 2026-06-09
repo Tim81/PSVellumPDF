@@ -1,0 +1,15 @@
+# Restored VellumPdf assemblies — regenerate with ./build.ps1 Restore
+/lib/
+
+# .NET build output from the dependencies acquisition project
+/dependencies/bin/
+/dependencies/obj/
+
+# Test / tooling output
+/testResults/
+*.user
+
+# OS / editor cruft
+.DS_Store
+Thumbs.db
+.vs/
