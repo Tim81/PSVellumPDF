@@ -6,10 +6,12 @@ PowerShell module for generating PDFs with the
 [VellumPdf](https://github.com/Tim81/VellumPDF) .NET 10 library — a modern,
 zero-dependency PDF engine with PDF/A archival support.
 
-> Status: in development (v0.1.0). Documents, headings, paragraphs, tables,
-> lists, images, and embedded TrueType fonts are wrapped. Still to come on the
-> [road to 1.0](https://github.com/Tim81/PSVellumPDF/issues/16): headers/footers,
-> metadata, rich text, outline/links, encryption, and digital signing.
+> Status: in development (v0.1.0). The full VellumPdf layout API is wrapped:
+> documents, headings, paragraphs (incl. mixed-style runs, colour, hyperlinks),
+> tables, lists, images, embedded TrueType fonts, headers/footers, metadata,
+> margins, bookmarks, and encryption. Remaining on the
+> [road to 1.0](https://github.com/Tim81/PSVellumPDF/issues/16): docs/platyPS
+> and PSGallery publishing. Digital signing (PAdES) is post-1.0.
 
 ## Requirements
 
@@ -43,12 +45,19 @@ New-VellumPdfDocument -Conformance PdfA2b -PageSize A4 |
 |---|---|
 | `New-VellumPdfDocument` | Create a document (`-Conformance`, `-PageSize`, `-DefaultFont`, `-DefaultFontSize`, `-Tagged`) |
 | `Add-VellumPdfHeading` | Add a heading (`-Text`, `-Level`, `-Font`, `-FontSize`, `-Alignment`, `-BookmarkTitle`, `-FontHandle`) |
-| `Add-VellumPdfParagraph` | Add body text (`-Text`, `-Font`, `-FontSize`, `-Alignment`, `-FontHandle`) |
+| `Add-VellumPdfParagraph` | Add body text (`-Text`, `-Font`, `-FontSize`, `-Alignment`, `-FontHandle`, `-Color`, `-LinkUri`) or mixed-style runs (`-Run`) |
+| `New-VellumPdfTextRun` | Build a styled run (`-Text`, `-Font`, `-FontSize`, `-FontHandle`, `-Color`, `-LinkUri`) for `-Run` paragraphs |
 | `Add-VellumPdfTable` | Add a table (`-Header`, `-Row`, `-ColumnWidth`, `-BorderWidth`, `-BorderColor`, `-HeaderBackground`, `-Font`, `-FontSize`, `-Alignment`) |
 | `Add-VellumPdfList` | Add an ordered/unordered list (`-Item`, `-Style`, `-Indent`, `-Font`, `-FontSize`) |
 | `Add-VellumPdfImage` | Embed an image (`-Path`, `-Width`, `-Height`, `-Alignment`, `-AltText`) |
 | `Register-VellumPdfFont` | Load a TrueType font for embedding; returns a handle for `-FontHandle` |
+| `Set-VellumPdfHeader` / `Set-VellumPdfFooter` | Running bands with `{page}`/`{pages}` tokens (`-Template`, `-Font`, `-FontSize`, `-Alignment`) |
+| `Set-VellumPdfDocumentInfo` | Document metadata (`-Title`, `-Author`, `-Subject`, `-Keywords`, `-Creator`, `-Producer`) |
+| `Protect-VellumPdfDocument` | Password protection (`-UserPassword`/`-OwnerPassword` as SecureString, `-Permission` flags, `-EncryptMetadata`) |
 | `Save-VellumPdfDocument` | Write the `.pdf` and dispose the document (`-Path`, `-KeepOpen`) |
+
+`New-VellumPdfDocument` also takes `-Margin` / `-MarginTop/Right/Bottom/Left`, and
+`Add-VellumPdfHeading -BookmarkTitle`/`-Level` builds the PDF outline (bookmarks).
 
 `Get-Help <function> -Full` documents each one.
 
