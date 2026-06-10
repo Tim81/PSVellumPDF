@@ -75,8 +75,10 @@ with an embedded font, rich text + encryption).
 
 ### Embedded fonts (Unicode / PDF&#8203;/A)
 
-The base-14 fonts can't be embedded, so Unicode text and PDF/A documents need a
-TrueType font:
+The base-14 fonts cover only Latin-1: text containing characters beyond it
+(e.g. Czech diacritics, CJK, the euro sign) renders **mangled** with those
+fonts — the cmdlets emit a warning when this is about to happen. The fix, which
+also satisfies PDF/A's embedding requirement, is a TrueType font:
 
 ```powershell
 $doc    = New-VellumPdfDocument -Conformance PdfA2b

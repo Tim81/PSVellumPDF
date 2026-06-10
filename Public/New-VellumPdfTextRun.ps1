@@ -52,6 +52,10 @@ function New-VellumPdfTextRun {
         [double]$Leading
     )
 
+    if (-not $FontHandle) {
+        Write-VellumPdfEncodingWarning -Text $Text -CommandName 'New-VellumPdfTextRun'
+    }
+
     # Build a style forwarding only the parameters that were explicitly bound.
     # Always produce at least a bare TextStyle (never $null) because the
     # VellumPdf renderer requires a non-null style on every TextRun in a

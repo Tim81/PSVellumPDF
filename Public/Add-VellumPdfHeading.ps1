@@ -49,6 +49,9 @@ function Add-VellumPdfHeading {
     )
 
     process {
+        if (-not $FontHandle) {
+            Write-VellumPdfEncodingWarning -Text $Text -CommandName 'Add-VellumPdfHeading'
+        }
         $styleParams = if ($FontHandle) {
             @{ FontHandle = $FontHandle; FontSize = $FontSize }
         } else {

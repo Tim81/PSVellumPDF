@@ -90,6 +90,9 @@ function Add-VellumPdfParagraph {
         }
 
         # --- Text parameter set ---
+        if (-not $FontHandle) {
+            Write-VellumPdfEncodingWarning -Text $Text -CommandName 'Add-VellumPdfParagraph'
+        }
         $wantsColor   = $PSBoundParameters.ContainsKey('Color')
         $wantsLink    = $PSBoundParameters.ContainsKey('LinkUri') -and ($LinkUri -ne '')
         $wantsLeading = $PSBoundParameters.ContainsKey('Leading')
