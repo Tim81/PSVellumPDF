@@ -59,7 +59,10 @@ New-VellumPdfDocument -Conformance PdfA2b -PageSize A4 |
 `New-VellumPdfDocument` also takes `-Margin` / `-MarginTop/Right/Bottom/Left`, and
 `Add-VellumPdfHeading -BookmarkTitle`/`-Level` builds the PDF outline (bookmarks).
 
-`Get-Help <function> -Full` documents each one.
+`Get-Help <function> -Full` documents each one. A generated markdown reference
+lives in [docs/PSVellumPDF](docs/PSVellumPDF), and runnable demo scripts in
+[examples/](examples) (report with tables and page numbering, PDF/A archival
+with an embedded font, rich text + encryption).
 
 ### Embedded fonts (Unicode / PDF&#8203;/A)
 
@@ -76,7 +79,9 @@ $doc | Add-VellumPdfParagraph -Text 'Unicode: héllo wörld €' -FontHandle $ha
 ## Development
 
 ```powershell
-./build.ps1 Test    # restore (if needed) + run Pester
+./build.ps1 Lint    # PSScriptAnalyzer gate
+./build.ps1 Test    # restore (if needed) + run Pester with coverage
+./build.ps1 Docs    # regenerate docs/ from comment-based help (PlatyPS)
 ./build.ps1 Clean   # remove ./lib and build output
 ```
 
