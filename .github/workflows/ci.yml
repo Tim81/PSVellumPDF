@@ -72,3 +72,63 @@ jobs:
           name: test-results-${{ matrix.os }}
           path: testResults/
           if-no-files-found: ignore
+
+  # External conformance validation: qpdf checks PDF structure, veraPDF
+  # validates PDF/A-2b compliance (the same validators upstream VellumPdf
+  # gates on). Runs on ubuntu where Docker is available.
+  validate:
+    name: validate (qpdf + veraPDF)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+
+      - name: Set up .NET 10 SDK
+        uses: actions/setup-dotnet@9a946fdbd5fb07b82b2f5a4466058b876ab72bb2 # v5
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Install PowerShell 7.6
+        shell: bash
+        run: dotnet tool install --global PowerShell --version 7.6.2
+
+      - name: Put the .NET tools PowerShell first on PATH
+        shell: pwsh
+        run: Add-Content -Path $env:GITHUB_PATH -Value (Join-Path $HOME '.dotnet/tools')
+
+      - name: Restore VellumPdf assemblies
+        shell: bash
+        run: pwsh -NoProfile -File ./build.ps1 Restore
+
+      - name: Generate validation samples
+        shell: bash
+        run: pwsh -NoProfile -File ./tools/New-ValidationSamples.ps1 -OutputPath ./samples
+
+      - name: Install qpdf
+        shell: bash
+        run: sudo apt-get update -q && sudo apt-get install -y -q qpdf
+
+      - name: qpdf structural checks
+        shell: bash
+        run: |
+          set -e
+          qpdf --check samples/plain.pdf
+          qpdf --check samples/pdfa2b.pdf
+          qpdf --check --password=validate samples/encrypted.pdf
+          echo "qpdf: all samples structurally valid"
+
+      - name: veraPDF PDF/A-2b validation
+        shell: bash
+        run: |
+          set -o pipefail
+          docker run --rm -v "$PWD/samples:/data" ghcr.io/verapdf/cli \
+            --flavour 2b --format text /data/pdfa2b.pdf | tee verapdf.out
+          grep -q '^PASS' verapdf.out || { echo 'veraPDF did not report PASS'; exit 1; }
+          echo "veraPDF: pdfa2b.pdf is PDF/A-2b compliant"
+
+      - name: Upload samples
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: validation-samples
+          path: samples/
+          if-no-files-found: ignore
