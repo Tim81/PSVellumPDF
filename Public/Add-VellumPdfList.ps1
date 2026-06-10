@@ -57,11 +57,14 @@ function Add-VellumPdfList {
         }
 
         # Build a TextStyle only when font or size overrides were requested.
+        # Gaps are filled from the document defaults: a style without a font
+        # renders in the library-global Helvetica, not the document default.
         $wantsStyle = [bool]$Font -or $PSBoundParameters.ContainsKey('FontSize')
         $textStyle = $null
         if ($wantsStyle) {
-            $effFont = if ($Font) { $Font } else { 'Helvetica' }
-            $effSize = if ($PSBoundParameters.ContainsKey('FontSize')) { $FontSize } else { 11 }
+            $default = Resolve-VellumPdfDefault -Document $Document
+            $effFont = if ($Font) { $Font } else { $default.Font }
+            $effSize = if ($PSBoundParameters.ContainsKey('FontSize')) { $FontSize } else { $default.FontSize }
             $textStyle = New-VellumTextStyle -Font $effFont -FontSize $effSize
         }
 

@@ -58,15 +58,46 @@ Describe 'PDF generation pipeline' {
     }
 
     It 'renders an alignment-only paragraph with the document default font' {
-        # Regression: alignment-only used to force Helvetica 11, overriding the default.
+        # Regression: alignment-only used to force Helvetica, overriding the
+        # default. Assert the actual /BaseFont, not just a valid header.
         New-VellumPdfDocument -DefaultFont TimesRoman -DefaultFontSize 12 |
             Add-VellumPdfParagraph -Text 'Centered, default typeface.' -Alignment Center |
             Save-VellumPdfDocument -Path $script:outPath
 
-        (Get-Item $script:outPath).Length | Should -BeGreaterThan 0
-        $head = [System.Text.Encoding]::ASCII.GetString(
-            [System.IO.File]::ReadAllBytes($script:outPath)[0..4])
-        $head | Should -Be '%PDF-'
+        $raw = [System.Text.Encoding]::Latin1.GetString(
+            [System.IO.File]::ReadAllBytes($script:outPath))
+        $raw | Should -Match '/BaseFont\s*/Times-Roman'
+        $raw | Should -Not -Match '/BaseFont\s*/Helvetica'
+    }
+
+    It 'renders a FontSize-only paragraph with the document default font' {
+        # Regression: -FontSize without -Font used to force Helvetica.
+        New-VellumPdfDocument -DefaultFont TimesRoman |
+            Add-VellumPdfParagraph -Text 'Bigger, same typeface.' -FontSize 14 |
+            Save-VellumPdfDocument -Path $script:outPath
+
+        $raw = [System.Text.Encoding]::Latin1.GetString(
+            [System.IO.File]::ReadAllBytes($script:outPath))
+        $raw | Should -Match '/BaseFont\s*/Times-Roman'
+        $raw | Should -Not -Match '/BaseFont\s*/Helvetica'
+    }
+
+    It 'disposes the document when the directory-not-found check throws' {
+        $doc = New-VellumPdfDocument | Add-VellumPdfParagraph -Text 'x'
+        { $doc | Save-VellumPdfDocument -Path (Join-Path $TestDrive 'no-dir' 'x.pdf') } |
+            Should -Throw '*directory not found*'
+        # A disposed document must not be saveable afterwards.
+        { $doc.Save((Join-Path $TestDrive 'after-dispose.pdf')) } | Should -Throw
+    }
+
+    It 'writes the /Lang entry when -Language is supplied' {
+        New-VellumPdfDocument -Language 'en-US' |
+            Add-VellumPdfParagraph -Text 'Localised.' |
+            Save-VellumPdfDocument -Path $script:outPath
+
+        $raw = [System.Text.Encoding]::Latin1.GetString(
+            [System.IO.File]::ReadAllBytes($script:outPath))
+        $raw | Should -Match '/Lang'
     }
 
     It 'throws an actionable error when the target directory does not exist' {

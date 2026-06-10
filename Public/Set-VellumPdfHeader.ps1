@@ -46,8 +46,9 @@ function Set-VellumPdfHeader {
     process {
         $wantsFont = [bool]$Font -or $PSBoundParameters.ContainsKey('FontSize')
         $style = if ($wantsFont) {
-            $effFont = if ($Font) { $Font } else { 'Helvetica' }
-            $effSize = if ($PSBoundParameters.ContainsKey('FontSize')) { $FontSize } else { 11 }
+            $default = Resolve-VellumPdfDefault -Document $Document
+            $effFont = if ($Font) { $Font } else { $default.Font }
+            $effSize = if ($PSBoundParameters.ContainsKey('FontSize')) { $FontSize } else { $default.FontSize }
             New-VellumTextStyle -Font $effFont -FontSize $effSize
         } else {
             $null

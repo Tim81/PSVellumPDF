@@ -19,6 +19,11 @@ function Add-VellumPdfTable {
         unary comma operator so PowerShell does not flatten the outer array:
         -Row @(,@('Cell1','Cell2')). A flat array like -Row @('a','b') is
         treated as two one-cell rows.
+
+        Objects from Import-Csv (PSCustomObject) are rejected with a hint;
+        convert them to value arrays first:
+            $rows = Import-Csv data.csv |
+                ForEach-Object { [object[]]($_.PSObject.Properties.Value) }
     .EXAMPLE
         $headers = @('Name', 'Score', 'Grade')
         $rows = @(
@@ -71,13 +76,29 @@ function Add-VellumPdfTable {
     )
 
     process {
+        # Objects from Import-Csv / Select-Object bind as one PSCustomObject per
+        # row, which would stringify into a single mangled cell. Fail fast with
+        # a conversion hint instead of producing a silently wrong table.
+        foreach ($r in $Row) {
+            foreach ($v in $r) {
+                if ($v -is [System.Management.Automation.PSCustomObject]) {
+                    throw ('Add-VellumPdfTable: -Row received a PSCustomObject (e.g. from Import-Csv). ' +
+                        'Convert rows to value arrays first: ' +
+                        '$rows = $data | ForEach-Object { [object[]]($_.PSObject.Properties.Value) }')
+                }
+            }
+        }
+
         $table = [VellumPdf.Layout.Elements.Table.TableElement]::new()
 
-        # Apply default cell style when font or size is requested.
+        # Apply default cell style when font or size is requested. Gaps are
+        # filled from the document defaults: a style without a font renders in
+        # the library-global Helvetica, not the document default.
         $wantsStyle = [bool]$Font -or $PSBoundParameters.ContainsKey('FontSize')
         if ($wantsStyle) {
-            $effFont = if ($Font) { $Font } else { 'Helvetica' }
-            $effSize = if ($PSBoundParameters.ContainsKey('FontSize')) { $FontSize } else { 11 }
+            $default = Resolve-VellumPdfDefault -Document $Document
+            $effFont = if ($Font) { $Font } else { $default.Font }
+            $effSize = if ($PSBoundParameters.ContainsKey('FontSize')) { $FontSize } else { $default.FontSize }
             $table.DefaultCellStyle = New-VellumTextStyle -Font $effFont -FontSize $effSize
         }
 

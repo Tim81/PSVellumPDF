@@ -99,6 +99,15 @@ Describe 'Add-VellumPdfTable' {
         $head | Should -Be '%PDF-'
     }
 
+    It 'rejects PSCustomObject rows (Import-Csv) with a conversion hint' {
+        $doc = New-VellumPdfDocument
+        try {
+            $csvish = @([pscustomobject]@{ Name = 'Alice'; Score = 95 })
+            { $doc | Add-VellumPdfTable -Row $csvish } | Should -Throw '*PSCustomObject*'
+        }
+        finally { $doc.Dispose() }
+    }
+
     It 'rejects out-of-range colour components' {
         $doc = New-VellumPdfDocument
         try {

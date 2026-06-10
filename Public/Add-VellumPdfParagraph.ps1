@@ -83,29 +83,22 @@ function Add-VellumPdfParagraph {
             return $Document
         }
 
-        # A $null style makes the paragraph render with the document's default
-        # font, so alignment-only paragraphs do not silently switch typeface.
+        # An explicit Paragraph needs a complete style: VellumPdf renders any
+        # style without a font in the library-global Helvetica, NOT the document
+        # default. Fill gaps from the stashed document defaults instead.
+        $default = Resolve-VellumPdfDefault -Document $Document
+        $effSize = if ($PSBoundParameters.ContainsKey('FontSize')) { $FontSize } else { $default.FontSize }
         $style = if ($FontHandle) {
-            $effSize = if ($PSBoundParameters.ContainsKey('FontSize')) { $FontSize } else { 11 }
             $sp = @{ FontHandle = $FontHandle; FontSize = $effSize }
             if ($wantsColor) { $sp['Color'] = $Color }
             if ($wantsLink)  { $sp['LinkUri'] = $LinkUri }
             New-VellumTextStyle @sp
-        } elseif ($wantsFont) {
-            $effFont = if ($Font) { $Font } else { 'Helvetica' }
-            $effSize = if ($PSBoundParameters.ContainsKey('FontSize')) { $FontSize } else { 11 }
+        } else {
+            $effFont = if ($Font) { $Font } else { $default.Font }
             $sp = @{ Font = $effFont; FontSize = $effSize }
             if ($wantsColor) { $sp['Color'] = $Color }
             if ($wantsLink)  { $sp['LinkUri'] = $LinkUri }
             New-VellumTextStyle @sp
-        } elseif ($wantsColor -or $wantsLink) {
-            # Color/LinkUri only, no font overrides - build a style without font info.
-            $sp = @{}
-            if ($wantsColor) { $sp['Color'] = $Color }
-            if ($wantsLink)  { $sp['LinkUri'] = $LinkUri }
-            New-VellumTextStyle @sp
-        } else {
-            $null
         }
 
         $paragraph = [VellumPdf.Layout.Elements.Paragraph]::new($Text, $style)

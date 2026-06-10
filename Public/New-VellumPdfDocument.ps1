@@ -47,6 +47,10 @@ function New-VellumPdfDocument {
 
         [switch]$Tagged,
 
+        # BCP 47 language tag written as the PDF /Lang entry (e.g. 'en-US').
+        # Relevant for tagged PDF and PDF/A accessibility. Requires VellumPdf 1.1+.
+        [string]$Language,
+
         [ValidateRange(0, 10000)]
         [double]$Margin,
 
@@ -67,9 +71,17 @@ function New-VellumPdfDocument {
     $doc.Conformance = [VellumPdf.Document.PdfConformance]::$Conformance
     $doc.PageSize = [VellumPdf.Document.PageSize]::$PageSize
     if ($Tagged) { $doc.Tagged = $true }
+    if ($Language) { $doc.Language = $Language }
 
     $style = New-VellumTextStyle -Font $DefaultFont -FontSize $DefaultFontSize
     [void]$doc.SetDefaultFont($style)
+
+    # VellumPdf has no getter for the default style, and a TextStyle without a
+    # font falls back to the library-global Helvetica rather than this default.
+    # Stash what we applied so other cmdlets can fill style gaps correctly
+    # (read back via Resolve-VellumPdfDefault).
+    $doc.PSObject.Properties.Add([psnoteproperty]::new(
+        'PSVellumDefault', @{ Font = $DefaultFont; FontSize = $DefaultFontSize }))
 
     $hasUniform = $PSBoundParameters.ContainsKey('Margin')
     $hasPerSide = $PSBoundParameters.ContainsKey('MarginTop') -or
