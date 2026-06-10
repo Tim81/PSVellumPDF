@@ -14,6 +14,11 @@ function Add-VellumPdfTable {
 
         The -BorderColor and -HeaderBackground parameters accept a three-element
         array of [double] values in the 0..1 range (R, G, B).
+
+        NOTE: -Row is a jagged array (array of rows). For a SINGLE row use the
+        unary comma operator so PowerShell does not flatten the outer array:
+        -Row @(,@('Cell1','Cell2')). A flat array like -Row @('a','b') is
+        treated as two one-cell rows.
     .EXAMPLE
         $headers = @('Name', 'Score', 'Grade')
         $rows = @(
@@ -46,9 +51,11 @@ function Add-VellumPdfTable {
         [double]$BorderWidth,
 
         [ValidateCount(3, 3)]
+        [ValidateRange(0.0, 1.0)]
         [double[]]$BorderColor,
 
         [ValidateCount(3, 3)]
+        [ValidateRange(0.0, 1.0)]
         [double[]]$HeaderBackground,
 
         [ValidateSet('Courier', 'CourierBold', 'CourierBoldOblique', 'CourierOblique',
