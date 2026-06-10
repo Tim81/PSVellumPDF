@@ -98,6 +98,9 @@ function Add-VellumPdfTable {
             }
         }
 
+        $cellText = @($Header) + @($Row | ForEach-Object { $_ | ForEach-Object { [string]$_ } })
+        Write-VellumPdfEncodingWarning -Text $cellText -CommandName 'Add-VellumPdfTable'
+
         $table = [VellumPdf.Layout.Elements.Table.TableElement]::new()
 
         # Apply default cell style when font or size is requested. Gaps are

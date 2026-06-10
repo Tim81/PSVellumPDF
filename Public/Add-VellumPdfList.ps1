@@ -55,6 +55,7 @@ function Add-VellumPdfList {
     )
 
     process {
+        Write-VellumPdfEncodingWarning -Text $Item -CommandName 'Add-VellumPdfList'
         $listStyle = [VellumPdf.Layout.Elements.ListStyle]::$Style
 
         # Build an empty typed list to satisfy the IEnumerable<ListItem> ctor param.
