@@ -14,6 +14,9 @@ function New-VellumPdfDocument {
         parameter is supplied, the uniform -Margin value (if given) is used as
         the baseline for the unspecified sides; otherwise the library defaults
         are kept for unspecified sides.
+
+        -UseObjectStreams enables PDF cross-reference object streams, which
+        reduces file size for documents with many objects.
     .EXAMPLE
         New-VellumPdfDocument -Conformance PdfA2b |
             Add-VellumPdfHeading -Text 'Report' |
@@ -64,7 +67,9 @@ function New-VellumPdfDocument {
         [double]$MarginBottom,
 
         [ValidateRange(0, 10000)]
-        [double]$MarginLeft
+        [double]$MarginLeft,
+
+        [switch]$UseObjectStreams
     )
 
     $doc = [VellumPdf.Layout.Document]::new()
@@ -72,6 +77,7 @@ function New-VellumPdfDocument {
     $doc.PageSize = [VellumPdf.Document.PageSize]::$PageSize
     if ($Tagged) { $doc.Tagged = $true }
     if ($Language) { $doc.Language = $Language }
+    if ($UseObjectStreams) { $doc.UseObjectStreams = $true }
 
     $style = New-VellumTextStyle -Font $DefaultFont -FontSize $DefaultFontSize
     [void]$doc.SetDefaultFont($style)

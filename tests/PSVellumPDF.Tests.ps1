@@ -100,6 +100,46 @@ Describe 'PDF generation pipeline' {
         $raw | Should -Match '/Lang'
     }
 
+    It 'produces a PDF containing /ObjStm when -UseObjectStreams is supplied' {
+        New-VellumPdfDocument -UseObjectStreams |
+            Add-VellumPdfParagraph -Text 'Object stream document.' |
+            Save-VellumPdfDocument -Path $script:outPath
+
+        Test-Path $script:outPath | Should -BeTrue
+        (Get-Item $script:outPath).Length | Should -BeGreaterThan 0
+
+        $bytes = [System.IO.File]::ReadAllBytes($script:outPath)
+        $raw = [System.Text.Encoding]::Latin1.GetString($bytes)
+        $raw | Should -Match '/ObjStm'
+    }
+
+    It 'applies -MarginTop and -MarginBottom to a paragraph and produces a valid PDF' {
+        New-VellumPdfDocument |
+            Add-VellumPdfParagraph -Text 'Spaced paragraph.' -MarginTop 20 -MarginBottom 20 |
+            Save-VellumPdfDocument -Path $script:outPath
+
+        Test-Path $script:outPath | Should -BeTrue
+        (Get-Item $script:outPath).Length | Should -BeGreaterThan 0
+
+        $head = [System.Text.Encoding]::ASCII.GetString(
+            [System.IO.File]::ReadAllBytes($script:outPath)[0..4])
+        $head | Should -Be '%PDF-'
+    }
+
+    It 'applies -MarginTop and -MarginBottom to a heading and produces a valid PDF' {
+        New-VellumPdfDocument |
+            Add-VellumPdfHeading -Text 'Spaced Heading' -Level 2 -MarginTop 15 -MarginBottom 15 |
+            Add-VellumPdfParagraph -Text 'Body after spaced heading.' |
+            Save-VellumPdfDocument -Path $script:outPath
+
+        Test-Path $script:outPath | Should -BeTrue
+        (Get-Item $script:outPath).Length | Should -BeGreaterThan 0
+
+        $head = [System.Text.Encoding]::ASCII.GetString(
+            [System.IO.File]::ReadAllBytes($script:outPath)[0..4])
+        $head | Should -Be '%PDF-'
+    }
+
     It 'throws an actionable error when the target directory does not exist' {
         $doc = New-VellumPdfDocument | Add-VellumPdfParagraph -Text 'x'
         try {

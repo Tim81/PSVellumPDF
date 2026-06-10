@@ -20,6 +20,9 @@ function Add-VellumPdfTable {
         -Row @(,@('Cell1','Cell2')). A flat array like -Row @('a','b') is
         treated as two one-cell rows.
 
+        -MarginTop and -MarginBottom apply spacing above and below the table
+        without affecting the left/right margins already set on the element.
+
         Objects from Import-Csv (PSCustomObject) are rejected with a hint;
         convert them to value arrays first:
             $rows = Import-Csv data.csv |
@@ -72,7 +75,13 @@ function Add-VellumPdfTable {
         [double]$FontSize,
 
         [ValidateSet('Left', 'Center', 'Right', 'Justify')]
-        [string]$Alignment = 'Left'
+        [string]$Alignment = 'Left',
+
+        [ValidateRange(0, 10000)]
+        [double]$MarginTop,
+
+        [ValidateRange(0, 10000)]
+        [double]$MarginBottom
     )
 
     process {
@@ -141,6 +150,9 @@ function Add-VellumPdfTable {
                 [void]$tableRow.AddCell($cell)
             }
         }
+
+        Set-VellumPdfElementMargin -Element $table -Top $MarginTop -Bottom $MarginBottom `
+            -BoundParameters $PSBoundParameters
 
         [void]$Document.Add($table)
         $Document

@@ -21,14 +21,19 @@ function New-VellumTextStyle {
         [ValidateRange(0.0, 1.0)]
         [double[]]$Color,
 
-        [string]$LinkUri
+        [string]$LinkUri,
+
+        # Line leading (extra vertical space between lines), in points.
+        [ValidateRange(0, 1000)]
+        [double]$Leading
     )
 
-    $wantsColor = $PSBoundParameters.ContainsKey('Color')
-    $wantsLink  = $PSBoundParameters.ContainsKey('LinkUri') -and ($LinkUri -ne '')
+    $wantsColor   = $PSBoundParameters.ContainsKey('Color')
+    $wantsLink    = $PSBoundParameters.ContainsKey('LinkUri') -and ($LinkUri -ne '')
+    $wantsLeading = $PSBoundParameters.ContainsKey('Leading')
 
     if (-not $Font -and -not $PSBoundParameters.ContainsKey('FontSize') -and -not $FontHandle `
-            -and -not $wantsColor -and -not $wantsLink) {
+            -and -not $wantsColor -and -not $wantsLink -and -not $wantsLeading) {
         return $null
     }
 
@@ -48,6 +53,9 @@ function New-VellumTextStyle {
     }
     if ($wantsLink) {
         $style.LinkUri = $LinkUri
+    }
+    if ($wantsLeading) {
+        $style.Leading = $Leading
     }
     return $style
 }

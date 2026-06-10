@@ -18,6 +18,7 @@
         'New-VellumPdfTextRun'
         'Add-VellumPdfHeading'
         'Add-VellumPdfImage'
+        'Add-VellumPdfLineSeparator'
         'Add-VellumPdfList'
         'Add-VellumPdfParagraph'
         'Add-VellumPdfTable'

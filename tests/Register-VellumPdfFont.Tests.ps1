@@ -94,6 +94,28 @@ Describe 'Register-VellumPdfFont' {
             [System.IO.File]::ReadAllBytes($script:outPath)[0..4])
         $head | Should -Be '%PDF-'
     }
+
+    It 'accepts -FontBytes and returns an EmbeddedFontHandle' {
+        $bytes = [System.IO.File]::ReadAllBytes($script:fontPath)
+        $handle = Register-VellumPdfFont -Document $script:doc -FontBytes $bytes
+        $handle | Should -BeOfType 'VellumPdf.Fonts.EmbeddedFontHandle'
+    }
+
+    It 'produces a valid PDF when -FontBytes handle is used in a paragraph' {
+        $bytes = [System.IO.File]::ReadAllBytes($script:fontPath)
+        $handle = Register-VellumPdfFont -Document $script:doc -FontBytes $bytes
+
+        $script:doc |
+            Add-VellumPdfParagraph -Text 'Bytes-registered font paragraph.' -FontHandle $handle |
+            Save-VellumPdfDocument -Path $script:outPath
+
+        Test-Path $script:outPath | Should -BeTrue
+        (Get-Item $script:outPath).Length | Should -BeGreaterThan 0
+
+        $head = [System.Text.Encoding]::ASCII.GetString(
+            [System.IO.File]::ReadAllBytes($script:outPath)[0..4])
+        $head | Should -Be '%PDF-'
+    }
 }
 
 Describe 'New-VellumTextStyle with FontHandle (private helper)' {

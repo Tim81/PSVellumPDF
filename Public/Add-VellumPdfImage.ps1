@@ -14,6 +14,9 @@ function Add-VellumPdfImage {
         image horizontally on the page. -AltText supplies alternate text that aids
         tagged PDF and PDF-A accessibility readers.
 
+        -MarginTop and -MarginBottom apply spacing above and below the image
+        without affecting the left/right margins already set on the element.
+
         The document flows through the pipeline for chaining with other
         Add-VellumPdf* functions.
     .EXAMPLE
@@ -44,7 +47,13 @@ function Add-VellumPdfImage {
         [ValidateSet('Left', 'Center', 'Right', 'Justify')]
         [string]$Alignment = 'Left',
 
-        [string]$AltText
+        [string]$AltText,
+
+        [ValidateRange(0, 10000)]
+        [double]$MarginTop,
+
+        [ValidateRange(0, 10000)]
+        [double]$MarginBottom
     )
 
     process {
@@ -84,6 +93,9 @@ function Add-VellumPdfImage {
         if ($PSBoundParameters.ContainsKey('AltText')) {
             $layoutImage.AltText = $AltText
         }
+
+        Set-VellumPdfElementMargin -Element $layoutImage -Top $MarginTop -Bottom $MarginBottom `
+            -BoundParameters $PSBoundParameters
 
         [void]$Document.Add($layoutImage)
         $Document
