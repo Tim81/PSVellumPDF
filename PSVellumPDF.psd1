@@ -16,6 +16,7 @@
     FunctionsToExport = @(
         'New-VellumPdfDocument'
         'Add-VellumPdfHeading'
+        'Add-VellumPdfList'
         'Add-VellumPdfParagraph'
         'Add-VellumPdfTable'
         'Save-VellumPdfDocument'
