@@ -29,11 +29,13 @@ function Add-VellumPdfParagraph {
         [double]$FontSize,
 
         [ValidateSet('Left', 'Center', 'Right', 'Justify')]
-        [string]$Alignment = 'Left'
+        [string]$Alignment = 'Left',
+
+        [VellumPdf.Fonts.EmbeddedFontHandle]$FontHandle
     )
 
     process {
-        $wantsStyle = [bool]$Font -or $PSBoundParameters.ContainsKey('FontSize') -or $Alignment -ne 'Left'
+        $wantsStyle = [bool]$Font -or $PSBoundParameters.ContainsKey('FontSize') -or $Alignment -ne 'Left' -or $FontHandle
         if (-not $wantsStyle) {
             # No overrides: use the document's default font.
             [void]$Document.Add($Text, $null)
@@ -42,9 +44,14 @@ function Add-VellumPdfParagraph {
 
         # Building an explicit Paragraph requires a concrete style; fill any gaps
         # with the base-14 default so text always has a usable font and size.
-        $effFont = if ($Font) { $Font } else { 'Helvetica' }
-        $effSize = if ($PSBoundParameters.ContainsKey('FontSize')) { $FontSize } else { 11 }
-        $style = New-VellumTextStyle -Font $effFont -FontSize $effSize
+        $style = if ($FontHandle) {
+            $effSize = if ($PSBoundParameters.ContainsKey('FontSize')) { $FontSize } else { 11 }
+            New-VellumTextStyle -FontHandle $FontHandle -FontSize $effSize
+        } else {
+            $effFont = if ($Font) { $Font } else { 'Helvetica' }
+            $effSize = if ($PSBoundParameters.ContainsKey('FontSize')) { $FontSize } else { 11 }
+            New-VellumTextStyle -Font $effFont -FontSize $effSize
+        }
 
         $paragraph = [VellumPdf.Layout.Elements.Paragraph]::new($Text, $style)
         $paragraph.Alignment = [VellumPdf.Layout.Core.HorizontalAlignment]::$Alignment
