@@ -40,9 +40,16 @@ $publishDir = Join-Path $root 'dependencies' 'bin' 'publish'
 # feature cmdlets and their tests land (see issue #11).
 $script:CoverageTarget = 70
 
+# Pinned tool versions: CI installs exactly these, so a freshly published (or
+# tampered) PSGallery release cannot silently enter the build.
+$script:PSScriptAnalyzerVersion = '1.25.0'
+$script:PesterVersion = '5.7.1'
+
 function Invoke-Restore {
     Write-Host '==> Publishing VellumPdf dependencies...' -ForegroundColor Cyan
-    dotnet publish $depProj -c Release -o $publishDir | Out-Host
+    # RestoreLockedMode: fail if the resolved package graph deviates from the
+    # committed dependencies/packages.lock.json (supply-chain drift guard).
+    dotnet publish $depProj -c Release -o $publishDir '/p:RestoreLockedMode=true' | Out-Host
     if ($LASTEXITCODE -ne 0) { throw "dotnet publish failed ($LASTEXITCODE)." }
 
     if (Test-Path $libDir) { Remove-Item $libDir -Recurse -Force }
@@ -59,14 +66,24 @@ function Invoke-Restore {
 }
 
 function Invoke-Lint {
-    if (-not (Get-Module -ListAvailable PSScriptAnalyzer)) {
+    if (-not (Get-Module -ListAvailable PSScriptAnalyzer | Where-Object Version -ge $PSScriptAnalyzerVersion)) {
         Write-Host '==> Installing PSScriptAnalyzer...' -ForegroundColor Cyan
-        Install-Module PSScriptAnalyzer -Scope CurrentUser -Force -SkipPublisherCheck
+        Install-Module PSScriptAnalyzer -RequiredVersion $PSScriptAnalyzerVersion -Scope CurrentUser -Force
     }
-    Import-Module PSScriptAnalyzer
+    Import-Module PSScriptAnalyzer -MinimumVersion $PSScriptAnalyzerVersion
     Write-Host '==> Running PSScriptAnalyzer...' -ForegroundColor Cyan
     $settings = Join-Path $root 'PSScriptAnalyzerSettings.psd1'
-    $findings = Invoke-ScriptAnalyzer -Path $root -Recurse -Settings $settings
+
+    # Pass 1: module + test code under full rules (Write-Host IS flagged here).
+    $moduleTargets = @('Public', 'Private', 'tests', 'PSVellumPDF.psm1', 'PSVellumPDF.psd1') |
+        ForEach-Object { Join-Path $root $_ } | Where-Object { Test-Path $_ }
+    $findings = @($moduleTargets | ForEach-Object {
+            Invoke-ScriptAnalyzer -Path $_ -Recurse -Settings $settings
+        })
+
+    # Pass 2: build.ps1 alone - a dev tool allowed to write host progress.
+    $findings += @(Invoke-ScriptAnalyzer -Path $PSCommandPath -Settings $settings -ExcludeRule PSAvoidUsingWriteHost)
+
     if ($findings) {
         $findings | Format-Table Severity, RuleName, ScriptName, Line, Message -AutoSize | Out-Host
         throw "PSScriptAnalyzer reported $($findings.Count) issue(s)."
@@ -76,11 +93,14 @@ function Invoke-Lint {
 
 function Invoke-Test {
     if (-not (Test-Path $libDir)) { Invoke-Restore }
-    if (-not (Get-Module -ListAvailable Pester | Where-Object Version -ge '5.0')) {
+    if (-not (Get-Module -ListAvailable Pester | Where-Object Version -ge $PesterVersion)) {
         Write-Host '==> Installing Pester...' -ForegroundColor Cyan
-        Install-Module Pester -MinimumVersion 5.0 -Scope CurrentUser -Force -SkipPublisherCheck
+        # SkipPublisherCheck: Windows ships an inbox Pester 3.x signed by
+        # Microsoft; Pester 5 has a different publisher, which would otherwise
+        # block the side-by-side install. The exact version is pinned above.
+        Install-Module Pester -RequiredVersion $PesterVersion -Scope CurrentUser -Force -SkipPublisherCheck
     }
-    Import-Module Pester -MinimumVersion 5.0
+    Import-Module Pester -MinimumVersion $PesterVersion
 
     $resultsDir = Join-Path $root 'testResults'
     New-Item -ItemType Directory -Path $resultsDir -Force | Out-Null

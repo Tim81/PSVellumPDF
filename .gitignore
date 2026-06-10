@@ -9,6 +9,9 @@
 /testResults/
 *.user
 
+# Claude Code local configuration (machine-specific)
+.claude/
+
 # OS / editor cruft
 .DS_Store
 Thumbs.db

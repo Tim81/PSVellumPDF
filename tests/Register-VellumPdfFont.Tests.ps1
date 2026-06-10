@@ -15,6 +15,13 @@ AfterAll {
     Remove-Module PSVellumPDF -Force -ErrorAction SilentlyContinue
 }
 
+Describe 'Vendored font asset integrity' {
+    It 'DejaVuSans.ttf matches the recorded SHA-256 (tamper check)' {
+        $hash = (Get-FileHash $script:fontPath -Algorithm SHA256).Hash
+        $hash | Should -Be '7DA195A74C55BEF988D0D48F9508BD5D849425C1770DBA5D7BFC6CE9ED848954'
+    }
+}
+
 Describe 'Register-VellumPdfFont' {
     BeforeEach {
         $script:outPath = Join-Path $TestDrive "font-$([guid]::NewGuid()).pdf"

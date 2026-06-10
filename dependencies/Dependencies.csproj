@@ -13,10 +13,15 @@
     <!-- Keep the publish output flat and self-contained so lib/ holds plain DLLs. -->
     <CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies>
     <EnableDynamicLoading>true</EnableDynamicLoading>
+    <!-- Pin the full dependency closure. packages.lock.json is committed; CI
+         restores with RestoreLockedMode so transitive drift fails the build.
+         After bumping a PackageReference, regenerate the lock file with:
+           dotnet restore dependencies/Dependencies.csproj "/p:RestoreLockedMode=false" (add the force-evaluate flag) -->
+    <RestorePackagesWithLockFile>true</RestorePackagesWithLockFile>
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="VellumPdf.Layout" Version="1.0.0" />
+    <PackageReference Include="VellumPdf.Layout" Version="1.1.0" />
     <!-- VellumPdf.Kernel comes in transitively via VellumPdf.Layout. -->
     <!-- Uncomment to wrap digital signing (PAdES) cmdlets later:
     <PackageReference Include="VellumPdf.Signing" Version="1.0.0" /> -->

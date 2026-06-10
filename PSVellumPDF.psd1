@@ -40,7 +40,7 @@
             )
             LicenseUri   = 'https://www.apache.org/licenses/LICENSE-2.0'
             ProjectUri   = 'https://github.com/Tim81/PSVellumPDF'
-            ReleaseNotes = 'Initial scaffold: document creation, headings, paragraphs, save.'
+            ReleaseNotes = '0.1.0 (pre-release, VellumPdf 1.1.0): full layout wrapper - documents (page size, margins, conformance, language), headings with bookmarks, paragraphs (rich runs, colour, hyperlinks), tables, lists, images, embedded TrueType fonts, headers/footers with page numbering, document metadata, and encryption.'
         }
     }
 }

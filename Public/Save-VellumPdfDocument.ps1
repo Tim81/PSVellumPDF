@@ -31,18 +31,23 @@ function Save-VellumPdfDocument {
 
     process {
         $resolved = $ExecutionContext.SessionState.Path.GetUnresolvedProviderPathFromPSPath($Path)
-        $parent = [System.IO.Path]::GetDirectoryName($resolved)
-        if ($parent -and -not [System.IO.Directory]::Exists($parent)) {
-            throw "Save-VellumPdfDocument: directory not found: '$parent'. Create it first or pass a path in an existing directory."
-        }
-        if ($PSCmdlet.ShouldProcess($resolved, 'Save PDF')) {
-            try {
+        $attempted = $false
+        try {
+            $parent = [System.IO.Path]::GetDirectoryName($resolved)
+            if ($parent -and -not [System.IO.Directory]::Exists($parent)) {
+                $attempted = $true
+                throw "Save-VellumPdfDocument: directory not found: '$parent'. Create it first or pass a path in an existing directory."
+            }
+            if ($PSCmdlet.ShouldProcess($resolved, 'Save PDF')) {
+                $attempted = $true
                 $Document.Save($resolved)
                 Get-Item -LiteralPath $resolved
             }
-            finally {
-                if (-not $KeepOpen) { $Document.Dispose() }
-            }
+        }
+        finally {
+            # Dispose after any save attempt (success or failure), but leave the
+            # document open under -WhatIf, where no attempt was made.
+            if ($attempted -and -not $KeepOpen) { $Document.Dispose() }
         }
     }
 }

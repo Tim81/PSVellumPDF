@@ -1,0 +1,21 @@
+{
+  "version": 1,
+  "dependencies": {
+    "net10.0": {
+      "VellumPdf.Layout": {
+        "type": "Direct",
+        "requested": "[1.1.0, )",
+        "resolved": "1.1.0",
+        "contentHash": "uuMc83D5mFn++63WMLkSR2HZfhIAAHxXH77IZYd2vQt7Jj3EKLt+iywoaC3/LS4nn8YEa9dVVYRLQSO63qtWRw==",
+        "dependencies": {
+          "VellumPdf.Kernel": "1.1.0"
+        }
+      },
+      "VellumPdf.Kernel": {
+        "type": "Transitive",
+        "resolved": "1.1.0",
+        "contentHash": "llytjJE1eLQL98Us+5ZFXAd5AQ17O1OQCiNZFYXZnsPuL3VWqua8ZqoS7v9vfNha3fUIqdxx276zH5IOSXDfJg=="
+      }
+    }
+  }
+}

@@ -1,0 +1,13 @@
+version: 2
+updates:
+  # Keep SHA-pinned action references current.
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+
+  # VellumPdf and the locked dependency closure (dependencies/packages.lock.json).
+  - package-ecosystem: nuget
+    directory: /dependencies
+    schedule:
+      interval: weekly
