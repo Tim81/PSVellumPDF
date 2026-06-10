@@ -73,14 +73,23 @@ Wrappers call these real types (namespaces matter — they are not all `VellumPd
 | `New-VellumPdfDocument` | `VellumPdf.Layout.Document`, `.Conformance` (`VellumPdf.Document.PdfConformance`), `.PageSize` (`VellumPdf.Document.PageSize::A4` etc.), `.SetDefaultFont(TextStyle)` |
 | `Add-VellumPdfHeading` | `VellumPdf.Layout.Elements.Heading(text, style)`, `.Add(heading)` |
 | `Add-VellumPdfParagraph` | `VellumPdf.Layout.Elements.Paragraph(text, style)` or `.Add(text, style)` for the default font |
-| text styling | `VellumPdf.Layout.Core.TextStyle` (`.Font` = `VellumPdf.Fonts.Standard14::Helvetica` …, `.FontSize`) |
+| `Add-VellumPdfTable` | `VellumPdf.Layout.Elements.Table.TableElement` (`AddHeaderRow`/`AddRow`/`AddCell`/`SetColumnWidths`), `.Add(table)` |
+| `Add-VellumPdfList` | `VellumPdf.Layout.Elements.ListElement(ListStyle, items)`, `.Add(text, style)`, `.Add(list)` |
+| `Add-VellumPdfImage` | `VellumPdf.Images.*ImageLoader::Load(byte[])` (static) → `LayoutImage`, `.Add(image)` |
+| `Register-VellumPdfFont` | `Document.LoadTrueTypeFont(path)` → `EmbeddedFontHandle` |
+| text styling | `VellumPdf.Layout.Core.TextStyle` (`.Font` = `VellumPdf.Fonts.Standard14::Helvetica` …, `.FontSize`, or `.FontRef` = `FontReference(EmbeddedFontHandle)` for embedded fonts) |
 | alignment | `VellumPdf.Layout.Core.HorizontalAlignment` (Left/Center/Right/Justify) |
 
-VellumPdf's `Document` also supports tables (`TableElement`), lists (`ListElement`),
-images (`LayoutImage`), headers/footers (`SetHeader`/`SetFooter`), TrueType font
-embedding (`LoadTrueTypeFont`), and encryption — none are wrapped yet. The
-`VellumPdf.Signing` package (PAdES signatures) is referenced-but-commented in the
-`.csproj`.
+Still unwrapped: headers/footers (`SetHeader`/`SetFooter`), document metadata
+(`Document.Info`), rich multi-run text, outline/link annotations, and encryption
+(`Document.Encrypt`) — see the [road-to-1.0 epic](https://github.com/Tim81/PSVellumPDF/issues/16).
+The `VellumPdf.Signing` package (PAdES signatures) is referenced-but-commented in
+the `.csproj`.
+
+Embedded fonts: `Register-VellumPdfFont` returns an `EmbeddedFontHandle`; pass it
+to `Add-VellumPdfHeading`/`Add-VellumPdfParagraph` via `-FontHandle`. Required for
+Unicode text and PDF/A (the base-14 fonts can't be embedded). The test suite
+vendors `tests/assets/DejaVuSans.ttf` for this.
 
 ## Conventions for extending the module
 
