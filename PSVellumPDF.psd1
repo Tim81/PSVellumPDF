@@ -15,6 +15,7 @@
 
     FunctionsToExport = @(
         'New-VellumPdfDocument'
+        'New-VellumPdfTextRun'
         'Add-VellumPdfHeading'
         'Add-VellumPdfImage'
         'Add-VellumPdfList'
