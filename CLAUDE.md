@@ -116,13 +116,16 @@ vendors `tests/assets/DejaVuSans.ttf` for this.
 
 ## Roadmap
 
-The path to 1.0 is tracked in the epic
-[#16 "Roadmap to PSVellumPDF 1.0"](https://github.com/Tim81/PSVellumPDF/issues/16)
-(milestone `v1.0.0`): feature-parity wrappers (#1–#9 — tables, lists, images,
-TrueType fonts, headers/footers, metadata, rich text, outline/links, encryption)
-and release engineering (#10–#15 — PSScriptAnalyzer, Pester coverage, GitHub
-Actions CI, PSGallery publishing, docs, manifest hardening). Start with #4
-(TrueType embedding) — Unicode/PDF-A correctness underpins the rest.
+0.1.0 is published on the PowerShell Gallery (the original epic #16 is closed).
+The path to a production 1.0.0 is tracked in
+[#23 "Epic: Production 1.0.0"](https://github.com/Tim81/PSVellumPDF/issues/23)
+(milestone `v1.0.0-stable`): CI conformance validation with veraPDF/qpdf,
+Unicode data-loss warnings for base-14 fonts, remaining layout-API parity,
+stress testing, repo hygiene, and the rc1 → stable release ladder.
+
+User-visible changes belong in `CHANGELOG.md` (Unreleased section); releases
+move them under the version heading and feed the manifest ReleaseNotes. See
+`CONTRIBUTING.md` for the full workflow and module-specific rules.
 
 ## Repo-specific git conventions
 
