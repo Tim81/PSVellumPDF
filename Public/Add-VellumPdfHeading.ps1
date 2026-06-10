@@ -34,11 +34,18 @@ function Add-VellumPdfHeading {
         [ValidateSet('Left', 'Center', 'Right', 'Justify')]
         [string]$Alignment = 'Left',
 
-        [string]$BookmarkTitle
+        [string]$BookmarkTitle,
+
+        [VellumPdf.Fonts.EmbeddedFontHandle]$FontHandle
     )
 
     process {
-        $style = New-VellumTextStyle -Font $Font -FontSize $FontSize
+        $styleParams = if ($FontHandle) {
+            @{ FontHandle = $FontHandle; FontSize = $FontSize }
+        } else {
+            @{ Font = $Font; FontSize = $FontSize }
+        }
+        $style = New-VellumTextStyle @styleParams
         $heading = [VellumPdf.Layout.Elements.Heading]::new($Text, $style)
         $heading.Level = $Level
         $heading.Alignment = [VellumPdf.Layout.Core.HorizontalAlignment]::$Alignment

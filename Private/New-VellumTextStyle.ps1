@@ -13,15 +13,19 @@ function New-VellumTextStyle {
     [OutputType([VellumPdf.Layout.Core.TextStyle])]
     param(
         [string]$Font,
-        [double]$FontSize
+        [double]$FontSize,
+        [VellumPdf.Fonts.EmbeddedFontHandle]$FontHandle
     )
 
-    if (-not $Font -and -not $PSBoundParameters.ContainsKey('FontSize')) {
+    if (-not $Font -and -not $PSBoundParameters.ContainsKey('FontSize') -and -not $FontHandle) {
         return $null
     }
 
     $style = [VellumPdf.Layout.Core.TextStyle]::new()
-    if ($Font) {
+    if ($FontHandle) {
+        # Embedded TrueType font wins; do NOT also set Standard14 Font.
+        $style.FontRef = [VellumPdf.Layout.Core.FontReference]::new($FontHandle)
+    } elseif ($Font) {
         # Standard14 exposes one static field per base-14 font (Helvetica, etc.).
         $style.Font = [VellumPdf.Fonts.Standard14]::$Font
     }
