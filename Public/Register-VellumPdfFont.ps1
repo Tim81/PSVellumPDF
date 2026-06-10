@@ -3,10 +3,14 @@ function Register-VellumPdfFont {
     .SYNOPSIS
         Registers a TrueType font file with a VellumPdf document for embedding.
     .DESCRIPTION
-        Loads a TrueType (.ttf) font file into the document and returns an
+        Loads a TrueType (.ttf) font into the document and returns an
         EmbeddedFontHandle. Pass the returned handle to the -FontHandle parameter
         of Add-VellumPdfHeading or Add-VellumPdfParagraph to use the embedded font
         instead of a Standard14 base-14 font.
+
+        Use the 'Path' parameter set (default) to load the font from a file path.
+        Use the 'Bytes' parameter set to supply raw font bytes directly (e.g. when
+        the font is already in memory or was read from a stream).
 
         NOTE: This cmdlet returns the EmbeddedFontHandle, NOT the document.
         TrueType font embedding is required for Unicode text and PDF/A conformance;
@@ -17,20 +21,30 @@ function Register-VellumPdfFont {
         $doc | Add-VellumPdfHeading -Text 'Unicode Heading' -FontHandle $handle |
                Add-VellumPdfParagraph -Text 'Body with embedded font.' -FontHandle $handle |
                Save-VellumPdfDocument -Path ./output.pdf
+    .EXAMPLE
+        $bytes = [System.IO.File]::ReadAllBytes('./DejaVuSans.ttf')
+        $handle = Register-VellumPdfFont -Document $doc -FontBytes $bytes
     .OUTPUTS
         VellumPdf.Fonts.EmbeddedFontHandle
     #>
-    [CmdletBinding()]
+    [CmdletBinding(DefaultParameterSetName = 'Path')]
     [OutputType([VellumPdf.Fonts.EmbeddedFontHandle])]
     param(
         [Parameter(Mandatory, ValueFromPipeline)]
         [VellumPdf.Layout.Document]$Document,
 
-        [Parameter(Mandatory, Position = 0)]
-        [string]$Path
+        [Parameter(Mandatory, Position = 0, ParameterSetName = 'Path')]
+        [string]$Path,
+
+        [Parameter(Mandatory, ParameterSetName = 'Bytes')]
+        [byte[]]$FontBytes
     )
 
     process {
+        if ($PSCmdlet.ParameterSetName -eq 'Bytes') {
+            return $Document.UseTrueTypeFont($FontBytes)
+        }
+
         $resolved = $ExecutionContext.SessionState.Path.GetUnresolvedProviderPathFromPSPath($Path)
         if (-not [System.IO.File]::Exists($resolved)) {
             throw "Register-VellumPdfFont: font file not found: '$resolved'. Verify the path and try again."

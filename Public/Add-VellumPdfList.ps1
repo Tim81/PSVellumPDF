@@ -7,9 +7,13 @@ function Add-VellumPdfList {
         string items and an optional list style (Unordered, OrderedDecimal,
         OrderedAlpha, OrderedRoman). An optional -Indent adjusts the left indent
         for the list. An optional -Font/-FontSize override applies a TextStyle to
-        every item; when omitted the document default font is used. The document
-        flows through the pipeline for chaining with other Add-VellumPdf*
-        functions.
+        every item; when omitted the document default font is used.
+
+        -MarginTop and -MarginBottom apply spacing above and below the list
+        without affecting the left/right margins already set on the element.
+
+        The document flows through the pipeline for chaining with other
+        Add-VellumPdf* functions.
     .EXAMPLE
         New-VellumPdfDocument |
             Add-VellumPdfList -Item 'Apples','Bananas','Cherries' |
@@ -41,7 +45,13 @@ function Add-VellumPdfList {
         [string]$Font,
 
         [ValidateRange(1, 1000)]
-        [double]$FontSize
+        [double]$FontSize,
+
+        [ValidateRange(0, 10000)]
+        [double]$MarginTop,
+
+        [ValidateRange(0, 10000)]
+        [double]$MarginBottom
     )
 
     process {
@@ -72,6 +82,9 @@ function Add-VellumPdfList {
         foreach ($text in $Item) {
             [void]$list.Add($text, $textStyle)
         }
+
+        Set-VellumPdfElementMargin -Element $list -Top $MarginTop -Bottom $MarginBottom `
+            -BoundParameters $PSBoundParameters
 
         [void]$Document.Add($list)
         $Document

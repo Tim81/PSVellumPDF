@@ -6,6 +6,9 @@ function Add-VellumPdfHeading {
         Wraps Document.Add(Heading). The document flows through the pipeline so
         Add-VellumPdf* calls can be chained. Headings with a BookmarkTitle (or any
         heading in a tagged document) become PDF outline/bookmark entries.
+
+        -MarginTop and -MarginBottom apply spacing above and below the heading
+        without affecting the left/right margins already set on the element.
     .EXAMPLE
         $doc | Add-VellumPdfHeading -Text 'Chapter 1' -Level 1 -FontSize 18
     .OUTPUTS
@@ -36,7 +39,13 @@ function Add-VellumPdfHeading {
 
         [string]$BookmarkTitle,
 
-        [VellumPdf.Fonts.EmbeddedFontHandle]$FontHandle
+        [VellumPdf.Fonts.EmbeddedFontHandle]$FontHandle,
+
+        [ValidateRange(0, 10000)]
+        [double]$MarginTop,
+
+        [ValidateRange(0, 10000)]
+        [double]$MarginBottom
     )
 
     process {
@@ -50,6 +59,9 @@ function Add-VellumPdfHeading {
         $heading.Level = $Level
         $heading.Alignment = [VellumPdf.Layout.Core.HorizontalAlignment]::$Alignment
         if ($BookmarkTitle) { $heading.BookmarkTitle = $BookmarkTitle }
+
+        Set-VellumPdfElementMargin -Element $heading -Top $MarginTop -Bottom $MarginBottom `
+            -BoundParameters $PSBoundParameters
 
         [void]$Document.Add($heading)
         $Document

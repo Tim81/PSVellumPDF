@@ -72,6 +72,13 @@ Describe 'New-VellumPdfTextRun' {
         $run.Style.Color.B | Should -Be 1.0
         $run.Style.LinkUri | Should -Be 'https://example.com'
     }
+
+    It 'sets Style.Leading when -Leading is supplied' {
+        $run = New-VellumPdfTextRun -Text 'Spaced' -Leading 14.0
+        $run | Should -BeOfType 'VellumPdf.Layout.Elements.TextRun'
+        $run.Style | Should -Not -BeNullOrEmpty
+        $run.Style.Leading | Should -Be 14.0
+    }
 }
 
 Describe 'Add-VellumPdfParagraph Runs parameter set' {
@@ -204,6 +211,19 @@ Describe 'Add-VellumPdfParagraph Text parameter set with Color and LinkUri' {
             Add-VellumPdfHeading -Text 'Rich Text Demo' -Level 1 |
             Add-VellumPdfParagraph -Run $run1, $run2 |
             Add-VellumPdfParagraph -Text 'Plain paragraph after runs.' |
+            Save-VellumPdfDocument -Path $script:outPath
+
+        Test-Path $script:outPath | Should -BeTrue
+        (Get-Item $script:outPath).Length | Should -BeGreaterThan 0
+
+        $head = [System.Text.Encoding]::ASCII.GetString(
+            [System.IO.File]::ReadAllBytes($script:outPath)[0..4])
+        $head | Should -Be '%PDF-'
+    }
+
+    It 'renders a -Leading paragraph to a valid PDF' {
+        $script:doc |
+            Add-VellumPdfParagraph -Text 'Double-spaced paragraph.' -Leading 24.0 |
             Save-VellumPdfDocument -Path $script:outPath
 
         Test-Path $script:outPath | Should -BeTrue

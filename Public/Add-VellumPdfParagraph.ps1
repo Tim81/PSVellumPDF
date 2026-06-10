@@ -11,6 +11,12 @@ function Add-VellumPdfParagraph {
         parameter set with the output of New-VellumPdfTextRun to compose a
         mixed-style paragraph (multiple fonts, colours, or hyperlinks in one
         paragraph).
+
+        -Leading (Text set only) sets the extra vertical spacing between lines,
+        in points.
+
+        -MarginTop and -MarginBottom apply spacing above and below the paragraph
+        without affecting the left/right margins already set on the element.
     .EXAMPLE
         $doc | Add-VellumPdfParagraph -Text 'The quick brown fox.' -Alignment Justify
     .EXAMPLE
@@ -53,13 +59,23 @@ function Add-VellumPdfParagraph {
         [Parameter(ParameterSetName = 'Text')]
         [string]$LinkUri,
 
+        [Parameter(ParameterSetName = 'Text')]
+        [ValidateRange(0, 1000)]
+        [double]$Leading,
+
         # --- Runs parameter set ---
         [Parameter(Mandatory, Position = 0, ParameterSetName = 'Runs')]
         [VellumPdf.Layout.Elements.TextRun[]]$Run,
 
         # --- Shared ---
         [ValidateSet('Left', 'Center', 'Right', 'Justify')]
-        [string]$Alignment = 'Left'
+        [string]$Alignment = 'Left',
+
+        [ValidateRange(0, 10000)]
+        [double]$MarginTop,
+
+        [ValidateRange(0, 10000)]
+        [double]$MarginBottom
     )
 
     process {
@@ -67,17 +83,22 @@ function Add-VellumPdfParagraph {
             $paragraph = [VellumPdf.Layout.Elements.Paragraph]::new(
                 [System.Collections.Generic.List[VellumPdf.Layout.Elements.TextRun]]$Run)
             $paragraph.Alignment = [VellumPdf.Layout.Core.HorizontalAlignment]::$Alignment
+            Set-VellumPdfElementMargin -Element $paragraph -Top $MarginTop -Bottom $MarginBottom `
+                -BoundParameters $PSBoundParameters
             [void]$Document.Add($paragraph)
             return $Document
         }
 
         # --- Text parameter set ---
-        $wantsColor = $PSBoundParameters.ContainsKey('Color')
-        $wantsLink  = $PSBoundParameters.ContainsKey('LinkUri') -and ($LinkUri -ne '')
-        $wantsFont  = [bool]$Font -or $PSBoundParameters.ContainsKey('FontSize') -or $FontHandle
-        $wantsStyle = $wantsFont -or $wantsColor -or $wantsLink
+        $wantsColor   = $PSBoundParameters.ContainsKey('Color')
+        $wantsLink    = $PSBoundParameters.ContainsKey('LinkUri') -and ($LinkUri -ne '')
+        $wantsLeading = $PSBoundParameters.ContainsKey('Leading')
+        $wantsFont    = [bool]$Font -or $PSBoundParameters.ContainsKey('FontSize') -or $FontHandle
+        $wantsStyle   = $wantsFont -or $wantsColor -or $wantsLink -or $wantsLeading
 
-        if (-not $wantsStyle -and $Alignment -eq 'Left') {
+        if (-not $wantsStyle -and $Alignment -eq 'Left' `
+                -and -not $PSBoundParameters.ContainsKey('MarginTop') `
+                -and -not $PSBoundParameters.ContainsKey('MarginBottom')) {
             # No overrides at all: use the document's default font.
             [void]$Document.Add($Text, $null)
             return $Document
@@ -88,21 +109,25 @@ function Add-VellumPdfParagraph {
         # default. Fill gaps from the stashed document defaults instead.
         $default = Resolve-VellumPdfDefault -Document $Document
         $effSize = if ($PSBoundParameters.ContainsKey('FontSize')) { $FontSize } else { $default.FontSize }
-        $style = if ($FontHandle) {
+        if ($FontHandle) {
             $sp = @{ FontHandle = $FontHandle; FontSize = $effSize }
-            if ($wantsColor) { $sp['Color'] = $Color }
-            if ($wantsLink)  { $sp['LinkUri'] = $LinkUri }
-            New-VellumTextStyle @sp
+            if ($wantsColor)   { $sp['Color']   = $Color }
+            if ($wantsLink)    { $sp['LinkUri'] = $LinkUri }
+            if ($wantsLeading) { $sp['Leading'] = $Leading }
+            $style = New-VellumTextStyle @sp
         } else {
             $effFont = if ($Font) { $Font } else { $default.Font }
             $sp = @{ Font = $effFont; FontSize = $effSize }
-            if ($wantsColor) { $sp['Color'] = $Color }
-            if ($wantsLink)  { $sp['LinkUri'] = $LinkUri }
-            New-VellumTextStyle @sp
+            if ($wantsColor)   { $sp['Color']   = $Color }
+            if ($wantsLink)    { $sp['LinkUri'] = $LinkUri }
+            if ($wantsLeading) { $sp['Leading'] = $Leading }
+            $style = New-VellumTextStyle @sp
         }
 
         $paragraph = [VellumPdf.Layout.Elements.Paragraph]::new($Text, $style)
         $paragraph.Alignment = [VellumPdf.Layout.Core.HorizontalAlignment]::$Alignment
+        Set-VellumPdfElementMargin -Element $paragraph -Top $MarginTop -Bottom $MarginBottom `
+            -BoundParameters $PSBoundParameters
         [void]$Document.Add($paragraph)
         $Document
     }

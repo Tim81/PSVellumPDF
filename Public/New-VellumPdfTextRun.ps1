@@ -14,6 +14,8 @@ function New-VellumPdfTextRun {
 
         -Color accepts three doubles (R, G, B) in the 0.0..1.0 range.
         -LinkUri makes the run a clickable external hyperlink in the PDF.
+        -Leading sets the extra vertical spacing between lines for this run, in
+        points. When omitted the document-level leading is used.
     .EXAMPLE
         $run1 = New-VellumPdfTextRun -Text 'Normal text '
         $run2 = New-VellumPdfTextRun -Text 'Red text ' -Color 1,0,0
@@ -44,7 +46,10 @@ function New-VellumPdfTextRun {
         [ValidateRange(0.0, 1.0)]
         [double[]]$Color,
 
-        [string]$LinkUri
+        [string]$LinkUri,
+
+        [ValidateRange(0, 1000)]
+        [double]$Leading
     )
 
     # Build a style forwarding only the parameters that were explicitly bound.
@@ -57,6 +62,7 @@ function New-VellumPdfTextRun {
     if ($PSBoundParameters.ContainsKey('FontHandle')) { $styleParams['FontHandle'] = $FontHandle }
     if ($PSBoundParameters.ContainsKey('Color'))      { $styleParams['Color']      = $Color }
     if ($PSBoundParameters.ContainsKey('LinkUri'))    { $styleParams['LinkUri']    = $LinkUri }
+    if ($PSBoundParameters.ContainsKey('Leading'))    { $styleParams['Leading']    = $Leading }
 
     $style = if ($styleParams.Count -gt 0) {
         New-VellumTextStyle @styleParams
