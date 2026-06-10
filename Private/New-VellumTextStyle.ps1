@@ -4,8 +4,9 @@ function New-VellumTextStyle {
         Builds a VellumPdf.Layout.Core.TextStyle from simple scalar parameters.
     .DESCRIPTION
         Internal helper shared by the public Add-* functions so that font, size,
-        and alignment handling stays in one place. Returns $null when no styling
-        was requested, letting callers fall back to the document's default font.
+        color, and alignment handling stays in one place. Returns $null when no
+        styling was requested, letting callers fall back to the document's default
+        font.
     #>
     [Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSUseShouldProcessForStateChangingFunctions', '',
         Justification = 'Returns a new in-memory TextStyle object; performs no external/system state change.')]
@@ -14,10 +15,20 @@ function New-VellumTextStyle {
     param(
         [string]$Font,
         [double]$FontSize,
-        [VellumPdf.Fonts.EmbeddedFontHandle]$FontHandle
+        [VellumPdf.Fonts.EmbeddedFontHandle]$FontHandle,
+
+        [ValidateCount(3, 3)]
+        [ValidateRange(0.0, 1.0)]
+        [double[]]$Color,
+
+        [string]$LinkUri
     )
 
-    if (-not $Font -and -not $PSBoundParameters.ContainsKey('FontSize') -and -not $FontHandle) {
+    $wantsColor = $PSBoundParameters.ContainsKey('Color')
+    $wantsLink  = $PSBoundParameters.ContainsKey('LinkUri') -and ($LinkUri -ne '')
+
+    if (-not $Font -and -not $PSBoundParameters.ContainsKey('FontSize') -and -not $FontHandle `
+            -and -not $wantsColor -and -not $wantsLink) {
         return $null
     }
 
@@ -31,6 +42,12 @@ function New-VellumTextStyle {
     }
     if ($PSBoundParameters.ContainsKey('FontSize')) {
         $style.FontSize = $FontSize
+    }
+    if ($wantsColor) {
+        $style.Color = [VellumPdf.Layout.Core.ColorRgb]::new($Color[0], $Color[1], $Color[2])
+    }
+    if ($wantsLink) {
+        $style.LinkUri = $LinkUri
     }
     return $style
 }
