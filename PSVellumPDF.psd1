@@ -17,6 +17,7 @@
         'New-VellumPdfDocument'
         'Add-VellumPdfHeading'
         'Add-VellumPdfParagraph'
+        'Add-VellumPdfTable'
         'Save-VellumPdfDocument'
     )
     CmdletsToExport   = @()
