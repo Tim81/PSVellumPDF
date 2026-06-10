@@ -8,11 +8,21 @@ function New-VellumPdfDocument {
 
         The document is IDisposable. If you do not call Save-VellumPdfDocument,
         dispose it yourself with $doc.Dispose().
+
+        Page margins can be set uniformly with -Margin, or per-side with
+        -MarginTop, -MarginRight, -MarginBottom, -MarginLeft.  When any per-side
+        parameter is supplied, the uniform -Margin value (if given) is used as
+        the baseline for the unspecified sides; otherwise the library defaults
+        are kept for unspecified sides.
     .EXAMPLE
         New-VellumPdfDocument -Conformance PdfA2b |
             Add-VellumPdfHeading -Text 'Report' |
             Add-VellumPdfParagraph -Text 'Body text.' |
             Save-VellumPdfDocument -Path ./report.pdf
+    .EXAMPLE
+        New-VellumPdfDocument -Margin 30
+    .EXAMPLE
+        New-VellumPdfDocument -Margin 30 -MarginLeft 50
     .OUTPUTS
         VellumPdf.Layout.Document
     #>
@@ -35,7 +45,22 @@ function New-VellumPdfDocument {
         [ValidateRange(1, 1000)]
         [double]$DefaultFontSize = 11,
 
-        [switch]$Tagged
+        [switch]$Tagged,
+
+        [ValidateRange(0, 10000)]
+        [double]$Margin,
+
+        [ValidateRange(0, 10000)]
+        [double]$MarginTop,
+
+        [ValidateRange(0, 10000)]
+        [double]$MarginRight,
+
+        [ValidateRange(0, 10000)]
+        [double]$MarginBottom,
+
+        [ValidateRange(0, 10000)]
+        [double]$MarginLeft
     )
 
     $doc = [VellumPdf.Layout.Document]::new()
@@ -45,6 +70,29 @@ function New-VellumPdfDocument {
 
     $style = New-VellumTextStyle -Font $DefaultFont -FontSize $DefaultFontSize
     [void]$doc.SetDefaultFont($style)
+
+    $hasUniform = $PSBoundParameters.ContainsKey('Margin')
+    $hasPerSide = $PSBoundParameters.ContainsKey('MarginTop') -or
+                  $PSBoundParameters.ContainsKey('MarginRight') -or
+                  $PSBoundParameters.ContainsKey('MarginBottom') -or
+                  $PSBoundParameters.ContainsKey('MarginLeft')
+
+    if ($hasPerSide) {
+        # Start from -Margin uniform value if given, else from current document margins.
+        $baseTop    = if ($hasUniform) { $Margin } else { $doc.Margins.Top }
+        $baseRight  = if ($hasUniform) { $Margin } else { $doc.Margins.Right }
+        $baseBottom = if ($hasUniform) { $Margin } else { $doc.Margins.Bottom }
+        $baseLeft   = if ($hasUniform) { $Margin } else { $doc.Margins.Left }
+
+        $top    = if ($PSBoundParameters.ContainsKey('MarginTop'))    { $MarginTop }    else { $baseTop }
+        $right  = if ($PSBoundParameters.ContainsKey('MarginRight'))  { $MarginRight }  else { $baseRight }
+        $bottom = if ($PSBoundParameters.ContainsKey('MarginBottom')) { $MarginBottom } else { $baseBottom }
+        $left   = if ($PSBoundParameters.ContainsKey('MarginLeft'))   { $MarginLeft }   else { $baseLeft }
+
+        $doc.Margins = [VellumPdf.Layout.Core.EdgeInsets]::new($top, $right, $bottom, $left)
+    } elseif ($hasUniform) {
+        $doc.Margins = [VellumPdf.Layout.Core.EdgeInsets]::new($Margin)
+    }
 
     return $doc
 }

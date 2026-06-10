@@ -22,6 +22,9 @@
         'Add-VellumPdfTable'
         'Register-VellumPdfFont'
         'Save-VellumPdfDocument'
+        'Set-VellumPdfHeader'
+        'Set-VellumPdfFooter'
+        'Set-VellumPdfDocumentInfo'
     )
     CmdletsToExport   = @()
     VariablesToExport = @()
