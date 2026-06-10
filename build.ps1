@@ -15,7 +15,9 @@
     Lint     - run PSScriptAnalyzer with PSScriptAnalyzerSettings.psd1 (fails on any finding).
     Test     - Restore (if lib is missing) then run Pester with code coverage (fails below target).
     Docs     - regenerate docs/ markdown reference from comment-based help (PlatyPS).
-    Clean    - remove ./lib and dependencies build output.
+    Stage    - assemble the publishable module layout in out/PSVellumPDF
+               (manifest, psm1, Public/, Private/, lib/, LICENSE - no dev files).
+    Clean    - remove ./lib, ./out, and dependencies build output.
 
 .EXAMPLE
     ./build.ps1 Restore
@@ -25,7 +27,7 @@
 #>
 [CmdletBinding()]
 param(
-    [ValidateSet('Restore', 'Lint', 'Test', 'Docs', 'Clean')]
+    [ValidateSet('Restore', 'Lint', 'Test', 'Docs', 'Stage', 'Clean')]
     [string]$Task = 'Restore'
 )
 
@@ -177,8 +179,32 @@ function Invoke-DocBuild {
     Write-Host "==> Docs written to $docsDir" -ForegroundColor Green
 }
 
+function Invoke-Stage {
+    if (-not (Test-Path $libDir)) { Invoke-Restore }
+
+    $stageDir = Join-Path $root 'out' 'PSVellumPDF'
+    if (Test-Path (Join-Path $root 'out')) { Remove-Item (Join-Path $root 'out') -Recurse -Force }
+    New-Item -ItemType Directory -Path $stageDir | Out-Null
+
+    Write-Host '==> Staging publishable module layout...' -ForegroundColor Cyan
+    # Only what the module needs at runtime; Publish-PSResource packs the whole
+    # folder, so dev files (tests, build, dependencies, docs) must not be here.
+    Copy-Item (Join-Path $root 'PSVellumPDF.psd1') $stageDir
+    Copy-Item (Join-Path $root 'PSVellumPDF.psm1') $stageDir
+    Copy-Item (Join-Path $root 'Public') $stageDir -Recurse
+    Copy-Item (Join-Path $root 'Private') $stageDir -Recurse
+    Copy-Item $libDir (Join-Path $stageDir 'lib') -Recurse
+    Copy-Item (Join-Path $root 'LICENSE') $stageDir
+
+    $manifest = Test-ModuleManifest (Join-Path $stageDir 'PSVellumPDF.psd1') -ErrorAction Stop
+    Write-Host "==> Staged $($manifest.Name) $($manifest.Version) -> $stageDir" -ForegroundColor Green
+    Get-ChildItem $stageDir -Recurse -File | ForEach-Object {
+        Write-Host "    $($_.FullName.Substring($stageDir.Length + 1))"
+    }
+}
+
 function Invoke-Clean {
-    foreach ($p in @($libDir, (Join-Path $root 'dependencies' 'bin'), (Join-Path $root 'dependencies' 'obj'))) {
+    foreach ($p in @($libDir, (Join-Path $root 'out'), (Join-Path $root 'dependencies' 'bin'), (Join-Path $root 'dependencies' 'obj'))) {
         if (Test-Path $p) { Remove-Item $p -Recurse -Force; Write-Host "Removed $p" }
     }
 }
@@ -188,5 +214,6 @@ switch ($Task) {
     'Lint'    { Invoke-Lint }
     'Test'    { Invoke-Test }
     'Docs'    { Invoke-DocBuild }
+    'Stage'   { Invoke-Stage }
     'Clean'   { Invoke-Clean }
 }
