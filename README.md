@@ -1,6 +1,7 @@
 # PSVellumPDF
 
 [![CI](https://github.com/Tim81/PSVellumPDF/actions/workflows/ci.yml/badge.svg)](https://github.com/Tim81/PSVellumPDF/actions/workflows/ci.yml)
+[![PowerShell Gallery](https://img.shields.io/powershellgallery/v/PSVellumPDF)](https://www.powershellgallery.com/packages/PSVellumPDF)
 
 PowerShell module for generating PDFs with the
 [VellumPdf](https://github.com/Tim81/VellumPDF) .NET 10 library — a modern,
@@ -18,7 +19,15 @@ zero-dependency PDF engine with PDF/A archival support.
 - **PowerShell 7.6+** (runs on .NET 10)
 - **.NET 10 SDK** — needed only to restore the VellumPdf assemblies
 
-## Getting started
+## Install
+
+From the [PowerShell Gallery](https://www.powershellgallery.com/packages/PSVellumPDF):
+
+```powershell
+Install-PSResource PSVellumPDF
+```
+
+### From source
 
 ```powershell
 git clone https://github.com/Tim81/PSVellumPDF
