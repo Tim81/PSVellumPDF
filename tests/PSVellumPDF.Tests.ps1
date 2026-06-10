@@ -57,6 +57,27 @@ Describe 'PDF generation pipeline' {
         (Get-Item $script:outPath).Length | Should -BeGreaterThan 0
     }
 
+    It 'renders an alignment-only paragraph with the document default font' {
+        # Regression: alignment-only used to force Helvetica 11, overriding the default.
+        New-VellumPdfDocument -DefaultFont TimesRoman -DefaultFontSize 12 |
+            Add-VellumPdfParagraph -Text 'Centered, default typeface.' -Alignment Center |
+            Save-VellumPdfDocument -Path $script:outPath
+
+        (Get-Item $script:outPath).Length | Should -BeGreaterThan 0
+        $head = [System.Text.Encoding]::ASCII.GetString(
+            [System.IO.File]::ReadAllBytes($script:outPath)[0..4])
+        $head | Should -Be '%PDF-'
+    }
+
+    It 'throws an actionable error when the target directory does not exist' {
+        $doc = New-VellumPdfDocument | Add-VellumPdfParagraph -Text 'x'
+        try {
+            { $doc | Save-VellumPdfDocument -Path (Join-Path $TestDrive 'missing-dir' 'out.pdf') } |
+                Should -Throw '*directory not found*'
+        }
+        finally { $doc.Dispose() }
+    }
+
     It 'keeps the document open with -KeepOpen' {
         $doc = New-VellumPdfDocument | Add-VellumPdfParagraph -Text 'Reusable.'
         $doc | Save-VellumPdfDocument -Path $script:outPath -KeepOpen

@@ -4,13 +4,17 @@ function Save-VellumPdfDocument {
         Writes a VellumPdf document to a .pdf file and disposes it.
     .DESCRIPTION
         Wraps Document.Save(path). The document is IDisposable; this function
-        disposes it after a successful save (the terminal step of a build
-        pipeline). Use -PassThru to keep the document alive for further edits,
-        in which case you are responsible for disposing it.
+        disposes it after the save attempt (success or failure) because saving is
+        the terminal step of a build pipeline. Use -KeepOpen to keep the document
+        alive for further edits, in which case you are responsible for calling
+        $doc.Dispose() yourself. With -WhatIf nothing is saved and the document
+        is left open.
+
+        An existing file at -Path is overwritten.
     .EXAMPLE
         $doc | Save-VellumPdfDocument -Path ./out.pdf
     .OUTPUTS
-        System.IO.FileInfo (only with -PassThru's sibling behavior off); none by default.
+        System.IO.FileInfo for the written file.
     #>
     [CmdletBinding(SupportsShouldProcess)]
     [OutputType([System.IO.FileInfo])]
@@ -27,6 +31,10 @@ function Save-VellumPdfDocument {
 
     process {
         $resolved = $ExecutionContext.SessionState.Path.GetUnresolvedProviderPathFromPSPath($Path)
+        $parent = [System.IO.Path]::GetDirectoryName($resolved)
+        if ($parent -and -not [System.IO.Directory]::Exists($parent)) {
+            throw "Save-VellumPdfDocument: directory not found: '$parent'. Create it first or pass a path in an existing directory."
+        }
         if ($PSCmdlet.ShouldProcess($resolved, 'Save PDF')) {
             try {
                 $Document.Save($resolved)

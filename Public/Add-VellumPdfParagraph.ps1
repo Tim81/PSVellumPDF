@@ -35,22 +35,24 @@ function Add-VellumPdfParagraph {
     )
 
     process {
-        $wantsStyle = [bool]$Font -or $PSBoundParameters.ContainsKey('FontSize') -or $Alignment -ne 'Left' -or $FontHandle
-        if (-not $wantsStyle) {
-            # No overrides: use the document's default font.
+        $wantsFont = [bool]$Font -or $PSBoundParameters.ContainsKey('FontSize') -or $FontHandle
+        if (-not $wantsFont -and $Alignment -eq 'Left') {
+            # No overrides at all: use the document's default font.
             [void]$Document.Add($Text, $null)
             return $Document
         }
 
-        # Building an explicit Paragraph requires a concrete style; fill any gaps
-        # with the base-14 default so text always has a usable font and size.
+        # A $null style makes the paragraph render with the document's default
+        # font, so alignment-only paragraphs do not silently switch typeface.
         $style = if ($FontHandle) {
             $effSize = if ($PSBoundParameters.ContainsKey('FontSize')) { $FontSize } else { 11 }
             New-VellumTextStyle -FontHandle $FontHandle -FontSize $effSize
-        } else {
+        } elseif ($wantsFont) {
             $effFont = if ($Font) { $Font } else { 'Helvetica' }
             $effSize = if ($PSBoundParameters.ContainsKey('FontSize')) { $FontSize } else { 11 }
             New-VellumTextStyle -Font $effFont -FontSize $effSize
+        } else {
+            $null
         }
 
         $paragraph = [VellumPdf.Layout.Elements.Paragraph]::new($Text, $style)

@@ -99,6 +99,26 @@ Describe 'Add-VellumPdfTable' {
         $head | Should -Be '%PDF-'
     }
 
+    It 'rejects out-of-range colour components' {
+        $doc = New-VellumPdfDocument
+        try {
+            { $doc | Add-VellumPdfTable -Row @(,@('a')) -BorderColor @(2.5, 0, 0) } |
+                Should -Throw
+        }
+        finally { $doc.Dispose() }
+    }
+
+    It 'builds a single-row table with the unary comma syntax' {
+        New-VellumPdfDocument |
+            Add-VellumPdfTable -Row @(,@('OnlyRowCell1', 'OnlyRowCell2')) |
+            Save-VellumPdfDocument -Path $script:outPath
+
+        (Get-Item $script:outPath).Length | Should -BeGreaterThan 0
+        $head = [System.Text.Encoding]::ASCII.GetString(
+            [System.IO.File]::ReadAllBytes($script:outPath)[0..4])
+        $head | Should -Be '%PDF-'
+    }
+
     It 'returns the document for pipeline chaining (passthrough)' {
         $rows = @([object[]]@('X', 'Y'))
         $doc = New-VellumPdfDocument | Add-VellumPdfTable -Row $rows
