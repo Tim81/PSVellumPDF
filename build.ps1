@@ -14,6 +14,7 @@
     Restore  - publish dependencies/Dependencies.csproj and copy the assemblies to ./lib.
     Lint     - run PSScriptAnalyzer with PSScriptAnalyzerSettings.psd1 (fails on any finding).
     Test     - Restore (if lib is missing) then run Pester with code coverage (fails below target).
+    Docs     - regenerate docs/ markdown reference from comment-based help (PlatyPS).
     Clean    - remove ./lib and dependencies build output.
 
 .EXAMPLE
@@ -24,7 +25,7 @@
 #>
 [CmdletBinding()]
 param(
-    [ValidateSet('Restore', 'Lint', 'Test', 'Clean')]
+    [ValidateSet('Restore', 'Lint', 'Test', 'Docs', 'Clean')]
     [string]$Task = 'Restore'
 )
 
@@ -84,6 +85,14 @@ function Invoke-Lint {
     # Pass 2: build.ps1 alone - a dev tool allowed to write host progress.
     $findings += @(Invoke-ScriptAnalyzer -Path $PSCommandPath -Settings $settings -ExcludeRule PSAvoidUsingWriteHost)
 
+    # Pass 3: examples - documentation scripts; the encryption demo hard-codes
+    # a sample password on purpose (with an inline warning not to).
+    $examplesDir = Join-Path $root 'examples'
+    if (Test-Path $examplesDir) {
+        $findings += @(Invoke-ScriptAnalyzer -Path $examplesDir -Recurse -Settings $settings `
+                -ExcludeRule PSAvoidUsingConvertToSecureStringWithPlainText)
+    }
+
     if ($findings) {
         $findings | Format-Table Severity, RuleName, ScriptName, Line, Message -AutoSize | Out-Host
         throw "PSScriptAnalyzer reported $($findings.Count) issue(s)."
@@ -136,6 +145,38 @@ function Invoke-Test {
     }
 }
 
+function Invoke-DocBuild {
+    if (-not (Test-Path $libDir)) { Invoke-Restore }
+    if (-not (Get-Module -ListAvailable Microsoft.PowerShell.PlatyPS)) {
+        Write-Host '==> Installing Microsoft.PowerShell.PlatyPS...' -ForegroundColor Cyan
+        Install-Module Microsoft.PowerShell.PlatyPS -Scope CurrentUser -Force
+    }
+    Import-Module Microsoft.PowerShell.PlatyPS
+    Import-Module (Join-Path $root 'PSVellumPDF.psd1') -Force
+
+    $docsDir = Join-Path $root 'docs'
+    if (Test-Path $docsDir) { Remove-Item $docsDir -Recurse -Force }
+
+    Write-Host '==> Generating markdown command help...' -ForegroundColor Cyan
+    $module = Get-Module PSVellumPDF
+    # PlatyPS 1.0.1 trips over this script's StrictMode in its internal
+    # help-object property probing; disable it for the generation scope only.
+    & {
+        Set-StrictMode -Off
+        New-MarkdownCommandHelp -ModuleInfo $module -OutputFolder $docsDir `
+            -HelpVersion $module.Version.ToString() | Out-Null
+    }
+
+    # Post-process generator artifacts: machine locale and template placeholders.
+    foreach ($md in Get-ChildItem $docsDir -Recurse -Filter '*.md') {
+        $text = Get-Content $md.FullName -Raw
+        $text = $text -replace 'Locale: [a-z]{2}-[A-Z]{2}', 'Locale: en-US'
+        $text = $text -replace '(?s)## ALIASES\r?\n.*?\{\{Insert list of aliases\}\}\r?\n\r?\n', ''
+        Set-Content -Path $md.FullName -Value $text -NoNewline
+    }
+    Write-Host "==> Docs written to $docsDir" -ForegroundColor Green
+}
+
 function Invoke-Clean {
     foreach ($p in @($libDir, (Join-Path $root 'dependencies' 'bin'), (Join-Path $root 'dependencies' 'obj'))) {
         if (Test-Path $p) { Remove-Item $p -Recurse -Force; Write-Host "Removed $p" }
@@ -146,5 +187,6 @@ switch ($Task) {
     'Restore' { Invoke-Restore }
     'Lint'    { Invoke-Lint }
     'Test'    { Invoke-Test }
+    'Docs'    { Invoke-DocBuild }
     'Clean'   { Invoke-Clean }
 }

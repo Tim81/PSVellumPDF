@@ -9,6 +9,9 @@
 /testResults/
 *.user
 
+# PDFs produced by the example scripts
+/examples/*.pdf
+
 # Claude Code local configuration (machine-specific)
 .claude/
 
