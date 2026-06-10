@@ -26,6 +26,7 @@
         'Set-VellumPdfHeader'
         'Set-VellumPdfFooter'
         'Set-VellumPdfDocumentInfo'
+        'Protect-VellumPdfDocument'
     )
     CmdletsToExport   = @()
     VariablesToExport = @()
