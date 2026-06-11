@@ -35,6 +35,7 @@ function Set-VellumPdfDocumentInfo {
     )
 
     process {
+        Assert-VellumPdfDocumentOpen -Document $Document -CommandName 'Set-VellumPdfDocumentInfo'
         if ($PSBoundParameters.ContainsKey('Title'))    { $Document.Info.Title    = $Title }
         if ($PSBoundParameters.ContainsKey('Author'))   { $Document.Info.Author   = $Author }
         if ($PSBoundParameters.ContainsKey('Subject'))  { $Document.Info.Subject  = $Subject }

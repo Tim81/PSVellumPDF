@@ -5,10 +5,16 @@ function Save-VellumPdfDocument {
     .DESCRIPTION
         Wraps Document.Save(path). The document is IDisposable; this function
         disposes it after the save attempt (success or failure) because saving is
-        the terminal step of a build pipeline. Use -KeepOpen to keep the document
-        alive for further edits, in which case you are responsible for calling
-        $doc.Dispose() yourself. With -WhatIf nothing is saved and the document
-        is left open.
+        the terminal step of a build pipeline, and marks it so later cmdlet calls
+        against the stale document fail with a clear error. Use -KeepOpen to keep
+        the document alive for further edits, in which case you are responsible
+        for calling $doc.Dispose() yourself. With -WhatIf nothing is saved and the
+        document is left open.
+
+        If the pipeline is aborted BEFORE this cmdlet runs (for example by an
+        error in an earlier Add-VellumPdf* call, or -WarningAction Stop turning
+        the encoding warning into a terminating error), the document is never
+        saved or disposed - dispose it yourself in your catch block.
 
         An existing file at -Path is overwritten.
     .EXAMPLE
@@ -30,6 +36,8 @@ function Save-VellumPdfDocument {
     )
 
     process {
+        Assert-VellumPdfDocumentOpen -Document $Document -CommandName 'Save-VellumPdfDocument'
+
         $resolved = $ExecutionContext.SessionState.Path.GetUnresolvedProviderPathFromPSPath($Path)
         $attempted = $false
         try {
@@ -40,14 +48,31 @@ function Save-VellumPdfDocument {
             }
             if ($PSCmdlet.ShouldProcess($resolved, 'Save PDF')) {
                 $attempted = $true
-                $Document.Save($resolved)
+                try {
+                    $Document.Save($resolved)
+                }
+                catch {
+                    # Surface layout/render failures with actionable context
+                    # instead of a bare library exception.
+                    $reason = $_.Exception.Message
+                    if ($_.Exception.InnerException) { $reason = $_.Exception.InnerException.Message }
+                    throw ("Save-VellumPdfDocument: failed to render '$resolved': $reason " +
+                        'Check for extreme margin values or elements taller than the page.')
+                }
                 Get-Item -LiteralPath $resolved
             }
         }
         finally {
             # Dispose after any save attempt (success or failure), but leave the
-            # document open under -WhatIf, where no attempt was made.
-            if ($attempted -and -not $KeepOpen) { $Document.Dispose() }
+            # document open under -WhatIf, where no attempt was made. The stamp
+            # lets the other cmdlets reject stale use of this document (VellumPdf
+            # itself accepts Add() on a disposed document without complaint).
+            if ($attempted -and -not $KeepOpen) {
+                $Document.Dispose()
+                if (-not $Document.PSObject.Properties['PSVellumDisposed']) {
+                    $Document.PSObject.Properties.Add([psnoteproperty]::new('PSVellumDisposed', $true))
+                }
+            }
         }
     }
 }

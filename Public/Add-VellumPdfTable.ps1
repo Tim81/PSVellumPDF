@@ -53,6 +53,7 @@ function Add-VellumPdfTable {
         [Parameter(Mandatory)]
         [object[][]]$Row,
 
+        [ValidateRange(0.01, 100000)]
         [double[]]$ColumnWidth,
 
         [ValidateRange(0, 100)]
@@ -85,6 +86,8 @@ function Add-VellumPdfTable {
     )
 
     process {
+        Assert-VellumPdfDocumentOpen -Document $Document -CommandName 'Add-VellumPdfTable'
+
         # Objects from Import-Csv / Select-Object bind as one PSCustomObject per
         # row, which would stringify into a single mangled cell. Fail fast with
         # a conversion hint instead of producing a silently wrong table.
@@ -127,6 +130,12 @@ function Add-VellumPdfTable {
 
         # Apply column widths.
         if ($ColumnWidth) {
+            $columnCount = if ($Header) { $Header.Count } else { $Row[0].Count }
+            if ($ColumnWidth.Count -ne $columnCount) {
+                Write-Warning ("Add-VellumPdfTable: -ColumnWidth has $($ColumnWidth.Count) value(s) " +
+                    "but the table has $columnCount column(s); extra widths are ignored and " +
+                    'missing ones fall back to the library default.')
+            }
             [void]$table.SetColumnWidths($ColumnWidth)
         }
 

@@ -29,8 +29,18 @@ function New-VellumTextStyle {
     )
 
     $wantsColor   = $PSBoundParameters.ContainsKey('Color')
-    $wantsLink    = $PSBoundParameters.ContainsKey('LinkUri') -and ($LinkUri -ne '')
     $wantsLeading = $PSBoundParameters.ContainsKey('Leading')
+
+    # Link hygiene: whitespace-only URIs become no-link (a literal '/URI (   )'
+    # annotation otherwise lands in the PDF), and script-capable / local-file
+    # schemes are rejected outright - a javascript: URI in a generated document
+    # executes in readers that honour it (e.g. Acrobat).
+    $LinkUri = if ($PSBoundParameters.ContainsKey('LinkUri')) { $LinkUri.Trim() } else { '' }
+    $wantsLink = $LinkUri -ne ''
+    if ($wantsLink -and $LinkUri -match '^(?i)\s*(javascript|vbscript|data|file)\s*:') {
+        throw ("-LinkUri uses the blocked scheme '$($Matches[1])': javascript/vbscript/data/file " +
+            'URIs are not allowed in generated documents. Use http(s), mailto, or another safe scheme.')
+    }
 
     if (-not $Font -and -not $PSBoundParameters.ContainsKey('FontSize') -and -not $FontHandle `
             -and -not $wantsColor -and -not $wantsLink -and -not $wantsLeading) {

@@ -44,6 +44,7 @@ function Set-VellumPdfHeader {
     )
 
     process {
+        Assert-VellumPdfDocumentOpen -Document $Document -CommandName 'Set-VellumPdfHeader'
         Write-VellumPdfEncodingWarning -Text $Template -CommandName 'Set-VellumPdfHeader'
         $wantsFont = [bool]$Font -or $PSBoundParameters.ContainsKey('FontSize')
         $style = if ($wantsFont) {

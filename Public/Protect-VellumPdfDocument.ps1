@@ -89,6 +89,15 @@ function Protect-VellumPdfDocument {
     )
 
     process {
+        Assert-VellumPdfDocumentOpen -Document $Document -CommandName 'Protect-VellumPdfDocument'
+
+        # Applying encryption twice leaves an orphaned /Encrypt object in the
+        # output (the second settings win, the first linger unreferenced).
+        if ($Document.PSObject.Properties['PSVellumProtected']) {
+            throw ('Protect-VellumPdfDocument: this document is already protected. ' +
+                'Encryption can only be applied once per document.')
+        }
+
         # Require at least one password.
         if (-not $PSBoundParameters.ContainsKey('UserPassword') -and
             -not $PSBoundParameters.ContainsKey('OwnerPassword')) {
@@ -123,6 +132,7 @@ function Protect-VellumPdfDocument {
         }
 
         [void]$Document.Encrypt($settings)
+        $Document.PSObject.Properties.Add([psnoteproperty]::new('PSVellumProtected', $true))
         $Document
     }
 }

@@ -15,6 +15,11 @@ function Register-VellumPdfFont {
         NOTE: This cmdlet returns the EmbeddedFontHandle, NOT the document.
         TrueType font embedding is required for Unicode text and PDF/A conformance;
         the Standard14 base-14 fonts cannot be embedded.
+
+        A handle is only valid for the document it was registered on. Using it
+        with a different document would silently produce a PDF whose text cannot
+        render (the font resource is missing), so the content cmdlets reject
+        foreign handles with a clear error.
     .EXAMPLE
         $doc = New-VellumPdfDocument -Conformance PdfA2b
         $handle = Register-VellumPdfFont -Document $doc -Path ./DejaVuSans.ttf
@@ -41,15 +46,22 @@ function Register-VellumPdfFont {
     )
 
     process {
-        if ($PSCmdlet.ParameterSetName -eq 'Bytes') {
-            return $Document.UseTrueTypeFont($FontBytes)
+        Assert-VellumPdfDocumentOpen -Document $Document -CommandName 'Register-VellumPdfFont'
+
+        $handle = if ($PSCmdlet.ParameterSetName -eq 'Bytes') {
+            $Document.UseTrueTypeFont($FontBytes)
+        }
+        else {
+            $resolved = $ExecutionContext.SessionState.Path.GetUnresolvedProviderPathFromPSPath($Path)
+            if (-not [System.IO.File]::Exists($resolved)) {
+                throw "Register-VellumPdfFont: font file not found: '$resolved'. Verify the path and try again."
+            }
+            $Document.LoadTrueTypeFont($resolved)
         }
 
-        $resolved = $ExecutionContext.SessionState.Path.GetUnresolvedProviderPathFromPSPath($Path)
-        if (-not [System.IO.File]::Exists($resolved)) {
-            throw "Register-VellumPdfFont: font file not found: '$resolved'. Verify the path and try again."
-        }
-
-        $Document.LoadTrueTypeFont($resolved)
+        # Tag the handle with its owning document so the content cmdlets can
+        # reject cross-document use (which silently breaks font rendering).
+        $handle.PSObject.Properties.Add([psnoteproperty]::new('PSVellumOwner', $Document))
+        $handle
     }
 }

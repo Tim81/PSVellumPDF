@@ -25,14 +25,26 @@ function Write-VellumPdfEncodingWarning {
 
     foreach ($t in $Text) {
         if (-not $t) { continue }
-        foreach ($c in $t.ToCharArray()) {
-            if ([int]$c -gt 255) {
-                Write-Warning ("${CommandName}: text contains characters outside Latin-1 " +
-                    "(first: '$c', U+$(([int]$c).ToString('X4'))) that the base-14 PDF fonts " +
-                    'cannot encode; they will render mangled. Embed a TrueType font with ' +
-                    'Register-VellumPdfFont and pass its handle via -FontHandle.')
-                return
+        for ($i = 0; $i -lt $t.Length; $i++) {
+            $c = $t[$i]
+            if ([int]$c -le 255) { continue }
+
+            # Report the real codepoint for supplementary-plane characters
+            # (emoji etc.) instead of a bare UTF-16 surrogate half.
+            if ([char]::IsHighSurrogate($c) -and ($i + 1) -lt $t.Length -and [char]::IsLowSurrogate($t[$i + 1])) {
+                $codepoint = [char]::ConvertToUtf32($c, $t[$i + 1])
+                $display = [char]::ConvertFromUtf32($codepoint)
             }
+            else {
+                $codepoint = [int]$c
+                $display = [string]$c
+            }
+
+            Write-Warning ("${CommandName}: text contains characters outside Latin-1 " +
+                "(first: '$display', U+$($codepoint.ToString('X4'))) that the base-14 PDF fonts " +
+                'cannot encode; they will render mangled. Embed a TrueType font with ' +
+                'Register-VellumPdfFont and pass its handle via -FontHandle.')
+            return
         }
     }
 }
