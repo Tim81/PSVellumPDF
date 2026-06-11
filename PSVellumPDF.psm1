@@ -7,7 +7,7 @@ Set-StrictMode -Version Latest
 $script:ModuleRoot = $PSScriptRoot
 $script:LibPath = Join-Path $script:ModuleRoot 'lib'
 
-$requiredAssemblies = @('VellumPdf.Kernel.dll', 'VellumPdf.Layout.dll')
+$requiredAssemblies = @('VellumPdf.Kernel.dll', 'VellumPdf.Layout.dll', 'VellumPdf.Signing.dll')
 foreach ($name in $requiredAssemblies) {
     $dll = Join-Path $script:LibPath $name
     if (-not (Test-Path $dll)) {

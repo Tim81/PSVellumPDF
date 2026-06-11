@@ -3,7 +3,10 @@ function Save-VellumPdfDocument {
     .SYNOPSIS
         Writes a VellumPdf document to a .pdf file and disposes it.
     .DESCRIPTION
-        Wraps Document.Save(path). The document is IDisposable; this function
+        Wraps Document.Save(path) - or, when a signature has been staged with
+        Set-VellumPdfSignature, SigningExtensions.Sign(document, stream,
+        settings), which signs the document while writing it (PAdES).
+        The document is IDisposable; this function
         disposes it after the save attempt (success or failure) because saving is
         the terminal step of a build pipeline, and marks it so later cmdlet calls
         against the stale document fail with a clear error. Use -KeepOpen to keep
@@ -60,10 +63,26 @@ function Save-VellumPdfDocument {
                 $attempted = $true
                 throw "Save-VellumPdfDocument: directory not found: '$parent'. Create it first or pass a path in an existing directory."
             }
-            if ($PSCmdlet.ShouldProcess($resolved, 'Save PDF')) {
+            # A signature staged by Set-VellumPdfSignature makes signing the
+            # write step: VellumPdf signs at serialization time, so Sign()
+            # replaces Save().
+            $signature = $Document.PSObject.Properties['PSVellumSignature']
+            $action = if ($signature) { 'Save signed PDF' } else { 'Save PDF' }
+            if ($PSCmdlet.ShouldProcess($resolved, $action)) {
                 $attempted = $true
                 try {
-                    $Document.Save($resolved)
+                    if ($signature) {
+                        $stream = [System.IO.File]::Create($resolved)
+                        try {
+                            [VellumPdf.Signing.SigningExtensions]::Sign($Document, $stream, $signature.Value)
+                        }
+                        finally {
+                            $stream.Dispose()
+                        }
+                    }
+                    else {
+                        $Document.Save($resolved)
+                    }
                 }
                 catch {
                     # Surface layout/render failures with actionable context

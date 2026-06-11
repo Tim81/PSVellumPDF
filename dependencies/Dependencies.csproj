@@ -21,10 +21,9 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="VellumPdf.Layout" Version="1.1.0" />
+    <PackageReference Include="VellumPdf.Layout" Version="1.2.0" />
     <!-- VellumPdf.Kernel comes in transitively via VellumPdf.Layout. -->
-    <!-- Uncomment to wrap digital signing (PAdES) cmdlets later:
-    <PackageReference Include="VellumPdf.Signing" Version="1.0.0" /> -->
+    <PackageReference Include="VellumPdf.Signing" Version="1.2.0" />
   </ItemGroup>
 
 </Project>

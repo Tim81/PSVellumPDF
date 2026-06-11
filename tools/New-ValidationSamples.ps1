@@ -2,13 +2,15 @@
 .SYNOPSIS
     Generates sample PDFs for external conformance validation (qpdf, veraPDF).
 .DESCRIPTION
-    Produces three representative documents in -OutputPath:
-      plain.pdf      - multi-page mixed content (headings/bookmarks, table,
-                       list, image, hyperlink, header/footer page numbers)
-      pdfa2b.pdf     - PDF/A-2b with embedded TrueType font, metadata, /Lang
-      encrypted.pdf  - password-protected (user password: validate)
+    Produces four representative documents in -OutputPath:
+      plain.pdf         - multi-page mixed content (headings/bookmarks, table,
+                          list, image, hyperlink, header/footer page numbers)
+      pdfa2b.pdf        - PDF/A-2b with embedded TrueType font, metadata, /Lang
+      pdfa2b-signed.pdf - the same archival profile with a PAdES signature
+                          (in-memory self-signed certificate)
+      encrypted.pdf     - password-protected (user password: validate)
     CI runs `qpdf --check` against all of them and veraPDF (--flavour 2b)
-    against pdfa2b.pdf.
+    against pdfa2b.pdf and pdfa2b-signed.pdf.
 #>
 #requires -Version 7.6
 [CmdletBinding()]
@@ -59,6 +61,31 @@ $archive |
     Add-VellumPdfHeading -Text 'Archival Sample' -Level 1 -FontHandle $font |
     Add-VellumPdfParagraph -Text 'PDF/A-2b body text with an embedded TrueType font.' -FontHandle $font |
     Save-VellumPdfDocument -Path (Join-Path $OutputPath 'pdfa2b.pdf') | Out-Null
+
+# --- pdfa2b-signed.pdf: archival + PAdES signature ----------------------------
+$rsa = [System.Security.Cryptography.RSA]::Create(2048)
+try {
+    $req = [System.Security.Cryptography.X509Certificates.CertificateRequest]::new(
+        'CN=PSVellumPDF Validation', $rsa,
+        [System.Security.Cryptography.HashAlgorithmName]::SHA256,
+        [System.Security.Cryptography.RSASignaturePadding]::Pkcs1)
+    $cert = $req.CreateSelfSigned(
+        [DateTimeOffset]::UtcNow.AddDays(-1), [DateTimeOffset]::UtcNow.AddDays(7))
+
+    $signed = New-VellumPdfDocument -Conformance PdfA2b -Language 'en-US'
+    $signedFont = Register-VellumPdfFont -Document $signed -Path $ttf
+    $signed |
+        Set-VellumPdfDocumentInfo -Title 'Signed Archival Validation Sample' -Author 'PSVellumPDF CI' |
+        Add-VellumPdfHeading -Text 'Signed Archival Sample' -Level 1 -FontHandle $signedFont |
+        Add-VellumPdfParagraph -Text 'PDF/A-2b body signed with a PAdES baseline signature.' `
+            -FontHandle $signedFont |
+        Set-VellumPdfSignature -Certificate $cert -Reason 'CI validation' -Location 'GitHub Actions' |
+        Save-VellumPdfDocument -Path (Join-Path $OutputPath 'pdfa2b-signed.pdf') | Out-Null
+    $cert.Dispose()
+}
+finally {
+    $rsa.Dispose()
+}
 
 # --- encrypted.pdf ------------------------------------------------------------
 $pw = ConvertTo-SecureString 'validate' -AsPlainText -Force
