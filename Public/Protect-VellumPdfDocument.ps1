@@ -18,6 +18,10 @@ function Protect-VellumPdfDocument {
         The VellumPdf library also enforces this constraint at Save() time, so the
         fail-fast check here gives an earlier, more actionable message.
 
+        SIGNING CONSTRAINT: encryption and digital signatures cannot be combined
+        (the library rejects the pair at save time). This cmdlet throws if a
+        signature has been staged with Set-VellumPdfSignature, and vice versa.
+
         PASSWORDS: Both password parameters accept [securestring] to keep credentials
         out of command history and verbose output. Use Read-Host -AsSecureString for
         interactive entry, or ConvertTo-SecureString for scripts.
@@ -96,6 +100,13 @@ function Protect-VellumPdfDocument {
         if ($Document.PSObject.Properties['PSVellumProtected']) {
             throw ('Protect-VellumPdfDocument: this document is already protected. ' +
                 'Encryption can only be applied once per document.')
+        }
+
+        # The library rejects Encrypt() + Sign() at save time; fail fast here
+        # with the same constraint so the error points at the right cmdlet.
+        if ($Document.PSObject.Properties['PSVellumSignature']) {
+            throw ('Protect-VellumPdfDocument: encryption and digital signatures cannot be combined. ' +
+                'Remove the Set-VellumPdfSignature call to encrypt this document.')
         }
 
         # Require at least one password.

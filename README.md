@@ -7,13 +7,13 @@ PowerShell module for generating PDFs with the
 [VellumPdf](https://github.com/Tim81/VellumPDF) .NET 10 library — a modern,
 zero-dependency PDF engine with PDF/A archival support.
 
-> Status: **stable (1.0.0)**. The full VellumPdf layout API is wrapped:
+> Status: **stable (1.1.0)**. The full VellumPdf layout API is wrapped:
 > documents, headings, paragraphs (incl. mixed-style runs, colour, hyperlinks,
 > line spacing), tables, lists, images, line separators, embedded TrueType
-> fonts, headers/footers, metadata, margins, bookmarks, and encryption.
-> PDF/A-2b output is validated with veraPDF in CI on every push. See the
-> [CHANGELOG](CHANGELOG.md) for release history; digital signing (PAdES) is
-> planned for a future release.
+> fonts, headers/footers, metadata, margins, bookmarks, encryption, **PAdES
+> digital signing**, and custom PDF/A output intents. PDF/A-2b output (plain
+> and signed) is validated with veraPDF in CI on every push. See the
+> [CHANGELOG](CHANGELOG.md) for release history.
 
 ## Requirements
 
@@ -65,7 +65,9 @@ New-VellumPdfDocument -Conformance PdfA2b -PageSize A4 |
 | `Set-VellumPdfHeader` / `Set-VellumPdfFooter` | Running bands with `{page}`/`{pages}` tokens (`-Template`, `-Font`, `-FontSize`, `-Alignment`) |
 | `Set-VellumPdfDocumentInfo` | Document metadata (`-Title`, `-Author`, `-Subject`, `-Keywords`, `-Creator`, `-Producer`) |
 | `Protect-VellumPdfDocument` | Password protection (`-UserPassword`/`-OwnerPassword` as SecureString, `-Permission` flags, `-EncryptMetadata`) |
-| `Save-VellumPdfDocument` | Write the `.pdf` and dispose the document (`-Path`, `-KeepOpen`) |
+| `Set-VellumPdfSignature` | Stage a PAdES digital signature (`-Certificate` with private key, `-Reason`, `-Location`, `-ContactInfo`, `-SignerName`, `-SigningTime`); applied by `Save-VellumPdfDocument` |
+| `Set-VellumPdfOutputIntent` | Replace the default sRGB PDF/A output intent (`-IccProfilePath`/`-ComponentCount` or `-Cmyk`) |
+| `Save-VellumPdfDocument` | Write the `.pdf` — signing it if a signature is staged — and dispose the document (`-Path`, `-KeepOpen`) |
 
 `Add-VellumPdfHeading -BookmarkTitle`/`-Level` builds the PDF outline (bookmarks).
 Dangerous `-LinkUri` schemes (`javascript:`, `file:`, …) are rejected, and the
@@ -75,7 +77,7 @@ handles.
 `Get-Help <function> -Full` documents each one. A generated markdown reference
 lives in [docs/PSVellumPDF](docs/PSVellumPDF), and runnable demo scripts in
 [examples/](examples) (report with tables and page numbering, PDF/A archival
-with an embedded font, rich text + encryption).
+with an embedded font, rich text + encryption, digital signing).
 
 ### Embedded fonts (Unicode / PDF&#8203;/A)
 

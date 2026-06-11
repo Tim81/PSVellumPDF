@@ -47,6 +47,11 @@ PdfA2a) this cmdlet throws a clear terminating error before calling Encrypt().
 The VellumPdf library also enforces this constraint at Save() time, so the
 fail-fast check here gives an earlier, more actionable message.
 
+SIGNING CONSTRAINT: encryption and digital signatures cannot be combined
+(the library rejects the pair at save time).
+This cmdlet throws if a
+signature has been staged with Set-VellumPdfSignature, and vice versa.
+
 PASSWORDS: Both password parameters accept [securestring] to keep credentials
 out of command history and verbose output.
 Use Read-Host -AsSecureString for

@@ -26,7 +26,9 @@ Save-VellumPdfDocument [-Path] <string> -Document <Document> [-KeepOpen] [-WhatI
 
 ## DESCRIPTION
 
-Wraps Document.Save(path).
+Wraps Document.Save(path) - or, when a signature has been staged with
+Set-VellumPdfSignature, SigningExtensions.Sign(document, stream,
+settings), which signs the document while writing it (PAdES).
 The document is IDisposable; this function
 disposes it after the save attempt (success or failure) because saving is
 the terminal step of a build pipeline, and marks it so later cmdlet calls
