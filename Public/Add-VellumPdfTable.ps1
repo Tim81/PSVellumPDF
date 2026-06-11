@@ -27,6 +27,51 @@ function Add-VellumPdfTable {
         convert them to value arrays first:
             $rows = Import-Csv data.csv |
                 ForEach-Object { [object[]]($_.PSObject.Properties.Value) }
+    .PARAMETER Document
+        The live VellumPdf document flowing through the pipeline. The same
+        instance is returned after the table is added, enabling chaining.
+    .PARAMETER Header
+        An optional string array of column header labels. When supplied, a
+        styled header row is prepended to the table via AddHeaderRow(). The
+        count of header cells determines the expected column count for
+        -ColumnWidth mismatch warnings.
+    .PARAMETER Row
+        A jagged array of data rows (array of arrays). Each inner array element
+        is converted to a string via ToString() and added as a cell. PSCustomObject
+        elements are rejected with a conversion hint. For a single data row, use
+        the unary comma operator to prevent PowerShell from flattening the outer
+        array: -Row @(,@('Cell1','Cell2')).
+    .PARAMETER ColumnWidth
+        Column widths in points, each between 0.01 and 100000. The count should
+        match the number of columns determined by the -Header or first -Row; a
+        mismatch emits a warning and extra widths are ignored.
+    .PARAMETER BorderWidth
+        Border line width in points applied to all cell borders, between 0 and
+        100. When omitted the VellumPdf library default is used.
+    .PARAMETER BorderColor
+        Border line colour as three doubles representing Red, Green, and Blue
+        channels, each in the 0.0..1.0 range. Exactly three values must be
+        supplied. When omitted the library default border colour is used.
+    .PARAMETER HeaderBackground
+        Background fill colour for the header row as three doubles representing
+        Red, Green, and Blue channels, each in the 0.0..1.0 range. Exactly
+        three values must be supplied. Only applied when -Header is also
+        supplied.
+    .PARAMETER Font
+        A base-14 font name applied as the default cell style for all data
+        cells. When omitted the document default font is used.
+    .PARAMETER FontSize
+        Font size in points for all data cells, between 1 and 1000. When
+        omitted the document default size is used.
+    .PARAMETER Alignment
+        Horizontal text alignment for all cells (header and data). Accepts
+        Left, Center, Right, or Justify. Defaults to Left.
+    .PARAMETER MarginTop
+        Extra spacing in points above the table element. Does not affect the
+        left/right page margins.
+    .PARAMETER MarginBottom
+        Extra spacing in points below the table element. Does not affect the
+        left/right page margins.
     .EXAMPLE
         $headers = @('Name', 'Score', 'Grade')
         $rows = @(

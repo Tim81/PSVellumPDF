@@ -4,7 +4,7 @@ external help file: PSVellumPDF-Help.xml
 HelpUri: ''
 Locale: en-US
 Module Name: PSVellumPDF
-ms.date: 06-10-2026
+ms.date: 06-11-2026
 PlatyPS schema version: 2024-05-01
 title: Add-VellumPdfImage
 ---
@@ -21,7 +21,8 @@ Embeds an image file into a VellumPdf document.
 
 ```
 Add-VellumPdfImage [-Path] <string> -Document <Document> [-Width <double>] [-Height <double>]
- [-Alignment <string>] [-AltText <string>] [<CommonParameters>]
+ [-Alignment <string>] [-AltText <string>] [-MarginTop <double>] [-MarginBottom <double>]
+ [<CommonParameters>]
 ```
 
 ## DESCRIPTION
@@ -39,6 +40,9 @@ omitted the image renders at its natural size.
 image horizontally on the page.
 -AltText supplies alternate text that aids
 tagged PDF and PDF-A accessibility readers.
+
+-MarginTop and -MarginBottom apply spacing above and below the image
+without affecting the left/right margins already set on the element.
 
 The document flows through the pipeline for chaining with other
 Add-VellumPdf* functions.
@@ -60,7 +64,10 @@ $doc | Add-VellumPdfImage -Path ./photo.jpg -Width 200 -Height 150 `
 
 ### -Alignment
 
-{{ Fill Alignment Description }}
+Horizontal alignment of the image on the page.
+Accepts Left, Center,
+Right, or Justify.
+Defaults to Left.
 
 ```yaml
 Type: System.String
@@ -81,7 +88,10 @@ HelpMessage: ''
 
 ### -AltText
 
-{{ Fill AltText Description }}
+Alternate text description for the image.
+Stored on the LayoutImage
+element and included in tagged PDF structure for accessibility readers
+and PDF/A compliance.
 
 ```yaml
 Type: System.String
@@ -102,7 +112,9 @@ HelpMessage: ''
 
 ### -Document
 
-{{ Fill Document Description }}
+The live VellumPdf document flowing through the pipeline.
+The same
+instance is returned after the image is added, enabling chaining.
 
 ```yaml
 Type: VellumPdf.Layout.Document
@@ -123,7 +135,55 @@ HelpMessage: ''
 
 ### -Height
 
-{{ Fill Height Description }}
+Rendered height of the image in points, between 1 and 100000.
+When
+omitted the image is rendered at its natural height.
+
+```yaml
+Type: System.Double
+DefaultValue: 0
+SupportsWildcards: false
+Aliases: []
+ParameterSets:
+- Name: (All)
+  Position: Named
+  IsRequired: false
+  ValueFromPipeline: false
+  ValueFromPipelineByPropertyName: false
+  ValueFromRemainingArguments: false
+DontShow: false
+AcceptedValues: []
+HelpMessage: ''
+```
+
+### -MarginBottom
+
+Extra spacing in points below the image element.
+Does not affect the
+left/right page margins.
+
+```yaml
+Type: System.Double
+DefaultValue: 0
+SupportsWildcards: false
+Aliases: []
+ParameterSets:
+- Name: (All)
+  Position: Named
+  IsRequired: false
+  ValueFromPipeline: false
+  ValueFromPipelineByPropertyName: false
+  ValueFromRemainingArguments: false
+DontShow: false
+AcceptedValues: []
+HelpMessage: ''
+```
+
+### -MarginTop
+
+Extra spacing in points above the image element.
+Does not affect the
+left/right page margins.
 
 ```yaml
 Type: System.Double
@@ -144,7 +204,13 @@ HelpMessage: ''
 
 ### -Path
 
-{{ Fill Path Description }}
+File system path to the image file.
+Supported extensions are .jpg,
+.jpeg, .png, .bmp, .gif, .tif, and .tiff.
+The path is resolved
+relative to the current PowerShell provider location.
+Mandatory and
+positional (position 0).
 
 ```yaml
 Type: System.String
@@ -165,7 +231,9 @@ HelpMessage: ''
 
 ### -Width
 
-{{ Fill Width Description }}
+Rendered width of the image in points, between 1 and 100000.
+When
+omitted the image is rendered at its natural width.
 
 ```yaml
 Type: System.Double
@@ -195,21 +263,17 @@ This cmdlet supports the common parameters: -Debug, -ErrorAction, -ErrorVariable
 
 ### VellumPdf.Layout.Document
 
-{{ Fill in the Description }}
 
 ## OUTPUTS
 
 ### VellumPdf.Layout.Document (the same instance
 
-{{ Fill in the Description }}
 
 ### VellumPdf.Layout.Document
 
-{{ Fill in the Description }}
 
 ## NOTES
 
 ## RELATED LINKS
 
-{{ Fill in the related links here }}
 

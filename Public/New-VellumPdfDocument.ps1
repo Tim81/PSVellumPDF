@@ -17,6 +17,51 @@ function New-VellumPdfDocument {
 
         -UseObjectStreams enables PDF cross-reference object streams, which
         reduces file size for documents with many objects.
+    .PARAMETER Conformance
+        The PDF/A conformance level for the document. Use PdfA2b, PdfA2u, or
+        PdfA2a to produce an ISO 19005-2 compliant archive file; None (default)
+        produces a standard PDF without conformance requirements. Note that PDF/A
+        forbids encryption, so -Conformance is incompatible with
+        Protect-VellumPdfDocument.
+    .PARAMETER PageSize
+        The paper size for every page in the document. Accepts standard ISO and
+        US names (A0-A6, Ledger, Legal, Letter). Defaults to A4.
+    .PARAMETER DefaultFont
+        The base-14 font name stored as the document-wide default. Content
+        cmdlets that receive no explicit -Font fill the gap from this value
+        rather than from the library-global Helvetica. Defaults to Helvetica.
+    .PARAMETER DefaultFontSize
+        The font size in points stored as the document-wide default. Content
+        cmdlets that receive no explicit -FontSize fill the gap from this value.
+        Must be between 1 and 1000. Defaults to 11.
+    .PARAMETER Tagged
+        When specified, marks the document as a tagged PDF (sets Document.Tagged
+        to $true). Tagged PDFs are required for full PDF/A accessibility
+        conformance and enable assistive-technology support.
+    .PARAMETER Language
+        A BCP 47 language tag written as the PDF /Lang entry (e.g. 'en-US').
+        Relevant for tagged PDF and PDF/A accessibility. Requires VellumPdf 1.1+.
+    .PARAMETER Margin
+        Uniform page margin in points applied to all four sides. When any
+        per-side parameter (-MarginTop, -MarginRight, -MarginBottom, -MarginLeft)
+        is also supplied, this value becomes the baseline for the unspecified
+        sides rather than overriding them.
+    .PARAMETER MarginTop
+        Top page margin in points. When supplied, overrides the -Margin baseline
+        (or the library default) for the top side only.
+    .PARAMETER MarginRight
+        Right page margin in points. When supplied, overrides the -Margin
+        baseline (or the library default) for the right side only.
+    .PARAMETER MarginBottom
+        Bottom page margin in points. When supplied, overrides the -Margin
+        baseline (or the library default) for the bottom side only.
+    .PARAMETER MarginLeft
+        Left page margin in points. When supplied, overrides the -Margin
+        baseline (or the library default) for the left side only.
+    .PARAMETER UseObjectStreams
+        When specified, enables PDF cross-reference object streams in the output
+        file. Object streams reduce file size for documents with many objects by
+        compressing the cross-reference table.
     .EXAMPLE
         New-VellumPdfDocument -Conformance PdfA2b |
             Add-VellumPdfHeading -Text 'Report' |

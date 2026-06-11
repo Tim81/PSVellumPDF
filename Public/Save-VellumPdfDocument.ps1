@@ -17,6 +17,20 @@ function Save-VellumPdfDocument {
         saved or disposed - dispose it yourself in your catch block.
 
         An existing file at -Path is overwritten.
+    .PARAMETER Document
+        The live VellumPdf document to save. Accepts pipeline input. After saving,
+        the document is disposed and stamped so subsequent cmdlet calls against
+        the stale instance fail with a clear error. Use -KeepOpen to suppress
+        disposal.
+    .PARAMETER Path
+        File system path for the output PDF file. The parent directory must
+        already exist; an existing file at this path is overwritten. Mandatory
+        and positional (position 0).
+    .PARAMETER KeepOpen
+        When specified, the document is not disposed after saving. The caller is
+        responsible for calling $doc.Dispose() when finished. Useful when the
+        same document object must be inspected or further manipulated after the
+        file is written.
     .EXAMPLE
         $doc | Save-VellumPdfDocument -Path ./out.pdf
     .OUTPUTS

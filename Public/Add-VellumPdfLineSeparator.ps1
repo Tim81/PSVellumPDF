@@ -15,6 +15,22 @@ function Add-VellumPdfLineSeparator {
 
         The document flows through the pipeline for chaining with other
         Add-VellumPdf* functions.
+    .PARAMETER Document
+        The live VellumPdf document flowing through the pipeline. The same
+        instance is returned after the separator is added, enabling chaining.
+    .PARAMETER LineWidth
+        Thickness of the horizontal rule in points, between 0.1 and 50. When
+        omitted the VellumPdf library default line width is used.
+    .PARAMETER Color
+        Line colour as three doubles representing Red, Green, and Blue channels,
+        each in the 0.0..1.0 range (e.g. 0,0,0 for black). Exactly three
+        values must be supplied. When omitted the library default colour is used.
+    .PARAMETER MarginTop
+        Extra spacing in points above the separator element. Does not affect
+        the left/right page margins.
+    .PARAMETER MarginBottom
+        Extra spacing in points below the separator element. Does not affect
+        the left/right page margins.
     .EXAMPLE
         New-VellumPdfDocument |
             Add-VellumPdfParagraph -Text 'Above the line.' |

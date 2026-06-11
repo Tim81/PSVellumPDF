@@ -19,6 +19,33 @@ function Add-VellumPdfImage {
 
         The document flows through the pipeline for chaining with other
         Add-VellumPdf* functions.
+    .PARAMETER Document
+        The live VellumPdf document flowing through the pipeline. The same
+        instance is returned after the image is added, enabling chaining.
+    .PARAMETER Path
+        File system path to the image file. Supported extensions are .jpg,
+        .jpeg, .png, .bmp, .gif, .tif, and .tiff. The path is resolved
+        relative to the current PowerShell provider location. Mandatory and
+        positional (position 0).
+    .PARAMETER Width
+        Rendered width of the image in points, between 1 and 100000. When
+        omitted the image is rendered at its natural width.
+    .PARAMETER Height
+        Rendered height of the image in points, between 1 and 100000. When
+        omitted the image is rendered at its natural height.
+    .PARAMETER Alignment
+        Horizontal alignment of the image on the page. Accepts Left, Center,
+        Right, or Justify. Defaults to Left.
+    .PARAMETER AltText
+        Alternate text description for the image. Stored on the LayoutImage
+        element and included in tagged PDF structure for accessibility readers
+        and PDF/A compliance.
+    .PARAMETER MarginTop
+        Extra spacing in points above the image element. Does not affect the
+        left/right page margins.
+    .PARAMETER MarginBottom
+        Extra spacing in points below the image element. Does not affect the
+        left/right page margins.
     .EXAMPLE
         New-VellumPdfDocument |
             Add-VellumPdfImage -Path ./logo.png |

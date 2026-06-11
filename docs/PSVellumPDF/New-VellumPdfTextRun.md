@@ -4,7 +4,7 @@ external help file: PSVellumPDF-Help.xml
 HelpUri: ''
 Locale: en-US
 Module Name: PSVellumPDF
-ms.date: 06-10-2026
+ms.date: 06-11-2026
 PlatyPS schema version: 2024-05-01
 title: New-VellumPdfTextRun
 ---
@@ -21,7 +21,8 @@ Creates a styled text run for use in a mixed-style paragraph.
 
 ```
 New-VellumPdfTextRun [-Text] <string> [-Font <string>] [-FontSize <double>]
- [-FontHandle <EmbeddedFontHandle>] [-Color <double[]>] [-LinkUri <string>] [<CommonParameters>]
+ [-FontHandle <EmbeddedFontHandle>] [-Color <double[]>] [-LinkUri <string>] [-Leading <double>]
+ [<CommonParameters>]
 ```
 
 ## DESCRIPTION
@@ -39,6 +40,9 @@ parameters are supplied the run inherits the document default.
 
 -Color accepts three doubles (R, G, B) in the 0.0..1.0 range.
 -LinkUri makes the run a clickable external hyperlink in the PDF.
+-Leading sets the extra vertical spacing between lines for this run, in
+points.
+When omitted the document-level leading is used.
 
 ## EXAMPLES
 
@@ -53,7 +57,11 @@ $doc | Add-VellumPdfParagraph -Run $run1, $run2, $run3
 
 ### -Color
 
-{{ Fill Color Description }}
+Text colour as three doubles representing Red, Green, and Blue channels,
+each in the 0.0..1.0 range (e.g.
+1,0,0 for pure red).
+Exactly three
+values must be supplied.
 
 ```yaml
 Type: System.Double[]
@@ -74,7 +82,10 @@ HelpMessage: ''
 
 ### -Font
 
-{{ Fill Font Description }}
+A base-14 font name applied to this run only.
+When omitted the run
+inherits the document default font.
+Mutually exclusive with -FontHandle.
 
 ```yaml
 Type: System.String
@@ -95,7 +106,12 @@ HelpMessage: ''
 
 ### -FontHandle
 
-{{ Fill FontHandle Description }}
+An EmbeddedFontHandle returned by Register-VellumPdfFont for the same
+document.
+When supplied, the run uses the embedded TrueType font instead
+of a base-14 font, and the base-14 encoding warning is suppressed.
+Handles are document-scoped; passing a handle from a different document
+is rejected by the content cmdlet.
 
 ```yaml
 Type: VellumPdf.Fonts.EmbeddedFontHandle
@@ -116,7 +132,31 @@ HelpMessage: ''
 
 ### -FontSize
 
-{{ Fill FontSize Description }}
+Font size in points for this run, between 1 and 1000.
+When omitted the
+run inherits the document default size.
+
+```yaml
+Type: System.Double
+DefaultValue: 0
+SupportsWildcards: false
+Aliases: []
+ParameterSets:
+- Name: (All)
+  Position: Named
+  IsRequired: false
+  ValueFromPipeline: false
+  ValueFromPipelineByPropertyName: false
+  ValueFromRemainingArguments: false
+DontShow: false
+AcceptedValues: []
+HelpMessage: ''
+```
+
+### -Leading
+
+Extra vertical line spacing in points added below each line of this run.
+When omitted the document-level leading applies.
 
 ```yaml
 Type: System.Double
@@ -137,7 +177,9 @@ HelpMessage: ''
 
 ### -LinkUri
 
-{{ Fill LinkUri Description }}
+Makes this run a clickable external hyperlink in the rendered PDF.
+javascript, vbscript, data, and file URI schemes are rejected; a
+whitespace-only value is treated as no link.
 
 ```yaml
 Type: System.String
@@ -158,7 +200,8 @@ HelpMessage: ''
 
 ### -Text
 
-{{ Fill Text Description }}
+The string content of this text run.
+Mandatory and positional (position 0).
 
 ```yaml
 Type: System.String
@@ -190,11 +233,9 @@ This cmdlet supports the common parameters: -Debug, -ErrorAction, -ErrorVariable
 
 ### VellumPdf.Layout.Elements.TextRun
 
-{{ Fill in the Description }}
 
 ## NOTES
 
 ## RELATED LINKS
 
-{{ Fill in the related links here }}
 

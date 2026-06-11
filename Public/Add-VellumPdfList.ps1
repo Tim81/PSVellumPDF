@@ -14,6 +14,31 @@ function Add-VellumPdfList {
 
         The document flows through the pipeline for chaining with other
         Add-VellumPdf* functions.
+    .PARAMETER Document
+        The live VellumPdf document flowing through the pipeline. The same
+        instance is returned after the list is added, enabling chaining.
+    .PARAMETER Item
+        A string array of list item labels. Each element becomes one list item.
+        Empty strings are permitted. Mandatory.
+    .PARAMETER Style
+        The list marker style. Unordered uses bullet points; OrderedDecimal,
+        OrderedAlpha, and OrderedRoman use numbered, alphabetic, and Roman
+        numeral markers respectively. Defaults to Unordered.
+    .PARAMETER Indent
+        Left indent for the list in points, between 0 and 1000. When omitted
+        the VellumPdf library default indent is used.
+    .PARAMETER Font
+        A base-14 font name applied to every list item. When omitted the
+        document default font is used.
+    .PARAMETER FontSize
+        Font size in points for list items, between 1 and 1000. When omitted
+        the document default size is used.
+    .PARAMETER MarginTop
+        Extra spacing in points above the list element. Does not affect the
+        left/right page margins.
+    .PARAMETER MarginBottom
+        Extra spacing in points below the list element. Does not affect the
+        left/right page margins.
     .EXAMPLE
         New-VellumPdfDocument |
             Add-VellumPdfList -Item 'Apples','Bananas','Cherries' |

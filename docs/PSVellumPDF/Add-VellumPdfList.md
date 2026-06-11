@@ -4,7 +4,7 @@ external help file: PSVellumPDF-Help.xml
 HelpUri: ''
 Locale: en-US
 Module Name: PSVellumPDF
-ms.date: 06-10-2026
+ms.date: 06-11-2026
 PlatyPS schema version: 2024-05-01
 title: Add-VellumPdfList
 ---
@@ -21,7 +21,8 @@ Adds an ordered or unordered list to a VellumPdf document.
 
 ```
 Add-VellumPdfList [-Document] <Document> [-Item] <string[]> [[-Style] <string>] [[-Indent] <double>]
- [[-Font] <string>] [[-FontSize] <double>] [<CommonParameters>]
+ [[-Font] <string>] [[-FontSize] <double>] [[-MarginTop] <double>] [[-MarginBottom] <double>]
+ [<CommonParameters>]
 ```
 
 ## DESCRIPTION
@@ -34,9 +35,12 @@ An optional -Indent adjusts the left indent
 for the list.
 An optional -Font/-FontSize override applies a TextStyle to
 every item; when omitted the document default font is used.
-The document
-flows through the pipeline for chaining with other Add-VellumPdf*
-functions.
+
+-MarginTop and -MarginBottom apply spacing above and below the list
+without affecting the left/right margins already set on the element.
+
+The document flows through the pipeline for chaining with other
+Add-VellumPdf* functions.
 
 ## EXAMPLES
 
@@ -55,7 +59,9 @@ $doc | Add-VellumPdfList -Item 'First','Second','Third' `
 
 ### -Document
 
-{{ Fill Document Description }}
+The live VellumPdf document flowing through the pipeline.
+The same
+instance is returned after the list is added, enabling chaining.
 
 ```yaml
 Type: VellumPdf.Layout.Document
@@ -76,7 +82,9 @@ HelpMessage: ''
 
 ### -Font
 
-{{ Fill Font Description }}
+A base-14 font name applied to every list item.
+When omitted the
+document default font is used.
 
 ```yaml
 Type: System.String
@@ -97,7 +105,9 @@ HelpMessage: ''
 
 ### -FontSize
 
-{{ Fill FontSize Description }}
+Font size in points for list items, between 1 and 1000.
+When omitted
+the document default size is used.
 
 ```yaml
 Type: System.Double
@@ -118,7 +128,9 @@ HelpMessage: ''
 
 ### -Indent
 
-{{ Fill Indent Description }}
+Left indent for the list in points, between 0 and 1000.
+When omitted
+the VellumPdf library default indent is used.
 
 ```yaml
 Type: System.Double
@@ -139,7 +151,10 @@ HelpMessage: ''
 
 ### -Item
 
-{{ Fill Item Description }}
+A string array of list item labels.
+Each element becomes one list item.
+Empty strings are permitted.
+Mandatory.
 
 ```yaml
 Type: System.String[]
@@ -158,9 +173,59 @@ AcceptedValues: []
 HelpMessage: ''
 ```
 
+### -MarginBottom
+
+Extra spacing in points below the list element.
+Does not affect the
+left/right page margins.
+
+```yaml
+Type: System.Double
+DefaultValue: 0
+SupportsWildcards: false
+Aliases: []
+ParameterSets:
+- Name: (All)
+  Position: 7
+  IsRequired: false
+  ValueFromPipeline: false
+  ValueFromPipelineByPropertyName: false
+  ValueFromRemainingArguments: false
+DontShow: false
+AcceptedValues: []
+HelpMessage: ''
+```
+
+### -MarginTop
+
+Extra spacing in points above the list element.
+Does not affect the
+left/right page margins.
+
+```yaml
+Type: System.Double
+DefaultValue: 0
+SupportsWildcards: false
+Aliases: []
+ParameterSets:
+- Name: (All)
+  Position: 6
+  IsRequired: false
+  ValueFromPipeline: false
+  ValueFromPipelineByPropertyName: false
+  ValueFromRemainingArguments: false
+DontShow: false
+AcceptedValues: []
+HelpMessage: ''
+```
+
 ### -Style
 
-{{ Fill Style Description }}
+The list marker style.
+Unordered uses bullet points; OrderedDecimal,
+OrderedAlpha, and OrderedRoman use numbered, alphabetic, and Roman
+numeral markers respectively.
+Defaults to Unordered.
 
 ```yaml
 Type: System.String
@@ -190,21 +255,17 @@ This cmdlet supports the common parameters: -Debug, -ErrorAction, -ErrorVariable
 
 ### VellumPdf.Layout.Document
 
-{{ Fill in the Description }}
 
 ## OUTPUTS
 
 ### VellumPdf.Layout.Document (the same instance
 
-{{ Fill in the Description }}
 
 ### VellumPdf.Layout.Document
 
-{{ Fill in the Description }}
 
 ## NOTES
 
 ## RELATED LINKS
 
-{{ Fill in the related links here }}
 

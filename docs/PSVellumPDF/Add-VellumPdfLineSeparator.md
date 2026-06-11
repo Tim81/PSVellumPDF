@@ -6,68 +6,74 @@ Locale: en-US
 Module Name: PSVellumPDF
 ms.date: 06-11-2026
 PlatyPS schema version: 2024-05-01
-title: Set-VellumPdfHeader
+title: Add-VellumPdfLineSeparator
 ---
 
-# Set-VellumPdfHeader
+# Add-VellumPdfLineSeparator
 
 ## SYNOPSIS
 
-Sets a running header band on a VellumPdf document.
+Adds a horizontal line separator to a VellumPdf document.
 
 ## SYNTAX
 
 ### __AllParameterSets
 
 ```
-Set-VellumPdfHeader [-Document] <Document> [-Template] <string> [[-Font] <string>]
- [[-FontSize] <double>] [[-Alignment] <string>] [<CommonParameters>]
+Add-VellumPdfLineSeparator [-Document] <Document> [[-LineWidth] <double>] [[-Color] <double[]>]
+ [[-MarginTop] <double>] [[-MarginBottom] <double>] [<CommonParameters>]
 ```
 
 ## DESCRIPTION
 
-Wraps Document.SetHeader(template, style, alignment).
-The header band
-appears at the top of every page.
-The document flows through the pipeline
-for chaining.
+Wraps Document.Add(LineSeparator).
+Constructs a LineSeparator element with
+an optional line width, RGB colour, and top/bottom margins, then adds it to
+the document.
 
-Template tokens:
-  {page}  - replaced with the current page number (e.g.
-2)
-  {pages} - replaced with the total page count   (e.g.
-9)
+-Color accepts a three-element array of [double] values in the 0.0..1.0
+range (R, G, B).
 
-Example template: 'Page {page} of {pages}'
+-MarginTop and -MarginBottom apply spacing above and below the separator
+without affecting the left/right margins already set on the element.
+
+The document flows through the pipeline for chaining with other
+Add-VellumPdf* functions.
 
 ## EXAMPLES
 
 ### EXAMPLE 1
 
-$doc | Set-VellumPdfHeader -Template 'Page {page} of {pages}'
+New-VellumPdfDocument |
+    Add-VellumPdfParagraph -Text 'Above the line.' |
+    Add-VellumPdfLineSeparator |
+    Add-VellumPdfParagraph -Text 'Below the line.' |
+    Save-VellumPdfDocument -Path ./report.pdf
 
 ### EXAMPLE 2
 
-$doc | Set-VellumPdfHeader -Template 'Confidential - Page {page} of {pages}' `
-       -Font Helvetica -FontSize 9 -Alignment Right
+$doc | Add-VellumPdfLineSeparator -LineWidth 2.0 -Color 0.2,0.4,0.8 `
+       -MarginTop 10 -MarginBottom 10
 
 ## PARAMETERS
 
-### -Alignment
+### -Color
 
-Horizontal alignment of the header text.
-Accepts Left, Center, Right,
-or Justify.
-Defaults to Center.
+Line colour as three doubles representing Red, Green, and Blue channels,
+each in the 0.0..1.0 range (e.g.
+0,0,0 for black).
+Exactly three
+values must be supplied.
+When omitted the library default colour is used.
 
 ```yaml
-Type: System.String
-DefaultValue: Center
+Type: System.Double[]
+DefaultValue: ''
 SupportsWildcards: false
 Aliases: []
 ParameterSets:
 - Name: (All)
-  Position: 4
+  Position: 2
   IsRequired: false
   ValueFromPipeline: false
   ValueFromPipelineByPropertyName: false
@@ -81,7 +87,7 @@ HelpMessage: ''
 
 The live VellumPdf document flowing through the pipeline.
 The same
-instance is returned after the header is configured, enabling chaining.
+instance is returned after the separator is added, enabling chaining.
 
 ```yaml
 Type: VellumPdf.Layout.Document
@@ -100,20 +106,20 @@ AcceptedValues: []
 HelpMessage: ''
 ```
 
-### -Font
+### -LineWidth
 
-A base-14 font name for the header text.
-When omitted the document
-default font is used.
+Thickness of the horizontal rule in points, between 0.1 and 50.
+When
+omitted the VellumPdf library default line width is used.
 
 ```yaml
-Type: System.String
-DefaultValue: ''
+Type: System.Double
+DefaultValue: 0
 SupportsWildcards: false
 Aliases: []
 ParameterSets:
 - Name: (All)
-  Position: 2
+  Position: 1
   IsRequired: false
   ValueFromPipeline: false
   ValueFromPipelineByPropertyName: false
@@ -123,11 +129,34 @@ AcceptedValues: []
 HelpMessage: ''
 ```
 
-### -FontSize
+### -MarginBottom
 
-Font size in points for the header text, between 1 and 1000.
-When
-omitted the document default size is used.
+Extra spacing in points below the separator element.
+Does not affect
+the left/right page margins.
+
+```yaml
+Type: System.Double
+DefaultValue: 0
+SupportsWildcards: false
+Aliases: []
+ParameterSets:
+- Name: (All)
+  Position: 4
+  IsRequired: false
+  ValueFromPipeline: false
+  ValueFromPipelineByPropertyName: false
+  ValueFromRemainingArguments: false
+DontShow: false
+AcceptedValues: []
+HelpMessage: ''
+```
+
+### -MarginTop
+
+Extra spacing in points above the separator element.
+Does not affect
+the left/right page margins.
 
 ```yaml
 Type: System.Double
@@ -138,31 +167,6 @@ ParameterSets:
 - Name: (All)
   Position: 3
   IsRequired: false
-  ValueFromPipeline: false
-  ValueFromPipelineByPropertyName: false
-  ValueFromRemainingArguments: false
-DontShow: false
-AcceptedValues: []
-HelpMessage: ''
-```
-
-### -Template
-
-The header text template.
-Use {page} for the current page number and
-{pages} for the total page count (e.g.
-'Page {page} of {pages}').
-Mandatory.
-
-```yaml
-Type: System.String
-DefaultValue: ''
-SupportsWildcards: false
-Aliases: []
-ParameterSets:
-- Name: (All)
-  Position: 1
-  IsRequired: true
   ValueFromPipeline: false
   ValueFromPipelineByPropertyName: false
   ValueFromRemainingArguments: false

@@ -17,6 +17,47 @@ function Add-VellumPdfParagraph {
 
         -MarginTop and -MarginBottom apply spacing above and below the paragraph
         without affecting the left/right margins already set on the element.
+    .PARAMETER Document
+        The live VellumPdf document flowing through the pipeline. The same
+        instance is returned after the paragraph is added, enabling chaining.
+    .PARAMETER Text
+        The string content of the paragraph. Used in the 'Text' parameter set
+        for a single-style paragraph. Mandatory and positional (position 0).
+    .PARAMETER Font
+        A base-14 font name for the paragraph text. When omitted the document
+        default font is used. Valid only in the 'Text' parameter set.
+    .PARAMETER FontSize
+        Font size in points for the paragraph, between 1 and 1000. When omitted
+        the document default size is used. Valid only in the 'Text' parameter set.
+    .PARAMETER FontHandle
+        An EmbeddedFontHandle returned by Register-VellumPdfFont for this
+        document. When supplied the paragraph uses the embedded TrueType font and
+        the base-14 encoding warning is suppressed. Handles from a different
+        document are rejected. Valid only in the 'Text' parameter set.
+    .PARAMETER Color
+        Text colour as three doubles representing Red, Green, and Blue channels,
+        each in the 0.0..1.0 range (e.g. 1,0,0 for pure red). Exactly three
+        values must be supplied. Valid only in the 'Text' parameter set.
+    .PARAMETER LinkUri
+        Makes the entire paragraph a clickable external hyperlink. javascript,
+        vbscript, data, and file URI schemes are rejected; a whitespace-only
+        value is treated as no link. Valid only in the 'Text' parameter set.
+    .PARAMETER Leading
+        Extra vertical line spacing in points added below each line. When omitted
+        the document-level leading applies. Valid only in the 'Text' parameter set.
+    .PARAMETER Run
+        An array of TextRun objects produced by New-VellumPdfTextRun that
+        compose a mixed-style paragraph. Used in the 'Runs' parameter set.
+        Mandatory and positional (position 0).
+    .PARAMETER Alignment
+        Horizontal alignment of the paragraph text. Accepts Left, Center, Right,
+        or Justify. Defaults to Left. Applies to both parameter sets.
+    .PARAMETER MarginTop
+        Extra spacing in points above the paragraph element. Does not affect the
+        left/right page margins. Applies to both parameter sets.
+    .PARAMETER MarginBottom
+        Extra spacing in points below the paragraph element. Does not affect the
+        left/right page margins. Applies to both parameter sets.
     .EXAMPLE
         $doc | Add-VellumPdfParagraph -Text 'The quick brown fox.' -Alignment Justify
     .EXAMPLE

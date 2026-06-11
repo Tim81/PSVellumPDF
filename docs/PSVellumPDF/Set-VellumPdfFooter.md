@@ -4,7 +4,7 @@ external help file: PSVellumPDF-Help.xml
 HelpUri: ''
 Locale: en-US
 Module Name: PSVellumPDF
-ms.date: 06-10-2026
+ms.date: 06-11-2026
 PlatyPS schema version: 2024-05-01
 title: Set-VellumPdfFooter
 ---
@@ -55,7 +55,10 @@ $doc | Set-VellumPdfFooter -Template '{page} / {pages}' `
 
 ### -Alignment
 
-{{ Fill Alignment Description }}
+Horizontal alignment of the footer text.
+Accepts Left, Center, Right,
+or Justify.
+Defaults to Center.
 
 ```yaml
 Type: System.String
@@ -76,7 +79,9 @@ HelpMessage: ''
 
 ### -Document
 
-{{ Fill Document Description }}
+The live VellumPdf document flowing through the pipeline.
+The same
+instance is returned after the footer is configured, enabling chaining.
 
 ```yaml
 Type: VellumPdf.Layout.Document
@@ -97,7 +102,9 @@ HelpMessage: ''
 
 ### -Font
 
-{{ Fill Font Description }}
+A base-14 font name for the footer text.
+When omitted the document
+default font is used.
 
 ```yaml
 Type: System.String
@@ -118,7 +125,9 @@ HelpMessage: ''
 
 ### -FontSize
 
-{{ Fill FontSize Description }}
+Font size in points for the footer text, between 1 and 1000.
+When
+omitted the document default size is used.
 
 ```yaml
 Type: System.Double
@@ -139,7 +148,11 @@ HelpMessage: ''
 
 ### -Template
 
-{{ Fill Template Description }}
+The footer text template.
+Use {page} for the current page number and
+{pages} for the total page count (e.g.
+'Page {page} of {pages}').
+Mandatory.
 
 ```yaml
 Type: System.String
@@ -169,21 +182,17 @@ This cmdlet supports the common parameters: -Debug, -ErrorAction, -ErrorVariable
 
 ### VellumPdf.Layout.Document
 
-{{ Fill in the Description }}
 
 ## OUTPUTS
 
 ### VellumPdf.Layout.Document (the same instance
 
-{{ Fill in the Description }}
 
 ### VellumPdf.Layout.Document
 
-{{ Fill in the Description }}
 
 ## NOTES
 
 ## RELATED LINKS
 
-{{ Fill in the related links here }}
 

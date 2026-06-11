@@ -10,6 +10,26 @@ function Set-VellumPdfDocumentInfo {
         Note: Title and Author are embedded in the XMP packet when writing
         PDF/A conformant documents and are required for PDF/A XMP metadata
         compliance.
+    .PARAMETER Document
+        The live VellumPdf document flowing through the pipeline. The same
+        instance is returned after the metadata is set, enabling chaining.
+    .PARAMETER Title
+        The document title written to Document.Info.Title and the XMP dc:title
+        field for PDF/A documents. Required for PDF/A XMP compliance.
+    .PARAMETER Author
+        The document author written to Document.Info.Author and the XMP
+        dc:creator field for PDF/A documents. Required for PDF/A XMP compliance.
+    .PARAMETER Subject
+        A short subject or description written to Document.Info.Subject.
+    .PARAMETER Keywords
+        Keyword string written to Document.Info.Keywords. Typically a
+        comma-separated list of search terms.
+    .PARAMETER Creator
+        The name of the application or tool that created the document content,
+        written to Document.Info.Creator.
+    .PARAMETER Producer
+        The name of the tool that produced the PDF file, written to
+        Document.Info.Producer.
     .EXAMPLE
         $doc | Set-VellumPdfDocumentInfo -Title 'Annual Report 2026' `
                -Author 'Acme Corp' -Subject 'Finance' -Keywords 'finance,annual'

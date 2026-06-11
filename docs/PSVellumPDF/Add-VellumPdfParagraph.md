@@ -4,7 +4,7 @@ external help file: PSVellumPDF-Help.xml
 HelpUri: ''
 Locale: en-US
 Module Name: PSVellumPDF
-ms.date: 06-10-2026
+ms.date: 06-11-2026
 PlatyPS schema version: 2024-05-01
 title: Add-VellumPdfParagraph
 ---
@@ -21,15 +21,15 @@ Adds a paragraph of text to a VellumPdf document.
 
 ```
 Add-VellumPdfParagraph [-Text] <string> -Document <Document> [-Font <string>] [-FontSize <double>]
- [-FontHandle <EmbeddedFontHandle>] [-Color <double[]>] [-LinkUri <string>] [-Alignment <string>]
- [<CommonParameters>]
+ [-FontHandle <EmbeddedFontHandle>] [-Color <double[]>] [-LinkUri <string>] [-Leading <double>]
+ [-Alignment <string>] [-MarginTop <double>] [-MarginBottom <double>] [<CommonParameters>]
 ```
 
 ### Runs
 
 ```
 Add-VellumPdfParagraph [-Run] <TextRun[]> -Document <Document> [-Alignment <string>]
- [<CommonParameters>]
+ [-MarginTop <double>] [-MarginBottom <double>] [<CommonParameters>]
 ```
 
 ## DESCRIPTION
@@ -45,6 +45,12 @@ Use the 'Text' parameter set for a single-style paragraph.
 parameter set with the output of New-VellumPdfTextRun to compose a
 mixed-style paragraph (multiple fonts, colours, or hyperlinks in one
 paragraph).
+
+-Leading (Text set only) sets the extra vertical spacing between lines,
+in points.
+
+-MarginTop and -MarginBottom apply spacing above and below the paragraph
+without affecting the left/right margins already set on the element.
 
 ## EXAMPLES
 
@@ -66,7 +72,11 @@ $doc | Add-VellumPdfParagraph -Run $run1, $run2
 
 ### -Alignment
 
---- Shared ---
+Horizontal alignment of the paragraph text.
+Accepts Left, Center, Right,
+or Justify.
+Defaults to Left.
+Applies to both parameter sets.
 
 ```yaml
 Type: System.String
@@ -87,7 +97,12 @@ HelpMessage: ''
 
 ### -Color
 
-{{ Fill Color Description }}
+Text colour as three doubles representing Red, Green, and Blue channels,
+each in the 0.0..1.0 range (e.g.
+1,0,0 for pure red).
+Exactly three
+values must be supplied.
+Valid only in the 'Text' parameter set.
 
 ```yaml
 Type: System.Double[]
@@ -108,7 +123,9 @@ HelpMessage: ''
 
 ### -Document
 
-{{ Fill Document Description }}
+The live VellumPdf document flowing through the pipeline.
+The same
+instance is returned after the paragraph is added, enabling chaining.
 
 ```yaml
 Type: VellumPdf.Layout.Document
@@ -129,7 +146,10 @@ HelpMessage: ''
 
 ### -Font
 
-{{ Fill Font Description }}
+A base-14 font name for the paragraph text.
+When omitted the document
+default font is used.
+Valid only in the 'Text' parameter set.
 
 ```yaml
 Type: System.String
@@ -150,7 +170,13 @@ HelpMessage: ''
 
 ### -FontHandle
 
-{{ Fill FontHandle Description }}
+An EmbeddedFontHandle returned by Register-VellumPdfFont for this
+document.
+When supplied the paragraph uses the embedded TrueType font and
+the base-14 encoding warning is suppressed.
+Handles from a different
+document are rejected.
+Valid only in the 'Text' parameter set.
 
 ```yaml
 Type: VellumPdf.Fonts.EmbeddedFontHandle
@@ -171,7 +197,34 @@ HelpMessage: ''
 
 ### -FontSize
 
-{{ Fill FontSize Description }}
+Font size in points for the paragraph, between 1 and 1000.
+When omitted
+the document default size is used.
+Valid only in the 'Text' parameter set.
+
+```yaml
+Type: System.Double
+DefaultValue: 0
+SupportsWildcards: false
+Aliases: []
+ParameterSets:
+- Name: Text
+  Position: Named
+  IsRequired: false
+  ValueFromPipeline: false
+  ValueFromPipelineByPropertyName: false
+  ValueFromRemainingArguments: false
+DontShow: false
+AcceptedValues: []
+HelpMessage: ''
+```
+
+### -Leading
+
+Extra vertical line spacing in points added below each line.
+When omitted
+the document-level leading applies.
+Valid only in the 'Text' parameter set.
 
 ```yaml
 Type: System.Double
@@ -192,7 +245,11 @@ HelpMessage: ''
 
 ### -LinkUri
 
-{{ Fill LinkUri Description }}
+Makes the entire paragraph a clickable external hyperlink.
+javascript,
+vbscript, data, and file URI schemes are rejected; a whitespace-only
+value is treated as no link.
+Valid only in the 'Text' parameter set.
 
 ```yaml
 Type: System.String
@@ -211,9 +268,60 @@ AcceptedValues: []
 HelpMessage: ''
 ```
 
+### -MarginBottom
+
+Extra spacing in points below the paragraph element.
+Does not affect the
+left/right page margins.
+Applies to both parameter sets.
+
+```yaml
+Type: System.Double
+DefaultValue: 0
+SupportsWildcards: false
+Aliases: []
+ParameterSets:
+- Name: (All)
+  Position: Named
+  IsRequired: false
+  ValueFromPipeline: false
+  ValueFromPipelineByPropertyName: false
+  ValueFromRemainingArguments: false
+DontShow: false
+AcceptedValues: []
+HelpMessage: ''
+```
+
+### -MarginTop
+
+Extra spacing in points above the paragraph element.
+Does not affect the
+left/right page margins.
+Applies to both parameter sets.
+
+```yaml
+Type: System.Double
+DefaultValue: 0
+SupportsWildcards: false
+Aliases: []
+ParameterSets:
+- Name: (All)
+  Position: Named
+  IsRequired: false
+  ValueFromPipeline: false
+  ValueFromPipelineByPropertyName: false
+  ValueFromRemainingArguments: false
+DontShow: false
+AcceptedValues: []
+HelpMessage: ''
+```
+
 ### -Run
 
---- Runs parameter set ---
+An array of TextRun objects produced by New-VellumPdfTextRun that
+compose a mixed-style paragraph.
+Used in the 'Runs' parameter set.
+Mandatory and positional (position 0).
 
 ```yaml
 Type: VellumPdf.Layout.Elements.TextRun[]
@@ -234,7 +342,10 @@ HelpMessage: ''
 
 ### -Text
 
---- Text parameter set ---
+The string content of the paragraph.
+Used in the 'Text' parameter set
+for a single-style paragraph.
+Mandatory and positional (position 0).
 
 ```yaml
 Type: System.String
@@ -264,21 +375,17 @@ This cmdlet supports the common parameters: -Debug, -ErrorAction, -ErrorVariable
 
 ### VellumPdf.Layout.Document
 
-{{ Fill in the Description }}
 
 ## OUTPUTS
 
 ### VellumPdf.Layout.Document (the same instance
 
-{{ Fill in the Description }}
 
 ### VellumPdf.Layout.Document
 
-{{ Fill in the Description }}
 
 ## NOTES
 
 ## RELATED LINKS
 
-{{ Fill in the related links here }}
 

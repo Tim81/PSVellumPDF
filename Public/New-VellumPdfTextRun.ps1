@@ -16,6 +16,31 @@ function New-VellumPdfTextRun {
         -LinkUri makes the run a clickable external hyperlink in the PDF.
         -Leading sets the extra vertical spacing between lines for this run, in
         points. When omitted the document-level leading is used.
+    .PARAMETER Text
+        The string content of this text run. Mandatory and positional (position 0).
+    .PARAMETER Font
+        A base-14 font name applied to this run only. When omitted the run
+        inherits the document default font. Mutually exclusive with -FontHandle.
+    .PARAMETER FontSize
+        Font size in points for this run, between 1 and 1000. When omitted the
+        run inherits the document default size.
+    .PARAMETER FontHandle
+        An EmbeddedFontHandle returned by Register-VellumPdfFont for the same
+        document. When supplied, the run uses the embedded TrueType font instead
+        of a base-14 font, and the base-14 encoding warning is suppressed.
+        Handles are document-scoped; passing a handle from a different document
+        is rejected by the content cmdlet.
+    .PARAMETER Color
+        Text colour as three doubles representing Red, Green, and Blue channels,
+        each in the 0.0..1.0 range (e.g. 1,0,0 for pure red). Exactly three
+        values must be supplied.
+    .PARAMETER LinkUri
+        Makes this run a clickable external hyperlink in the rendered PDF.
+        javascript, vbscript, data, and file URI schemes are rejected; a
+        whitespace-only value is treated as no link.
+    .PARAMETER Leading
+        Extra vertical line spacing in points added below each line of this run.
+        When omitted the document-level leading applies.
     .EXAMPLE
         $run1 = New-VellumPdfTextRun -Text 'Normal text '
         $run2 = New-VellumPdfTextRun -Text 'Red text ' -Color 1,0,0
