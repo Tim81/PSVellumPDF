@@ -6,6 +6,29 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [1.1.0] - 2026-06-11
+
+Built on VellumPdf 1.2.0 (was 1.1.0).
+
+### Added
+- `Set-VellumPdfSignature`: PAdES digital signing (SubFilter
+  `ETSI.CAdES.detached`) via the new `VellumPdf.Signing` package. Stage a
+  signature anywhere in the pipeline with an `[X509Certificate2]` (from
+  `Get-PfxCertificate` or the `cert:` drive) plus optional `-Reason`,
+  `-Location`, `-ContactInfo`, `-SignerName` and `-SigningTime`;
+  `Save-VellumPdfDocument` signs the document while writing it. Composes with
+  PDF/A conformance. Signing and encryption cannot be combined (library
+  constraint) - both `Set-VellumPdfSignature` and `Protect-VellumPdfDocument`
+  fail fast on the conflict.
+- `Set-VellumPdfOutputIntent`: replace the default sRGB PDF/A output intent
+  with a custom ICC profile (`-IccProfilePath`/`-ComponentCount`) or the
+  library's built-in generic CMYK profile (`-Cmyk`).
+
+### Changed
+- VellumPdf 1.2.0 brings CFF (OpenType-CFF) font subsetting, cmap subtable
+  formats 0 and 6, ICC-based colour management, and hardened font parsers.
+  Existing pipelines benefit transparently (smaller embedded-font output).
+
 ## [1.0.0] - 2026-06-11
 
 First stable release, built on VellumPdf 1.1.0. PDF/A-2b output is now
@@ -61,6 +84,7 @@ First public release, built on VellumPdf 1.1.0 (.NET 10).
 - Quality gates: PSScriptAnalyzer, Pester (94% coverage), 3-OS CI, locked
   NuGet restore, SHA-pinned actions, PSGallery release pipeline.
 
-[Unreleased]: https://github.com/Tim81/PSVellumPDF/compare/v1.0.0...HEAD
+[Unreleased]: https://github.com/Tim81/PSVellumPDF/compare/v1.1.0...HEAD
+[1.1.0]: https://github.com/Tim81/PSVellumPDF/compare/v1.0.0...v1.1.0
 [1.0.0]: https://github.com/Tim81/PSVellumPDF/compare/v0.1.0...v1.0.0
 [0.1.0]: https://github.com/Tim81/PSVellumPDF/releases/tag/v0.1.0

@@ -113,6 +113,7 @@ jobs:
           set -e
           qpdf --check samples/plain.pdf
           qpdf --check samples/pdfa2b.pdf
+          qpdf --check samples/pdfa2b-signed.pdf
           qpdf --check --password=validate samples/encrypted.pdf
           echo "qpdf: all samples structurally valid"
 
@@ -120,10 +121,12 @@ jobs:
         shell: bash
         run: |
           set -o pipefail
-          docker run --rm -v "$PWD/samples:/data" ghcr.io/verapdf/cli \
-            --flavour 2b --format text /data/pdfa2b.pdf | tee verapdf.out
-          grep -q '^PASS' verapdf.out || { echo 'veraPDF did not report PASS'; exit 1; }
-          echo "veraPDF: pdfa2b.pdf is PDF/A-2b compliant"
+          for f in pdfa2b pdfa2b-signed; do
+            docker run --rm -v "$PWD/samples:/data" ghcr.io/verapdf/cli \
+              --flavour 2b --format text "/data/$f.pdf" | tee verapdf.out
+            grep -q '^PASS' verapdf.out || { echo "veraPDF did not report PASS for $f.pdf"; exit 1; }
+            echo "veraPDF: $f.pdf is PDF/A-2b compliant"
+          done
 
       - name: Upload samples
         if: always()
