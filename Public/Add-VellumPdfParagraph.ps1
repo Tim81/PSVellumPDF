@@ -79,6 +79,11 @@ function Add-VellumPdfParagraph {
     )
 
     process {
+        Assert-VellumPdfDocumentOpen -Document $Document -CommandName 'Add-VellumPdfParagraph'
+        if ($FontHandle) {
+            Assert-VellumPdfFontHandle -FontHandle $FontHandle -Document $Document -CommandName 'Add-VellumPdfParagraph'
+        }
+
         if ($PSCmdlet.ParameterSetName -eq 'Runs') {
             $paragraph = [VellumPdf.Layout.Elements.Paragraph]::new(
                 [System.Collections.Generic.List[VellumPdf.Layout.Elements.TextRun]]$Run)

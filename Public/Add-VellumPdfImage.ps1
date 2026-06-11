@@ -57,6 +57,8 @@ function Add-VellumPdfImage {
     )
 
     process {
+        Assert-VellumPdfDocumentOpen -Document $Document -CommandName 'Add-VellumPdfImage'
+
         $resolved = $ExecutionContext.SessionState.Path.GetUnresolvedProviderPathFromPSPath($Path)
         if (-not [System.IO.File]::Exists($resolved)) {
             throw "Add-VellumPdfImage: file not found: '$resolved'. Verify the path and try again."
@@ -65,18 +67,27 @@ function Add-VellumPdfImage {
         $ext = [System.IO.Path]::GetExtension($resolved).ToLowerInvariant()
         $bytes = [System.IO.File]::ReadAllBytes($resolved)
 
-        $xObject = switch ($ext) {
-            '.jpg'  { [VellumPdf.Images.JpegImageLoader]::Load($bytes) }
-            '.jpeg' { [VellumPdf.Images.JpegImageLoader]::Load($bytes) }
-            '.png'  { [VellumPdf.Images.PngImageLoader]::Load($bytes) }
-            '.bmp'  { [VellumPdf.Images.BmpImageLoader]::Load($bytes) }
-            '.gif'  { [VellumPdf.Images.GifImageLoader]::Load($bytes) }
-            '.tif'  { [VellumPdf.Images.TiffImageLoader]::Load($bytes) }
-            '.tiff' { [VellumPdf.Images.TiffImageLoader]::Load($bytes) }
-            default {
-                throw ("Add-VellumPdfImage: unsupported image extension '$ext'. " +
-                    "Supported extensions are: .jpg, .jpeg, .png, .bmp, .gif, .tif, .tiff.")
+        # Loader errors ("Not a PNG file.") do not mention which file failed;
+        # rethrow with the path so batch scripts can identify the culprit.
+        try {
+            $xObject = switch ($ext) {
+                '.jpg'  { [VellumPdf.Images.JpegImageLoader]::Load($bytes) }
+                '.jpeg' { [VellumPdf.Images.JpegImageLoader]::Load($bytes) }
+                '.png'  { [VellumPdf.Images.PngImageLoader]::Load($bytes) }
+                '.bmp'  { [VellumPdf.Images.BmpImageLoader]::Load($bytes) }
+                '.gif'  { [VellumPdf.Images.GifImageLoader]::Load($bytes) }
+                '.tif'  { [VellumPdf.Images.TiffImageLoader]::Load($bytes) }
+                '.tiff' { [VellumPdf.Images.TiffImageLoader]::Load($bytes) }
+                default {
+                    throw ("Add-VellumPdfImage: unsupported image extension '$ext'. " +
+                        "Supported extensions are: .jpg, .jpeg, .png, .bmp, .gif, .tif, .tiff.")
+                }
             }
+        }
+        catch {
+            if ($_.Exception.Message -like 'Add-VellumPdfImage:*') { throw }
+            $inner = if ($_.Exception.InnerException) { $_.Exception.InnerException.Message } else { $_.Exception.Message }
+            throw "Add-VellumPdfImage: failed to load '$resolved': $inner"
         }
 
         $layoutImage = [VellumPdf.Layout.Elements.LayoutImage]::new($xObject)

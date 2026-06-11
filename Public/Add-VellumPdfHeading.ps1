@@ -49,6 +49,10 @@ function Add-VellumPdfHeading {
     )
 
     process {
+        Assert-VellumPdfDocumentOpen -Document $Document -CommandName 'Add-VellumPdfHeading'
+        if ($FontHandle) {
+            Assert-VellumPdfFontHandle -FontHandle $FontHandle -Document $Document -CommandName 'Add-VellumPdfHeading'
+        }
         if (-not $FontHandle) {
             Write-VellumPdfEncodingWarning -Text $Text -CommandName 'Add-VellumPdfHeading'
         }

@@ -48,6 +48,8 @@ function Add-VellumPdfLineSeparator {
     )
 
     process {
+        Assert-VellumPdfDocumentOpen -Document $Document -CommandName 'Add-VellumPdfLineSeparator'
+
         $sep = [VellumPdf.Layout.Elements.LineSeparator]::new()
 
         if ($PSBoundParameters.ContainsKey('LineWidth')) {

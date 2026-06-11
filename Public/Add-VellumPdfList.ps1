@@ -31,6 +31,7 @@ function Add-VellumPdfList {
         [VellumPdf.Layout.Document]$Document,
 
         [Parameter(Mandatory)]
+        [AllowEmptyString()]
         [string[]]$Item,
 
         [ValidateSet('Unordered', 'OrderedDecimal', 'OrderedAlpha', 'OrderedRoman')]
@@ -55,6 +56,7 @@ function Add-VellumPdfList {
     )
 
     process {
+        Assert-VellumPdfDocumentOpen -Document $Document -CommandName 'Add-VellumPdfList'
         Write-VellumPdfEncodingWarning -Text $Item -CommandName 'Add-VellumPdfList'
         $listStyle = [VellumPdf.Layout.Elements.ListStyle]::$Style
 

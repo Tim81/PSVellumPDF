@@ -44,6 +44,7 @@ function Set-VellumPdfFooter {
     )
 
     process {
+        Assert-VellumPdfDocumentOpen -Document $Document -CommandName 'Set-VellumPdfFooter'
         Write-VellumPdfEncodingWarning -Text $Template -CommandName 'Set-VellumPdfFooter'
         $wantsFont = [bool]$Font -or $PSBoundParameters.ContainsKey('FontSize')
         $style = if ($wantsFont) {
