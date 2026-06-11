@@ -116,12 +116,14 @@ vendors `tests/assets/DejaVuSans.ttf` for this.
 
 ## Roadmap
 
-0.1.0 is published on the PowerShell Gallery (the original epic #16 is closed).
-The path to a production 1.0.0 is tracked in
-[#23 "Epic: Production 1.0.0"](https://github.com/Tim81/PSVellumPDF/issues/23)
-(milestone `v1.0.0-stable`): CI conformance validation with veraPDF/qpdf,
-Unicode data-loss warnings for base-14 fonts, remaining layout-API parity,
-stress testing, repo hygiene, and the rc1 → stable release ladder.
+**1.0.0 stable is published on the PowerShell Gallery** (epics #16 and #23 are
+closed). The next milestone is tracked in
+[#29 "Epic: v1.1.0 — signing, conformance, barcodes"](https://github.com/Tim81/PSVellumPDF/issues/29),
+aligned with the upstream VellumPdf roadmap: PAdES digital signing via
+`VellumPdf.Signing` (#24, ready to start), then conformance-validator,
+barcodes, and engine-capability adoption as upstream packages ship
+(#25–#27), plus 1.x maintenance (#28 — note the PSGallery API key expires
+mid-2027).
 
 User-visible changes belong in `CHANGELOG.md` (Unreleased section); releases
 move them under the version heading and feed the manifest ReleaseNotes. See
