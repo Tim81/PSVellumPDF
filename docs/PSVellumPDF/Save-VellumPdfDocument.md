@@ -44,7 +44,10 @@ error in an earlier Add-VellumPdf* call, or -WarningAction Stop turning
 the encoding warning into a terminating error), the document is never
 saved or disposed - dispose it yourself in your catch block.
 
-An existing file at -Path is overwritten.
+The write is atomic: the PDF is rendered (and signed) to a temporary
+file beside -Path and only moved into place once it is complete, so a
+render or signing failure leaves any existing file at -Path untouched.
+On success an existing file at -Path is overwritten.
 
 ## EXAMPLES
 

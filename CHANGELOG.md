@@ -6,6 +6,26 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [1.1.1] - 2026-06-11
+
+### Fixed
+- `Save-VellumPdfDocument` now renders (and signs) to a temporary file and moves
+  it into place only on success, so a render or signing failure no longer
+  truncates an existing good file at `-Path`, and a failed save leaves no
+  0-byte artifact behind.
+- `Save-VellumPdfDocument -WhatIf` to a nonexistent directory no longer throws
+  or disposes the document - a dry run now leaves the document open as
+  documented. A real (non-`-WhatIf`) save to a missing directory still fails
+  fast and disposes the document.
+- Signing and file-write failures from `Save-VellumPdfDocument` now carry
+  operation-specific guidance (certificate/signing or path-writability) instead
+  of the layout/render hint.
+- `-LinkUri` scheme blocklist now normalises out embedded whitespace and control
+  characters before matching, closing a bypass where `java<TAB>script:`, a
+  mid-keyword no-break space, or a leading control byte could smuggle a blocked
+  scheme past the check (lenient PDF readers strip such noise before dispatching
+  the scheme).
+
 ## [1.1.0] - 2026-06-11
 
 Built on VellumPdf 1.2.0 (was 1.1.0).
@@ -84,7 +104,8 @@ First public release, built on VellumPdf 1.1.0 (.NET 10).
 - Quality gates: PSScriptAnalyzer, Pester (94% coverage), 3-OS CI, locked
   NuGet restore, SHA-pinned actions, PSGallery release pipeline.
 
-[Unreleased]: https://github.com/Tim81/PSVellumPDF/compare/v1.1.0...HEAD
+[Unreleased]: https://github.com/Tim81/PSVellumPDF/compare/v1.1.1...HEAD
+[1.1.1]: https://github.com/Tim81/PSVellumPDF/compare/v1.1.0...v1.1.1
 [1.1.0]: https://github.com/Tim81/PSVellumPDF/compare/v1.0.0...v1.1.0
 [1.0.0]: https://github.com/Tim81/PSVellumPDF/compare/v0.1.0...v1.0.0
 [0.1.0]: https://github.com/Tim81/PSVellumPDF/releases/tag/v0.1.0
