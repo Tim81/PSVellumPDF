@@ -53,6 +53,29 @@ Describe 'LinkUri hygiene' {
         }
     }
 
+    It 'rejects blocked schemes smuggled past with embedded whitespace/control chars' {
+        # Lenient readers strip this noise before dispatching the scheme, so the
+        # blocklist must normalise it out before matching (not just trim leading).
+        $tab  = "java`tscript:alert(1)"                       # tab inside keyword
+        $ctrl = [char]0x01 + 'javascript:alert(1)'            # leading control byte
+        $nbsp = 'java' + [char]0x00A0 + 'script:alert(1)'     # no-break space inside keyword
+        foreach ($uri in $tab, $ctrl, $nbsp) {
+            { $script:doc | Add-VellumPdfParagraph -Text 'link' -LinkUri $uri } |
+                Should -Throw '*blocked scheme*'
+            { New-VellumPdfTextRun -Text 'link' -LinkUri $uri } |
+                Should -Throw '*blocked scheme*'
+        }
+    }
+
+    It 'does not false-positive on a safe URL that merely contains a blocked keyword in its path' {
+        $out = Join-Path $TestDrive 'kw-in-path.pdf'
+        { $script:doc |
+            Add-VellumPdfParagraph -Text 'ok' -LinkUri 'https://example.com/javascript:guide' |
+            Save-VellumPdfDocument -Path $out } | Should -Not -Throw
+        $script:doc = $null
+        (Get-Item $out).Length | Should -BeGreaterThan 0
+    }
+
     It 'treats a whitespace-only -LinkUri as no link (no /URI in output)' {
         $out = Join-Path $TestDrive 'ws-link.pdf'
         $script:doc | Add-VellumPdfParagraph -Text 'no link' -LinkUri '   ' |
@@ -140,6 +163,90 @@ Describe 'Error message quality' {
         $doc = New-VellumPdfDocument -Margin 10000 | Add-VellumPdfParagraph -Text 'cannot fit'
         { $doc | Save-VellumPdfDocument -Path (Join-Path $TestDrive 'overflow.pdf') } |
             Should -Throw '*failed to render*'
+    }
+
+    It 'reports a signing failure as a signing failure, not a render failure' {
+        $rsa = [System.Security.Cryptography.RSA]::Create(2048)
+        try {
+            $req = [System.Security.Cryptography.X509Certificates.CertificateRequest]::new(
+                'CN=Save Test', $rsa,
+                [System.Security.Cryptography.HashAlgorithmName]::SHA256,
+                [System.Security.Cryptography.RSASignaturePadding]::Pkcs1)
+            $cert = $req.CreateSelfSigned([DateTimeOffset]::UtcNow.AddDays(-1), [DateTimeOffset]::UtcNow.AddDays(1))
+            $doc = New-VellumPdfDocument |
+                Add-VellumPdfParagraph -Text 'x' |
+                Set-VellumPdfSignature -Certificate $cert
+            $cert.Dispose()   # break signing after staging
+            { $doc | Save-VellumPdfDocument -Path (Join-Path $TestDrive 'sign-fail.pdf') } |
+                Should -Throw '*failed to sign*'
+        }
+        finally { $rsa.Dispose() }
+    }
+}
+
+Describe 'Save-VellumPdfDocument failure and -WhatIf hardening' {
+    It 'preserves a pre-existing good file when a later save fails (no truncation)' {
+        $path = Join-Path $TestDrive 'preserve.pdf'
+        New-VellumPdfDocument | Add-VellumPdfParagraph -Text 'good' |
+            Save-VellumPdfDocument -Path $path | Out-Null
+        $originalLen = (Get-Item $path).Length
+        $originalLen | Should -BeGreaterThan 0
+
+        $bad = New-VellumPdfDocument -Margin 10000 | Add-VellumPdfParagraph -Text 'cannot fit'
+        { $bad | Save-VellumPdfDocument -Path $path } | Should -Throw
+
+        # The original file is intact, not a 0-byte truncation.
+        (Get-Item $path).Length | Should -Be $originalLen
+        # And no temp artifact is left beside it.
+        @(Get-ChildItem -LiteralPath $TestDrive -Filter '*.tmp').Count | Should -Be 0
+    }
+
+    It 'leaves no 0-byte artifact when a save to a new path fails' {
+        $path = Join-Path $TestDrive 'never-created.pdf'
+        $bad = New-VellumPdfDocument -Margin 10000 | Add-VellumPdfParagraph -Text 'cannot fit'
+        { $bad | Save-VellumPdfDocument -Path $path } | Should -Throw
+        Test-Path -LiteralPath $path | Should -BeFalse
+        @(Get-ChildItem -LiteralPath $TestDrive -Filter '*.tmp').Count | Should -Be 0
+    }
+
+    It 'a successful save leaves no temp file behind' {
+        $path = Join-Path $TestDrive 'clean.pdf'
+        New-VellumPdfDocument | Add-VellumPdfParagraph -Text 'x' |
+            Save-VellumPdfDocument -Path $path | Out-Null
+        (Get-Item $path).Length | Should -BeGreaterThan 0
+        @(Get-ChildItem -LiteralPath $TestDrive -Filter '*.tmp').Count | Should -Be 0
+    }
+
+    It '-WhatIf to a nonexistent directory leaves the document open and writes nothing' {
+        $dir  = Join-Path $TestDrive 'no-such-dir'
+        $path = Join-Path $dir 'f.pdf'
+        $doc = New-VellumPdfDocument | Add-VellumPdfParagraph -Text 'x'
+        try {
+            { $doc | Save-VellumPdfDocument -Path $path -WhatIf } | Should -Not -Throw
+            # Document must still be usable (not disposed by the dry run).
+            $doc.PSObject.Properties['PSVellumDisposed'] | Should -BeNullOrEmpty
+            { $doc | Add-VellumPdfParagraph -Text 'more' | Out-Null } | Should -Not -Throw
+            Test-Path -LiteralPath $dir | Should -BeFalse
+        }
+        finally { $doc.Dispose() }
+    }
+
+    It 'reports a clear error (and leaves no temp) when -Path cannot be written, e.g. a directory' {
+        $dirPath = Join-Path $TestDrive 'target-is-a-dir'
+        New-Item -ItemType Directory -Path $dirPath | Out-Null
+        $doc = New-VellumPdfDocument | Add-VellumPdfParagraph -Text 'x'
+        { $doc | Save-VellumPdfDocument -Path $dirPath } |
+            Should -Throw '*could not write it to*'
+        @(Get-ChildItem -LiteralPath $TestDrive -Filter '*.tmp' -Recurse).Count | Should -Be 0
+    }
+
+    It 'still disposes the document when a real (non-WhatIf) save hits a missing directory' {
+        # Preserves the documented non-WhatIf contract: a save attempt - even one
+        # that fails the directory pre-check - is terminal and disposes the doc.
+        $doc = New-VellumPdfDocument | Add-VellumPdfParagraph -Text 'x'
+        { $doc | Save-VellumPdfDocument -Path (Join-Path $TestDrive 'missing-dir' 'x.pdf') } |
+            Should -Throw '*directory not found*'
+        { $doc.Save((Join-Path $TestDrive 'after.pdf')) } | Should -Throw
     }
 }
 

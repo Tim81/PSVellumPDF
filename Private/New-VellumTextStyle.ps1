@@ -35,11 +35,20 @@ function New-VellumTextStyle {
     # annotation otherwise lands in the PDF), and script-capable / local-file
     # schemes are rejected outright - a javascript: URI in a generated document
     # executes in readers that honour it (e.g. Acrobat).
+    #
+    # The scheme check runs against a copy with ALL whitespace and control
+    # characters removed, not just leading ones, because lenient readers strip
+    # that noise before dispatching the scheme. Matching only a contiguous
+    # leading keyword would let 'java<TAB>script:', a mid-keyword no-break
+    # space, or a leading 0x01 byte smuggle a blocked scheme through.
     $LinkUri = if ($PSBoundParameters.ContainsKey('LinkUri')) { $LinkUri.Trim() } else { '' }
     $wantsLink = $LinkUri -ne ''
-    if ($wantsLink -and $LinkUri -match '^(?i)\s*(javascript|vbscript|data|file)\s*:') {
-        throw ("-LinkUri uses the blocked scheme '$($Matches[1])': javascript/vbscript/data/file " +
-            'URIs are not allowed in generated documents. Use http(s), mailto, or another safe scheme.')
+    if ($wantsLink) {
+        $normalized = $LinkUri -replace '[\s\p{Cc}\p{Cf}]', ''
+        if ($normalized -match '^(?i)(javascript|vbscript|data|file):') {
+            throw ("-LinkUri uses the blocked scheme '$($Matches[1])': javascript/vbscript/data/file " +
+                'URIs are not allowed in generated documents. Use http(s), mailto, or another safe scheme.')
+        }
     }
 
     if (-not $Font -and -not $PSBoundParameters.ContainsKey('FontSize') -and -not $FontHandle `
