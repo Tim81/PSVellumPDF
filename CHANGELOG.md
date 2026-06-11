@@ -6,6 +6,8 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [1.1.1] - 2026-06-11
+
 ### Fixed
 - `Save-VellumPdfDocument` now renders (and signs) to a temporary file and moves
   it into place only on success, so a render or signing failure no longer
@@ -102,7 +104,8 @@ First public release, built on VellumPdf 1.1.0 (.NET 10).
 - Quality gates: PSScriptAnalyzer, Pester (94% coverage), 3-OS CI, locked
   NuGet restore, SHA-pinned actions, PSGallery release pipeline.
 
-[Unreleased]: https://github.com/Tim81/PSVellumPDF/compare/v1.1.0...HEAD
+[Unreleased]: https://github.com/Tim81/PSVellumPDF/compare/v1.1.1...HEAD
+[1.1.1]: https://github.com/Tim81/PSVellumPDF/compare/v1.1.0...v1.1.1
 [1.1.0]: https://github.com/Tim81/PSVellumPDF/compare/v1.0.0...v1.1.0
 [1.0.0]: https://github.com/Tim81/PSVellumPDF/compare/v0.1.0...v1.0.0
 [0.1.0]: https://github.com/Tim81/PSVellumPDF/releases/tag/v0.1.0
