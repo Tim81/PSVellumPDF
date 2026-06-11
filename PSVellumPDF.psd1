@@ -1,6 +1,6 @@
 ﻿@{
     RootModule        = 'PSVellumPDF.psm1'
-    ModuleVersion     = '1.1.0'
+    ModuleVersion     = '1.1.1'
     GUID              = 'e51842c7-ddb1-4700-8ade-77055baa4f3a'
     Author            = 'Timothy van der Ham (@Tim81)'
     Copyright         = '© Timothy van der Ham. Licensed under Apache-2.0.'
@@ -43,7 +43,7 @@
             )
             LicenseUri   = 'https://www.apache.org/licenses/LICENSE-2.0'
             ProjectUri   = 'https://github.com/Tim81/PSVellumPDF'
-            ReleaseNotes = '1.1.0 (VellumPdf 1.2.0): PAdES digital signing via Set-VellumPdfSignature (X509Certificate2, reason/location/contact, composes with PDF/A; veraPDF-validated in CI) and custom PDF/A output intents via Set-VellumPdfOutputIntent (ICC profile or built-in CMYK). VellumPdf 1.2.0 adds CFF font subsetting, cmap formats 0/6, and ICC colour management transparently. Full changelog: https://github.com/Tim81/PSVellumPDF/blob/main/CHANGELOG.md'
+            ReleaseNotes = '1.1.1: hardening fixes. Save-VellumPdfDocument writes atomically (temp file + move) so a render/signing failure no longer truncates an existing file or leaves a 0-byte artifact; -WhatIf to a missing directory no longer disposes the document; signing/write failures carry operation-specific guidance. The -LinkUri scheme blocklist now normalises out embedded whitespace/control characters, closing a bypass. Full changelog: https://github.com/Tim81/PSVellumPDF/blob/main/CHANGELOG.md'
         }
     }
 }

@@ -19,7 +19,10 @@ function Save-VellumPdfDocument {
         the encoding warning into a terminating error), the document is never
         saved or disposed - dispose it yourself in your catch block.
 
-        An existing file at -Path is overwritten.
+        The write is atomic: the PDF is rendered (and signed) to a temporary
+        file beside -Path and only moved into place once it is complete, so a
+        render or signing failure leaves any existing file at -Path untouched.
+        On success an existing file at -Path is overwritten.
     .PARAMETER Document
         The live VellumPdf document to save. Accepts pipeline input. After saving,
         the document is disposed and stamped so subsequent cmdlet calls against
@@ -56,42 +59,78 @@ function Save-VellumPdfDocument {
         Assert-VellumPdfDocumentOpen -Document $Document -CommandName 'Save-VellumPdfDocument'
 
         $resolved = $ExecutionContext.SessionState.Path.GetUnresolvedProviderPathFromPSPath($Path)
+
+        # A signature staged by Set-VellumPdfSignature makes signing the write
+        # step: VellumPdf signs at serialization time, so Sign() replaces Save().
+        $signature = $Document.PSObject.Properties['PSVellumSignature']
+        $action = if ($signature) { 'Save signed PDF' } else { 'Save PDF' }
+
         $attempted = $false
         try {
-            $parent = [System.IO.Path]::GetDirectoryName($resolved)
-            if ($parent -and -not [System.IO.Directory]::Exists($parent)) {
-                $attempted = $true
-                throw "Save-VellumPdfDocument: directory not found: '$parent'. Create it first or pass a path in an existing directory."
-            }
-            # A signature staged by Set-VellumPdfSignature makes signing the
-            # write step: VellumPdf signs at serialization time, so Sign()
-            # replaces Save().
-            $signature = $Document.PSObject.Properties['PSVellumSignature']
-            $action = if ($signature) { 'Save signed PDF' } else { 'Save PDF' }
+            # Everything below is skipped under -WhatIf (ShouldProcess returns
+            # $false): nothing is written and the document is left open. The
+            # directory check lives here too so a -WhatIf dry run never throws
+            # or disposes the document.
             if ($PSCmdlet.ShouldProcess($resolved, $action)) {
                 $attempted = $true
+
+                $parent = [System.IO.Path]::GetDirectoryName($resolved)
+                if ($parent -and -not [System.IO.Directory]::Exists($parent)) {
+                    throw "Save-VellumPdfDocument: directory not found: '$parent'. Create it first or pass a path in an existing directory."
+                }
+
+                # Render/sign to a temporary file beside the target, then move
+                # it into place only once it is complete. File.Create and
+                # Document.Save both open the destination for writing before any
+                # content exists, so writing straight to -Path would truncate an
+                # existing good file the moment a render/sign failure occurred.
+                $temp = "$resolved.$([guid]::NewGuid().ToString('N')).tmp"
                 try {
-                    if ($signature) {
-                        $stream = [System.IO.File]::Create($resolved)
-                        try {
-                            [VellumPdf.Signing.SigningExtensions]::Sign($Document, $stream, $signature.Value)
+                    try {
+                        if ($signature) {
+                            $stream = [System.IO.File]::Create($temp)
+                            try {
+                                [VellumPdf.Signing.SigningExtensions]::Sign($Document, $stream, $signature.Value)
+                            }
+                            finally {
+                                $stream.Dispose()
+                            }
                         }
-                        finally {
-                            $stream.Dispose()
+                        else {
+                            $Document.Save($temp)
                         }
                     }
-                    else {
-                        $Document.Save($resolved)
+                    catch {
+                        # Surface failures with context specific to the operation
+                        # that failed instead of a bare library exception.
+                        $reason = $_.Exception.Message
+                        if ($_.Exception.InnerException) { $reason = $_.Exception.InnerException.Message }
+                        if ($signature) {
+                            throw ("Save-VellumPdfDocument: failed to sign '$resolved': $reason " +
+                                'Check that the signing certificate is valid and still holds its private key.')
+                        }
+                        throw ("Save-VellumPdfDocument: failed to render '$resolved': $reason " +
+                            'Check for extreme margin values or elements taller than the page.')
+                    }
+
+                    # The rendered file is known good; replace the target now.
+                    try {
+                        [System.IO.File]::Move($temp, $resolved, $true)
+                    }
+                    catch {
+                        $reason = $_.Exception.Message
+                        throw ("Save-VellumPdfDocument: rendered the PDF but could not write it to '$resolved': $reason " +
+                            'Check that -Path is a writable file location (not a directory) and is not locked by another process.')
                     }
                 }
-                catch {
-                    # Surface layout/render failures with actionable context
-                    # instead of a bare library exception.
-                    $reason = $_.Exception.Message
-                    if ($_.Exception.InnerException) { $reason = $_.Exception.InnerException.Message }
-                    throw ("Save-VellumPdfDocument: failed to render '$resolved': $reason " +
-                        'Check for extreme margin values or elements taller than the page.')
+                finally {
+                    # Clean up the temp file if a failure left it behind; on
+                    # success it has already been moved onto the target.
+                    if (Test-Path -LiteralPath $temp) {
+                        Remove-Item -LiteralPath $temp -Force -ErrorAction SilentlyContinue
+                    }
                 }
+
                 Get-Item -LiteralPath $resolved
             }
         }
