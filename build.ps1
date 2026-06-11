@@ -169,11 +169,14 @@ function Invoke-DocBuild {
             -HelpVersion $module.Version.ToString() | Out-Null
     }
 
-    # Post-process generator artifacts: machine locale and template placeholders.
+    # Post-process generator artifacts: machine locale and template placeholders
+    # (comment-based help has no field that fills the INPUTS/OUTPUTS type
+    # descriptions or RELATED LINKS, so PlatyPS leaves {{ Fill ... }} stubs).
     foreach ($md in Get-ChildItem $docsDir -Recurse -Filter '*.md') {
         $text = Get-Content $md.FullName -Raw
         $text = $text -replace 'Locale: [a-z]{2}-[A-Z]{2}', 'Locale: en-US'
         $text = $text -replace '(?s)## ALIASES\r?\n.*?\{\{Insert list of aliases\}\}\r?\n\r?\n', ''
+        $text = $text -replace '(?m)^\{\{ Fill in the (Description|related links here) \}\}\r?\n', ''
         Set-Content -Path $md.FullName -Value $text -NoNewline
     }
     Write-Host "==> Docs written to $docsDir" -ForegroundColor Green

@@ -4,7 +4,7 @@ external help file: PSVellumPDF-Help.xml
 HelpUri: ''
 Locale: en-US
 Module Name: PSVellumPDF
-ms.date: 06-10-2026
+ms.date: 06-11-2026
 PlatyPS schema version: 2024-05-01
 title: Save-VellumPdfDocument
 ---
@@ -29,12 +29,18 @@ Save-VellumPdfDocument [-Path] <string> -Document <Document> [-KeepOpen] [-WhatI
 Wraps Document.Save(path).
 The document is IDisposable; this function
 disposes it after the save attempt (success or failure) because saving is
-the terminal step of a build pipeline.
-Use -KeepOpen to keep the document
-alive for further edits, in which case you are responsible for calling
-$doc.Dispose() yourself.
-With -WhatIf nothing is saved and the document
-is left open.
+the terminal step of a build pipeline, and marks it so later cmdlet calls
+against the stale document fail with a clear error.
+Use -KeepOpen to keep
+the document alive for further edits, in which case you are responsible
+for calling $doc.Dispose() yourself.
+With -WhatIf nothing is saved and the
+document is left open.
+
+If the pipeline is aborted BEFORE this cmdlet runs (for example by an
+error in an earlier Add-VellumPdf* call, or -WarningAction Stop turning
+the encoding warning into a terminating error), the document is never
+saved or disposed - dispose it yourself in your catch block.
 
 An existing file at -Path is overwritten.
 
@@ -70,7 +76,13 @@ HelpMessage: ''
 
 ### -Document
 
-{{ Fill Document Description }}
+The live VellumPdf document to save.
+Accepts pipeline input.
+After saving,
+the document is disposed and stamped so subsequent cmdlet calls against
+the stale instance fail with a clear error.
+Use -KeepOpen to suppress
+disposal.
 
 ```yaml
 Type: VellumPdf.Layout.Document
@@ -91,7 +103,12 @@ HelpMessage: ''
 
 ### -KeepOpen
 
-Keep the document open after saving (caller must Dispose it).
+When specified, the document is not disposed after saving.
+The caller is
+responsible for calling $doc.Dispose() when finished.
+Useful when the
+same document object must be inspected or further manipulated after the
+file is written.
 
 ```yaml
 Type: System.Management.Automation.SwitchParameter
@@ -112,7 +129,11 @@ HelpMessage: ''
 
 ### -Path
 
-{{ Fill Path Description }}
+File system path for the output PDF file.
+The parent directory must
+already exist; an existing file at this path is overwritten.
+Mandatory
+and positional (position 0).
 
 ```yaml
 Type: System.String
@@ -164,21 +185,17 @@ This cmdlet supports the common parameters: -Debug, -ErrorAction, -ErrorVariable
 
 ### VellumPdf.Layout.Document
 
-{{ Fill in the Description }}
 
 ## OUTPUTS
 
 ### System.IO.FileInfo for the written file.
 
-{{ Fill in the Description }}
 
 ### System.IO.FileInfo
 
-{{ Fill in the Description }}
 
 ## NOTES
 
 ## RELATED LINKS
 
-{{ Fill in the related links here }}
 

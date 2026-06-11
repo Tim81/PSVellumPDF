@@ -4,7 +4,7 @@ external help file: PSVellumPDF-Help.xml
 HelpUri: ''
 Locale: en-US
 Module Name: PSVellumPDF
-ms.date: 06-10-2026
+ms.date: 06-11-2026
 PlatyPS schema version: 2024-05-01
 title: Set-VellumPdfDocumentInfo
 ---
@@ -51,7 +51,9 @@ $doc | Set-VellumPdfDocumentInfo -Title 'Draft'
 
 ### -Author
 
-{{ Fill Author Description }}
+The document author written to Document.Info.Author and the XMP
+dc:creator field for PDF/A documents.
+Required for PDF/A XMP compliance.
 
 ```yaml
 Type: System.String
@@ -72,7 +74,8 @@ HelpMessage: ''
 
 ### -Creator
 
-{{ Fill Creator Description }}
+The name of the application or tool that created the document content,
+written to Document.Info.Creator.
 
 ```yaml
 Type: System.String
@@ -93,7 +96,9 @@ HelpMessage: ''
 
 ### -Document
 
-{{ Fill Document Description }}
+The live VellumPdf document flowing through the pipeline.
+The same
+instance is returned after the metadata is set, enabling chaining.
 
 ```yaml
 Type: VellumPdf.Layout.Document
@@ -114,7 +119,9 @@ HelpMessage: ''
 
 ### -Keywords
 
-{{ Fill Keywords Description }}
+Keyword string written to Document.Info.Keywords.
+Typically a
+comma-separated list of search terms.
 
 ```yaml
 Type: System.String
@@ -135,7 +142,8 @@ HelpMessage: ''
 
 ### -Producer
 
-{{ Fill Producer Description }}
+The name of the tool that produced the PDF file, written to
+Document.Info.Producer.
 
 ```yaml
 Type: System.String
@@ -156,7 +164,7 @@ HelpMessage: ''
 
 ### -Subject
 
-{{ Fill Subject Description }}
+A short subject or description written to Document.Info.Subject.
 
 ```yaml
 Type: System.String
@@ -177,7 +185,9 @@ HelpMessage: ''
 
 ### -Title
 
-{{ Fill Title Description }}
+The document title written to Document.Info.Title and the XMP dc:title
+field for PDF/A documents.
+Required for PDF/A XMP compliance.
 
 ```yaml
 Type: System.String
@@ -207,21 +217,17 @@ This cmdlet supports the common parameters: -Debug, -ErrorAction, -ErrorVariable
 
 ### VellumPdf.Layout.Document
 
-{{ Fill in the Description }}
 
 ## OUTPUTS
 
 ### VellumPdf.Layout.Document (the same instance
 
-{{ Fill in the Description }}
 
 ### VellumPdf.Layout.Document
 
-{{ Fill in the Description }}
 
 ## NOTES
 
 ## RELATED LINKS
 
-{{ Fill in the related links here }}
 

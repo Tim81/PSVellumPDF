@@ -20,6 +20,17 @@ function Register-VellumPdfFont {
         with a different document would silently produce a PDF whose text cannot
         render (the font resource is missing), so the content cmdlets reject
         foreign handles with a clear error.
+    .PARAMETER Document
+        The VellumPdf document to register the font on. Accepts pipeline input.
+        The returned handle is only valid for this specific document instance.
+    .PARAMETER Path
+        File system path to a TrueType (.ttf) font file. Used in the default
+        'Path' parameter set. The path is resolved relative to the current
+        PowerShell provider location before reading.
+    .PARAMETER FontBytes
+        Raw TrueType font data as a byte array. Used in the 'Bytes' parameter
+        set when the font is already in memory (e.g. read from a stream or
+        embedded resource). Mutually exclusive with -Path.
     .EXAMPLE
         $doc = New-VellumPdfDocument -Conformance PdfA2b
         $handle = Register-VellumPdfFont -Document $doc -Path ./DejaVuSans.ttf

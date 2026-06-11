@@ -9,6 +9,38 @@ function Add-VellumPdfHeading {
 
         -MarginTop and -MarginBottom apply spacing above and below the heading
         without affecting the left/right margins already set on the element.
+    .PARAMETER Document
+        The live VellumPdf document flowing through the pipeline. The same
+        instance is returned after the heading is added, enabling chaining.
+    .PARAMETER Text
+        The string content of the heading. Mandatory and positional (position 0).
+    .PARAMETER Level
+        The heading level from 1 (top-level) to 6 (lowest). Controls the PDF
+        outline depth and the H1-H6 structure tag in tagged documents. Defaults
+        to 1.
+    .PARAMETER Font
+        A base-14 font name for the heading. Defaults to HelveticaBold. Ignored
+        when -FontHandle is supplied.
+    .PARAMETER FontSize
+        Font size in points for the heading, between 1 and 1000. Defaults to 16.
+    .PARAMETER Alignment
+        Horizontal alignment of the heading text. Accepts Left, Center, Right,
+        or Justify. Defaults to Left.
+    .PARAMETER BookmarkTitle
+        When supplied, adds a named PDF outline (bookmark) entry for this
+        heading. In tagged documents all headings automatically produce outline
+        entries; this parameter overrides the bookmark label for non-tagged docs.
+    .PARAMETER FontHandle
+        An EmbeddedFontHandle returned by Register-VellumPdfFont for this
+        document. When supplied the heading uses the embedded TrueType font and
+        the base-14 encoding warning is suppressed. Handles from a different
+        document are rejected.
+    .PARAMETER MarginTop
+        Extra spacing in points above the heading element. Does not affect the
+        left/right page margins.
+    .PARAMETER MarginBottom
+        Extra spacing in points below the heading element. Does not affect the
+        left/right page margins.
     .EXAMPLE
         $doc | Add-VellumPdfHeading -Text 'Chapter 1' -Level 1 -FontSize 18
     .OUTPUTS

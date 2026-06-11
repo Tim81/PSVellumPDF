@@ -4,7 +4,7 @@ external help file: PSVellumPDF-Help.xml
 HelpUri: ''
 Locale: en-US
 Module Name: PSVellumPDF
-ms.date: 06-10-2026
+ms.date: 06-11-2026
 PlatyPS schema version: 2024-05-01
 title: New-VellumPdfDocument
 ---
@@ -23,7 +23,7 @@ Creates a new VellumPdf layout document.
 New-VellumPdfDocument [[-Conformance] <string>] [[-PageSize] <string>] [[-DefaultFont] <string>]
  [[-DefaultFontSize] <double>] [[-Language] <string>] [[-Margin] <double>] [[-MarginTop] <double>]
  [[-MarginRight] <double>] [[-MarginBottom] <double>] [[-MarginLeft] <double>] [-Tagged]
- [<CommonParameters>]
+ [-UseObjectStreams] [<CommonParameters>]
 ```
 
 ## DESCRIPTION
@@ -42,6 +42,9 @@ Page margins can be set uniformly with -Margin, or per-side with
 parameter is supplied, the uniform -Margin value (if given) is used as
 the baseline for the unspecified sides; otherwise the library defaults
 are kept for unspecified sides.
+
+-UseObjectStreams enables PDF cross-reference object streams, which
+reduces file size for documents with many objects.
 
 ## EXAMPLES
 
@@ -64,7 +67,13 @@ New-VellumPdfDocument -Margin 30 -MarginLeft 50
 
 ### -Conformance
 
-{{ Fill Conformance Description }}
+The PDF/A conformance level for the document.
+Use PdfA2b, PdfA2u, or
+PdfA2a to produce an ISO 19005-2 compliant archive file; None (default)
+produces a standard PDF without conformance requirements.
+Note that PDF/A
+forbids encryption, so -Conformance is incompatible with
+Protect-VellumPdfDocument.
 
 ```yaml
 Type: System.String
@@ -85,7 +94,11 @@ HelpMessage: ''
 
 ### -DefaultFont
 
-{{ Fill DefaultFont Description }}
+The base-14 font name stored as the document-wide default.
+Content
+cmdlets that receive no explicit -Font fill the gap from this value
+rather than from the library-global Helvetica.
+Defaults to Helvetica.
 
 ```yaml
 Type: System.String
@@ -106,7 +119,11 @@ HelpMessage: ''
 
 ### -DefaultFontSize
 
-{{ Fill DefaultFontSize Description }}
+The font size in points stored as the document-wide default.
+Content
+cmdlets that receive no explicit -FontSize fill the gap from this value.
+Must be between 1 and 1000.
+Defaults to 11.
 
 ```yaml
 Type: System.Double
@@ -127,7 +144,7 @@ HelpMessage: ''
 
 ### -Language
 
-BCP 47 language tag written as the PDF /Lang entry (e.g.
+A BCP 47 language tag written as the PDF /Lang entry (e.g.
 'en-US').
 Relevant for tagged PDF and PDF/A accessibility.
 Requires VellumPdf 1.1+.
@@ -151,7 +168,11 @@ HelpMessage: ''
 
 ### -Margin
 
-{{ Fill Margin Description }}
+Uniform page margin in points applied to all four sides.
+When any
+per-side parameter (-MarginTop, -MarginRight, -MarginBottom, -MarginLeft)
+is also supplied, this value becomes the baseline for the unspecified
+sides rather than overriding them.
 
 ```yaml
 Type: System.Double
@@ -172,7 +193,9 @@ HelpMessage: ''
 
 ### -MarginBottom
 
-{{ Fill MarginBottom Description }}
+Bottom page margin in points.
+When supplied, overrides the -Margin
+baseline (or the library default) for the bottom side only.
 
 ```yaml
 Type: System.Double
@@ -193,7 +216,9 @@ HelpMessage: ''
 
 ### -MarginLeft
 
-{{ Fill MarginLeft Description }}
+Left page margin in points.
+When supplied, overrides the -Margin
+baseline (or the library default) for the left side only.
 
 ```yaml
 Type: System.Double
@@ -214,7 +239,9 @@ HelpMessage: ''
 
 ### -MarginRight
 
-{{ Fill MarginRight Description }}
+Right page margin in points.
+When supplied, overrides the -Margin
+baseline (or the library default) for the right side only.
 
 ```yaml
 Type: System.Double
@@ -235,7 +262,9 @@ HelpMessage: ''
 
 ### -MarginTop
 
-{{ Fill MarginTop Description }}
+Top page margin in points.
+When supplied, overrides the -Margin baseline
+(or the library default) for the top side only.
 
 ```yaml
 Type: System.Double
@@ -256,7 +285,10 @@ HelpMessage: ''
 
 ### -PageSize
 
-{{ Fill PageSize Description }}
+The paper size for every page in the document.
+Accepts standard ISO and
+US names (A0-A6, Ledger, Legal, Letter).
+Defaults to A4.
 
 ```yaml
 Type: System.String
@@ -277,7 +309,34 @@ HelpMessage: ''
 
 ### -Tagged
 
-{{ Fill Tagged Description }}
+When specified, marks the document as a tagged PDF (sets Document.Tagged
+to $true).
+Tagged PDFs are required for full PDF/A accessibility
+conformance and enable assistive-technology support.
+
+```yaml
+Type: System.Management.Automation.SwitchParameter
+DefaultValue: False
+SupportsWildcards: false
+Aliases: []
+ParameterSets:
+- Name: (All)
+  Position: Named
+  IsRequired: false
+  ValueFromPipeline: false
+  ValueFromPipelineByPropertyName: false
+  ValueFromRemainingArguments: false
+DontShow: false
+AcceptedValues: []
+HelpMessage: ''
+```
+
+### -UseObjectStreams
+
+When specified, enables PDF cross-reference object streams in the output
+file.
+Object streams reduce file size for documents with many objects by
+compressing the cross-reference table.
 
 ```yaml
 Type: System.Management.Automation.SwitchParameter
@@ -309,11 +368,9 @@ This cmdlet supports the common parameters: -Debug, -ErrorAction, -ErrorVariable
 
 ### VellumPdf.Layout.Document
 
-{{ Fill in the Description }}
 
 ## NOTES
 
 ## RELATED LINKS
 
-{{ Fill in the related links here }}
 

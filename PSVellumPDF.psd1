@@ -1,6 +1,6 @@
 ﻿@{
     RootModule        = 'PSVellumPDF.psm1'
-    ModuleVersion     = '0.1.0'
+    ModuleVersion     = '1.0.0'
     GUID              = 'e51842c7-ddb1-4700-8ade-77055baa4f3a'
     Author            = 'Timothy van der Ham (@Tim81)'
     Copyright         = '© Timothy van der Ham. Licensed under Apache-2.0.'
@@ -41,7 +41,7 @@
             )
             LicenseUri   = 'https://www.apache.org/licenses/LICENSE-2.0'
             ProjectUri   = 'https://github.com/Tim81/PSVellumPDF'
-            ReleaseNotes = '0.1.0 (pre-release, VellumPdf 1.1.0): full layout wrapper - documents (page size, margins, conformance, language), headings with bookmarks, paragraphs (rich runs, colour, hyperlinks), tables, lists, images, embedded TrueType fonts, headers/footers with page numbering, document metadata, and encryption.'
+            ReleaseNotes = '1.0.0 (stable, VellumPdf 1.1.0): complete layout wrapper with veraPDF-validated PDF/A-2b output. Adds line separators, line spacing (-Leading), element margins, font-from-bytes, object streams, and /Lang. Hardening: warnings for base-14 Unicode data loss, dangerous -LinkUri schemes rejected, stale-document and cross-document font-handle guards, double-encryption guard, column-width validation. Full changelog: https://github.com/Tim81/PSVellumPDF/blob/main/CHANGELOG.md'
         }
     }
 }

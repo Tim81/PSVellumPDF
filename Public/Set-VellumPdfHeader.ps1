@@ -12,6 +12,22 @@ function Set-VellumPdfHeader {
           {pages} - replaced with the total page count   (e.g. 9)
 
         Example template: 'Page {page} of {pages}'
+    .PARAMETER Document
+        The live VellumPdf document flowing through the pipeline. The same
+        instance is returned after the header is configured, enabling chaining.
+    .PARAMETER Template
+        The header text template. Use {page} for the current page number and
+        {pages} for the total page count (e.g. 'Page {page} of {pages}').
+        Mandatory.
+    .PARAMETER Font
+        A base-14 font name for the header text. When omitted the document
+        default font is used.
+    .PARAMETER FontSize
+        Font size in points for the header text, between 1 and 1000. When
+        omitted the document default size is used.
+    .PARAMETER Alignment
+        Horizontal alignment of the header text. Accepts Left, Center, Right,
+        or Justify. Defaults to Center.
     .EXAMPLE
         $doc | Set-VellumPdfHeader -Template 'Page {page} of {pages}'
     .EXAMPLE
