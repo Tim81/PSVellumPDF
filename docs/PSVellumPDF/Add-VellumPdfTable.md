@@ -20,43 +20,51 @@ Adds a table to a VellumPdf document.
 ### __AllParameterSets
 
 ```
-Add-VellumPdfTable [-Document] <Document> [[-Header] <string[]>] [-Row] <Object[][]>
- [[-ColumnWidth] <double[]>] [[-BorderWidth] <double>] [[-BorderColor] <double[]>]
- [[-HeaderBackground] <double[]>] [[-Font] <string>] [[-FontSize] <double>] [[-Alignment] <string>]
- [[-MarginTop] <double>] [[-MarginBottom] <double>] [<CommonParameters>]
+Add-VellumPdfTable [-Document] <Document> [[-Header] <string[]>] [-Row] <Object[]>
+ [[-ColumnWidth] <double[]>] [[-BorderWidth] <double>] [[-BorderColor] <Object>]
+ [[-HeaderBackground] <Object>] [[-AlternateRowBackground] <Object>] [[-ColumnAlignment] <string[]>]
+ [[-Font] <string>] [[-FontSize] <double>] [[-Alignment] <string>] [[-MarginTop] <double>]
+ [[-MarginBottom] <double>] [<CommonParameters>]
 ```
 
 ## DESCRIPTION
 
 Wraps Document.Add(TableElement).
-Builds a TableElement from a jagged array
-of row data, an optional header row, optional column widths, border styling,
-and a default cell text style.
+Builds a TableElement from row data, an
+optional header row, optional column widths, border and row styling, and a
+default cell text style.
 The document flows through the pipeline for
 chaining with other Add-VellumPdf* functions.
 
-Each inner array in -Row represents one data row; each element is converted
-to a string with ToString() and added as a cell.
-The optional -Header array
-produces a header row via AddHeaderRow().
+-Row accepts two shapes (the first row decides which):
+  - Records: PSCustomObject rows straight from Import-Csv or Select-Object,
+    or one hashtable per row.
+Columns are the property/key names and a
+    header is derived from them when -Header is omitted.
+  - Cell arrays: one array per row.
+Each element is a scalar (added as
+    text) or a rich-cell hashtable for that one cell:
+      @{ Text = 'Total'; ColSpan = 2; Alignment = 'Right';
+         Background = '#eeeeee'; Font = 'HelveticaBold'; FontSize = 11;
+         Color = 'navy' }
+    Text is required; the rest are optional.
 
-The -BorderColor and -HeaderBackground parameters accept a three-element
-array of [double] values in the 0..1 range (R, G, B).
+Colour parameters (-BorderColor, -HeaderBackground, -AlternateRowBackground,
+and a cell's Background/Color) accept an R,G,B triple in 0..1, a hex string
+('#3366cc'/'#36c'), or a colour name.
 
-NOTE: -Row is a jagged array (array of rows).
-For a SINGLE row use the
-unary comma operator so PowerShell does not flatten the outer array:
--Row @(,@('Cell1','Cell2')).
-A flat array like -Row @('a','b') is
-treated as two one-cell rows.
+NOTE: with cell-array rows, a SINGLE row needs the unary comma operator so
+PowerShell does not flatten the outer array: -Row @(,@('Cell1','Cell2')).
+A flat array like -Row @('a','b') is treated as two one-cell rows.
+Records
+do not need this.
 
 -MarginTop and -MarginBottom apply spacing above and below the table
 without affecting the left/right margins already set on the element.
 
-Objects from Import-Csv (PSCustomObject) are rejected with a hint;
-convert them to value arrays first:
-    $rows = Import-Csv data.csv |
-        ForEach-Object { [object[]]($_.PSObject.Properties.Value) }
+Import-Csv example:
+    Import-Csv data.csv | ForEach-Object { $rows += $_ }
+    Add-VellumPdfTable -Row (Import-Csv data.csv)
 
 ## EXAMPLES
 
@@ -92,7 +100,29 @@ SupportsWildcards: false
 Aliases: []
 ParameterSets:
 - Name: (All)
-  Position: 9
+  Position: 11
+  IsRequired: false
+  ValueFromPipeline: false
+  ValueFromPipelineByPropertyName: false
+  ValueFromRemainingArguments: false
+DontShow: false
+AcceptedValues: []
+HelpMessage: ''
+```
+
+### -AlternateRowBackground
+
+Background fill colour applied to every second data row (zebra striping):
+an R,G,B triple in 0..1, a hex string, or a colour name.
+
+```yaml
+Type: System.Object
+DefaultValue: ''
+SupportsWildcards: false
+Aliases: []
+ParameterSets:
+- Name: (All)
+  Position: 7
   IsRequired: false
   ValueFromPipeline: false
   ValueFromPipelineByPropertyName: false
@@ -104,14 +134,12 @@ HelpMessage: ''
 
 ### -BorderColor
 
-Border line colour as three doubles representing Red, Green, and Blue
-channels, each in the 0.0..1.0 range.
-Exactly three values must be
-supplied.
+Border line colour: an R,G,B triple in 0..1, a hex string ('#3366cc'),
+or a colour name.
 When omitted the library default border colour is used.
 
 ```yaml
-Type: System.Double[]
+Type: System.Object
 DefaultValue: ''
 SupportsWildcards: false
 Aliases: []
@@ -141,6 +169,30 @@ Aliases: []
 ParameterSets:
 - Name: (All)
   Position: 4
+  IsRequired: false
+  ValueFromPipeline: false
+  ValueFromPipelineByPropertyName: false
+  ValueFromRemainingArguments: false
+DontShow: false
+AcceptedValues: []
+HelpMessage: ''
+```
+
+### -ColumnAlignment
+
+Per-column horizontal alignment by column index (Left/Center/Right/
+Justify), overriding -Alignment for those columns.
+A cell's own
+Alignment key still wins over this.
+
+```yaml
+Type: System.String[]
+DefaultValue: ''
+SupportsWildcards: false
+Aliases: []
+ParameterSets:
+- Name: (All)
+  Position: 8
   IsRequired: false
   ValueFromPipeline: false
   ValueFromPipelineByPropertyName: false
@@ -210,7 +262,7 @@ SupportsWildcards: false
 Aliases: []
 ParameterSets:
 - Name: (All)
-  Position: 7
+  Position: 9
   IsRequired: false
   ValueFromPipeline: false
   ValueFromPipelineByPropertyName: false
@@ -233,7 +285,7 @@ SupportsWildcards: false
 Aliases: []
 ParameterSets:
 - Name: (All)
-  Position: 8
+  Position: 10
   IsRequired: false
   ValueFromPipeline: false
   ValueFromPipelineByPropertyName: false
@@ -271,15 +323,12 @@ HelpMessage: ''
 
 ### -HeaderBackground
 
-Background fill colour for the header row as three doubles representing
-Red, Green, and Blue channels, each in the 0.0..1.0 range.
-Exactly
-three values must be supplied.
-Only applied when -Header is also
-supplied.
+Background fill colour for the header row (R,G,B triple, hex, or name).
+Applied only when a header is present (supplied via -Header or derived
+from record columns).
 
 ```yaml
-Type: System.Double[]
+Type: System.Object
 DefaultValue: ''
 SupportsWildcards: false
 Aliases: []
@@ -308,7 +357,7 @@ SupportsWildcards: false
 Aliases: []
 ParameterSets:
 - Name: (All)
-  Position: 11
+  Position: 13
   IsRequired: false
   ValueFromPipeline: false
   ValueFromPipelineByPropertyName: false
@@ -331,7 +380,7 @@ SupportsWildcards: false
 Aliases: []
 ParameterSets:
 - Name: (All)
-  Position: 10
+  Position: 12
   IsRequired: false
   ValueFromPipeline: false
   ValueFromPipelineByPropertyName: false
@@ -343,17 +392,16 @@ HelpMessage: ''
 
 ### -Row
 
-A jagged array of data rows (array of arrays).
-Each inner array element
-is converted to a string via ToString() and added as a cell.
-PSCustomObject
-elements are rejected with a conversion hint.
-For a single data row, use
-the unary comma operator to prevent PowerShell from flattening the outer
-array: -Row @(,@('Cell1','Cell2')).
+The table rows.
+Either PSCustomObject/hashtable records (columns are the
+property/key names; header derived when -Header is omitted), or one array
+per row whose elements are scalars or rich-cell hashtables (see the
+description).
+For a single cell-array row, use the unary comma operator to
+prevent PowerShell from flattening the outer array: -Row @(,@('a','b')).
 
 ```yaml
-Type: System.Object[][]
+Type: System.Object[]
 DefaultValue: ''
 SupportsWildcards: false
 Aliases: []

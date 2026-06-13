@@ -169,3 +169,36 @@ Describe 'New-VellumTextStyle (private helper)' {
         $style.FontSize | Should -Be 14
     }
 }
+
+Describe 'ConvertTo-VellumColor (private helper)' {
+    It 'passes a 0..1 RGB triple through' {
+        $c = InModuleScope PSVellumPDF { ConvertTo-VellumColor @(0.1, 0.2, 0.3) }
+        $c[0] | Should -Be 0.1; $c[1] | Should -Be 0.2; $c[2] | Should -Be 0.3
+    }
+
+    It 'parses a #RRGGBB hex string' {
+        $c = InModuleScope PSVellumPDF { ConvertTo-VellumColor '#3366cc' }
+        [math]::Round($c[0], 4) | Should -Be ([math]::Round(0x33 / 255, 4))
+        [math]::Round($c[1], 4) | Should -Be ([math]::Round(0x66 / 255, 4))
+        [math]::Round($c[2], 4) | Should -Be ([math]::Round(0xcc / 255, 4))
+    }
+
+    It 'expands a #RGB shorthand to the same colour as #RRGGBB' {
+        $short = InModuleScope PSVellumPDF { ConvertTo-VellumColor '#36c' }
+        $long  = InModuleScope PSVellumPDF { ConvertTo-VellumColor '#3366cc' }
+        $short[0] | Should -Be $long[0]; $short[1] | Should -Be $long[1]; $short[2] | Should -Be $long[2]
+    }
+
+    It 'resolves a known colour name' {
+        $c = InModuleScope PSVellumPDF { ConvertTo-VellumColor 'red' }
+        $c[0] | Should -Be 1; $c[1] | Should -Be 0; $c[2] | Should -Be 0
+    }
+
+    It 'throws on an unrecognised colour' {
+        { InModuleScope PSVellumPDF { ConvertTo-VellumColor 'notacolour' } } | Should -Throw '*unrecognised colour*'
+    }
+
+    It 'throws on an out-of-range component' {
+        { InModuleScope PSVellumPDF { ConvertTo-VellumColor @(2.5, 0, 0) } } | Should -Throw '*between 0 and 1*'
+    }
+}

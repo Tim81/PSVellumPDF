@@ -21,7 +21,7 @@ Creates a styled text run for use in a mixed-style paragraph.
 
 ```
 New-VellumPdfTextRun [-Text] <string> [-Font <string>] [-FontSize <double>]
- [-FontHandle <EmbeddedFontHandle>] [-Color <double[]>] [-LinkUri <string>] [-Leading <double>]
+ [-FontHandle <EmbeddedFontHandle>] [-Color <Object>] [-LinkUri <string>] [-Leading <double>]
  [<CommonParameters>]
 ```
 
@@ -57,14 +57,12 @@ $doc | Add-VellumPdfParagraph -Run $run1, $run2, $run3
 
 ### -Color
 
-Text colour as three doubles representing Red, Green, and Blue channels,
-each in the 0.0..1.0 range (e.g.
-1,0,0 for pure red).
-Exactly three
-values must be supplied.
+Text colour, given as an R,G,B triple in 0..1 (e.g.
+1,0,0 for red), a hex
+string ('#3366cc' or '#36c'), or a colour name (red, navy, orange, ...).
 
 ```yaml
-Type: System.Double[]
+Type: System.Object
 DefaultValue: ''
 SupportsWildcards: false
 Aliases: []

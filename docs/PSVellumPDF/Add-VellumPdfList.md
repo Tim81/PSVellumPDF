@@ -20,7 +20,7 @@ Adds an ordered or unordered list to a VellumPdf document.
 ### __AllParameterSets
 
 ```
-Add-VellumPdfList [-Document] <Document> [-Item] <string[]> [[-Style] <string>] [[-Indent] <double>]
+Add-VellumPdfList [-Document] <Document> [-Item] <Object[]> [[-Style] <string>] [[-Indent] <double>]
  [[-Font] <string>] [[-FontSize] <double>] [[-MarginTop] <double>] [[-MarginBottom] <double>]
  [<CommonParameters>]
 ```
@@ -54,6 +54,14 @@ New-VellumPdfDocument |
 
 $doc | Add-VellumPdfList -Item 'First','Second','Third' `
        -Style OrderedDecimal -Indent 20 -Font Helvetica -FontSize 11
+
+### EXAMPLE 3
+
+# Nested list
+$doc | Add-VellumPdfList -Item @(
+    'Fruit',
+    @{ Text = 'Vegetables'; Children = @('Carrot', 'Potato') }
+)
 
 ## PARAMETERS
 
@@ -151,13 +159,18 @@ HelpMessage: ''
 
 ### -Item
 
-A string array of list item labels.
-Each element becomes one list item.
-Empty strings are permitted.
+The list items.
+Each element is either a string (a leaf item) or a
+hashtable describing a nested item:
+    @{ Text = 'Parent'; Children = @('Child A', @{ Text = 'Child B';
+       Children = @('Grandchild') }) }
+Children nest to any depth via ListItem.AddChild.
+Empty strings are
+permitted.
 Mandatory.
 
 ```yaml
-Type: System.String[]
+Type: System.Object[]
 DefaultValue: ''
 SupportsWildcards: false
 Aliases: []

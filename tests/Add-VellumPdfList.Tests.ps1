@@ -158,4 +158,30 @@ Describe 'Add-VellumPdfList' {
             [System.IO.File]::ReadAllBytes($script:outPath)[0..4])
         $head | Should -Be '%PDF-'
     }
+
+    It 'builds a multi-level nested list (hashtable items with Children) into a valid PDF' {
+        # The content stream is compressed, so assert structural validity rather
+        # than matching label text; reaching Save without error proves the
+        # recursive ListItem.AddChild build traversed every level.
+        New-VellumPdfDocument |
+            Add-VellumPdfList -Item @(
+                'Top one',
+                @{ Text = 'Top two'; Children = @('Child A', @{ Text = 'Child B'; Children = @('Grandchild') }) }
+            ) -Style OrderedDecimal |
+            Save-VellumPdfDocument -Path $script:outPath
+
+        Test-Path $script:outPath | Should -BeTrue
+        (Get-Item $script:outPath).Length | Should -BeGreaterThan 0
+        $head = [System.Text.Encoding]::ASCII.GetString(
+            [System.IO.File]::ReadAllBytes($script:outPath)[0..4])
+        $head | Should -Be '%PDF-'
+    }
+
+    It 'throws when a nested-item hashtable lacks a Text key' {
+        $doc = New-VellumPdfDocument
+        try {
+            { $doc | Add-VellumPdfList -Item @(@{ Children = @('x') }) } | Should -Throw "*'Text' key*"
+        }
+        finally { $doc.Dispose() }
+    }
 }
