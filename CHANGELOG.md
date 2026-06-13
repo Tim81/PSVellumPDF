@@ -6,6 +6,31 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [1.2.2] - 2026-06-13
+
+Built on VellumPdf 1.5.4 (was 1.5.3). No wrapper API change.
+
+### Fixed
+- JPEG 2000 and JBIG2 images now compose with PDF/A-2. VellumPdf 1.5.4 embeds the
+  JP2 box metadata (`ihdr`/`colr`) that veraPDF reads for PDF/A-2 clause 6.2.8.3
+  and only emits `/BitsPerComponent` when PDF/A permits the value, so a PDF/A-2b
+  document with an embedded JPEG 2000 image is now veraPDF-conformant
+  ([VellumPDF#91](https://github.com/Tim81/VellumPDF/issues/91)). Before this,
+  the image was embedded as a bare codestream and veraPDF saw 0 channels / 0 bit
+  depth and failed.
+
+### Tests
+- CI now veraPDF-validates two new PDF/A-2b samples - one with an embedded JPEG
+  2000 image, one with a JBIG2 image - so the conformance fix cannot regress.
+- Vendored `tests/assets/sample.jp2` (a real 16x16 RGB JPEG 2000) and
+  `sample.jb2` (minimal JBIG2), with SHA-256 integrity checks, plus Pester
+  tests embedding each in a PDF/A-2b document.
+
+### Changed
+- `Add-VellumPdfImage` help now states JPEG 2000/JBIG2 compose with PDF/A-2
+  (on the bundled engine), noting JPEG 2000's channel/bit-depth requirement,
+  replacing the earlier "may not conform" caveat.
+
 ## [1.2.1] - 2026-06-13
 
 Adversarial-review follow-ups to 1.2.0. No new features; behaviour, tests, and
@@ -162,7 +187,8 @@ First public release, built on VellumPdf 1.1.0 (.NET 10).
 - Quality gates: PSScriptAnalyzer, Pester (94% coverage), 3-OS CI, locked
   NuGet restore, SHA-pinned actions, PSGallery release pipeline.
 
-[Unreleased]: https://github.com/Tim81/PSVellumPDF/compare/v1.2.1...HEAD
+[Unreleased]: https://github.com/Tim81/PSVellumPDF/compare/v1.2.2...HEAD
+[1.2.2]: https://github.com/Tim81/PSVellumPDF/compare/v1.2.1...v1.2.2
 [1.2.1]: https://github.com/Tim81/PSVellumPDF/compare/v1.2.0...v1.2.1
 [1.2.0]: https://github.com/Tim81/PSVellumPDF/compare/v1.1.1...v1.2.0
 [1.1.1]: https://github.com/Tim81/PSVellumPDF/compare/v1.1.0...v1.1.1
