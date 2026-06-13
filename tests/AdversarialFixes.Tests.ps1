@@ -47,23 +47,34 @@ Describe 'LinkUri hygiene' {
     It 'rejects javascript:, vbscript:, data: and file: schemes' {
         foreach ($uri in 'javascript:alert(1)', 'VBScript:x', 'data:text/html,x', 'file:///C:/Windows') {
             { $script:doc | Add-VellumPdfParagraph -Text 'link' -LinkUri $uri } |
-                Should -Throw '*blocked scheme*'
+                Should -Throw '*only http, https, and mailto*'
             { New-VellumPdfTextRun -Text 'link' -LinkUri $uri } |
-                Should -Throw '*blocked scheme*'
+                Should -Throw '*only http, https, and mailto*'
+        }
+    }
+
+    It 'rejects any non-allowlisted scheme, including relative and scheme-relative URIs' {
+        # Allowlist semantics: only http/https/mailto pass. Everything else is
+        # rejected, so an unanticipated protocol handler can never reach the PDF.
+        foreach ($uri in 'ftp://host/f', 'tel:+15551234', 'ms-msdt:/id', '//evil.example/x', '/relative/path') {
+            { $script:doc | Add-VellumPdfParagraph -Text 'link' -LinkUri $uri } |
+                Should -Throw '*only http, https, and mailto*'
+            { New-VellumPdfTextRun -Text 'link' -LinkUri $uri } |
+                Should -Throw '*only http, https, and mailto*'
         }
     }
 
     It 'rejects blocked schemes smuggled past with embedded whitespace/control chars' {
         # Lenient readers strip this noise before dispatching the scheme, so the
-        # blocklist must normalise it out before matching (not just trim leading).
+        # scheme must be read from a normalised copy (not just trimmed leading).
         $tab  = "java`tscript:alert(1)"                       # tab inside keyword
         $ctrl = [char]0x01 + 'javascript:alert(1)'            # leading control byte
         $nbsp = 'java' + [char]0x00A0 + 'script:alert(1)'     # no-break space inside keyword
         foreach ($uri in $tab, $ctrl, $nbsp) {
             { $script:doc | Add-VellumPdfParagraph -Text 'link' -LinkUri $uri } |
-                Should -Throw '*blocked scheme*'
+                Should -Throw '*only http, https, and mailto*'
             { New-VellumPdfTextRun -Text 'link' -LinkUri $uri } |
-                Should -Throw '*blocked scheme*'
+                Should -Throw '*only http, https, and mailto*'
         }
     }
 

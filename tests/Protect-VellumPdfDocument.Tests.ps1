@@ -189,4 +189,29 @@ Describe 'Protect-VellumPdfDocument' {
         $content = [System.Text.Encoding]::Latin1.GetString($bytes)
         $content | Should -Match '/Encrypt'
     }
+
+    It 'warns when an owner password is set with no user password and default permissions' {
+        $ownerPw = ConvertTo-SecureString 'ownerpw' -AsPlainText -Force
+        $doc = New-VellumPdfDocument | Add-VellumPdfParagraph -Text 'Owner only, default perms.'
+        $doc | Protect-VellumPdfDocument -OwnerPassword $ownerPw -WarningVariable warn -WarningAction SilentlyContinue | Out-Null
+        $warn -join "`n" | Should -Match 'nothing is restricted'
+        $doc.Dispose()
+    }
+
+    It 'does not warn when -Permission is narrowed on an owner-only document' {
+        $ownerPw = ConvertTo-SecureString 'ownerpw' -AsPlainText -Force
+        $doc = New-VellumPdfDocument | Add-VellumPdfParagraph -Text 'Owner only, restricted.'
+        $doc | Protect-VellumPdfDocument -OwnerPassword $ownerPw -Permission Print -WarningVariable warn -WarningAction SilentlyContinue | Out-Null
+        $warn | Should -BeNullOrEmpty
+        $doc.Dispose()
+    }
+
+    It 'does not warn when a user password is also supplied' {
+        $userPw  = ConvertTo-SecureString 'userpw'  -AsPlainText -Force
+        $ownerPw = ConvertTo-SecureString 'ownerpw' -AsPlainText -Force
+        $doc = New-VellumPdfDocument | Add-VellumPdfParagraph -Text 'Both passwords.'
+        $doc | Protect-VellumPdfDocument -UserPassword $userPw -OwnerPassword $ownerPw -WarningVariable warn -WarningAction SilentlyContinue | Out-Null
+        $warn | Should -BeNullOrEmpty
+        $doc.Dispose()
+    }
 }
