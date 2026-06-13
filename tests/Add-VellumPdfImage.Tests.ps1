@@ -237,3 +237,58 @@ Describe 'Add-VellumPdfImage end-to-end for JBIG2 and JPEG 2000' {
         $head | Should -Be '%PDF-'
     }
 }
+
+Describe 'Vendored codec asset integrity' {
+    # tests/assets/sample.jp2 (real 16x16 RGB JPEG 2000, Pillow/OpenJPEG) and
+    # sample.jb2 (minimal valid JBIG2) back the PDF/A conformance gate for
+    # VellumPDF#91. A tamper/regeneration changing these bytes should be visible.
+    It 'sample.jp2 matches the recorded SHA-256' {
+        $p = Join-Path $PSScriptRoot 'assets' 'sample.jp2'
+        (Get-FileHash $p -Algorithm SHA256).Hash |
+            Should -Be '9636C154316F8CC95667FEF13D1093262E2FC8A29074B0D0280C49C282C01D90'
+    }
+
+    It 'sample.jb2 matches the recorded SHA-256' {
+        $p = Join-Path $PSScriptRoot 'assets' 'sample.jb2'
+        (Get-FileHash $p -Algorithm SHA256).Hash |
+            Should -Be '94731E12CCA0FECBAE7CE2DE5B3EC5820F631F57BFECD4B9858F4AB62174B342'
+    }
+}
+
+Describe 'JPEG 2000 / JBIG2 compose with PDF/A-2b' {
+    # Offline structural check; veraPDF conformance is gated in CI
+    # (tools/New-ValidationSamples.ps1 + the validate job). Guards VellumPDF#91.
+    BeforeEach {
+        $script:outPath = Join-Path $TestDrive "pdfa-codec-$([guid]::NewGuid()).pdf"
+        $script:ttf = Join-Path $PSScriptRoot 'assets' 'DejaVuSans.ttf'
+    }
+
+    It 'embeds a real JPEG 2000 image in a PDF/A-2b document with the JP2 metadata preserved' {
+        $jpx = Join-Path $PSScriptRoot 'assets' 'sample.jp2'
+        $doc = New-VellumPdfDocument -Conformance PdfA2b -Language 'en-US'
+        $font = Register-VellumPdfFont -Document $doc -Path $script:ttf
+        $doc |
+            Add-VellumPdfParagraph -Text 'Archival JP2.' -FontHandle $font |
+            Add-VellumPdfImage -Path $jpx -Width 40 -AltText 'jp2' |
+            Save-VellumPdfDocument -Path $script:outPath
+
+        $raw = [System.Text.Encoding]::Latin1.GetString([System.IO.File]::ReadAllBytes($script:outPath))
+        $raw | Should -BeLike '%PDF-*'
+        $raw | Should -Match '/JPXDecode'
+        $raw | Should -Match 'pdfaid'   # PDF/A identification survives
+    }
+
+    It 'embeds a JBIG2 image in a PDF/A-2b document' {
+        $jb2 = Join-Path $PSScriptRoot 'assets' 'sample.jb2'
+        $doc = New-VellumPdfDocument -Conformance PdfA2b -Language 'en-US'
+        $font = Register-VellumPdfFont -Document $doc -Path $script:ttf
+        $doc |
+            Add-VellumPdfParagraph -Text 'Archival JBIG2.' -FontHandle $font |
+            Add-VellumPdfImage -Path $jb2 -Width 40 -AltText 'jbig2' |
+            Save-VellumPdfDocument -Path $script:outPath
+
+        $raw = [System.Text.Encoding]::Latin1.GetString([System.IO.File]::ReadAllBytes($script:outPath))
+        $raw | Should -BeLike '%PDF-*'
+        $raw | Should -Match '/JBIG2Decode'
+    }
+}

@@ -8,9 +8,11 @@
       pdfa2b.pdf        - PDF/A-2b with embedded TrueType font, metadata, /Lang
       pdfa2b-signed.pdf - the same archival profile with a PAdES signature
                           (in-memory self-signed certificate)
+      pdfa2b-jpx.pdf    - PDF/A-2b with an embedded JPEG 2000 image
+      pdfa2b-jbig2.pdf  - PDF/A-2b with an embedded JBIG2 image
       encrypted.pdf     - password-protected (user password: validate)
     CI runs `qpdf --check` against all of them and veraPDF (--flavour 2b)
-    against pdfa2b.pdf and pdfa2b-signed.pdf.
+    against pdfa2b.pdf, pdfa2b-signed.pdf, pdfa2b-jpx.pdf, and pdfa2b-jbig2.pdf.
 #>
 #requires -Version 7.6
 [CmdletBinding()]
@@ -86,6 +88,28 @@ try {
 finally {
     $rsa.Dispose()
 }
+
+# --- pdfa2b-jpx.pdf / pdfa2b-jbig2.pdf: archival with JPEG 2000 / JBIG2 image --
+# Guards VellumPDF#91: a JPEG 2000 image must keep the JP2 ihdr/colr boxes that
+# veraPDF reads for PDF/A-2 clause 6.2.8.3. tests/assets/sample.jp2 is a real
+# 16x16 RGB JP2 (Pillow/OpenJPEG); sample.jb2 is a minimal valid JBIG2.
+$jpx = Join-Path $repoRoot 'tests' 'assets' 'sample.jp2'
+$docJpx = New-VellumPdfDocument -Conformance PdfA2b -Language 'en-US'
+$jpxFont = Register-VellumPdfFont -Document $docJpx -Path $ttf
+$docJpx |
+    Set-VellumPdfDocumentInfo -Title 'JPEG 2000 Archival Sample' -Author 'PSVellumPDF CI' |
+    Add-VellumPdfParagraph -Text 'PDF/A-2b with an embedded JPEG 2000 image.' -FontHandle $jpxFont |
+    Add-VellumPdfImage -Path $jpx -Width 40 -AltText 'JPEG 2000 sample' |
+    Save-VellumPdfDocument -Path (Join-Path $OutputPath 'pdfa2b-jpx.pdf') | Out-Null
+
+$jb2 = Join-Path $repoRoot 'tests' 'assets' 'sample.jb2'
+$docJb2 = New-VellumPdfDocument -Conformance PdfA2b -Language 'en-US'
+$jb2Font = Register-VellumPdfFont -Document $docJb2 -Path $ttf
+$docJb2 |
+    Set-VellumPdfDocumentInfo -Title 'JBIG2 Archival Sample' -Author 'PSVellumPDF CI' |
+    Add-VellumPdfParagraph -Text 'PDF/A-2b with an embedded JBIG2 image.' -FontHandle $jb2Font |
+    Add-VellumPdfImage -Path $jb2 -Width 40 -AltText 'JBIG2 sample' |
+    Save-VellumPdfDocument -Path (Join-Path $OutputPath 'pdfa2b-jbig2.pdf') | Out-Null
 
 # --- encrypted.pdf ------------------------------------------------------------
 $pw = ConvertTo-SecureString 'validate' -AsPlainText -Force
