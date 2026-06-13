@@ -31,7 +31,10 @@ BeforeAll {
     # header is used to find the true end).
     function script:Get-SignatureCmsBlob([byte[]]$PdfBytes) {
         $text = [System.Text.Encoding]::Latin1.GetString($PdfBytes)
-        $m = [regex]::Match($text, '/Contents\s*<([0-9A-Fa-f]+)>')
+        # VellumPdf 1.5.x emits a placeholder comment between /Contents and the
+        # hex string (e.g. "/Contents %VELLUM_SIG_CONTENTS_...<hex>"); skip an
+        # optional PDF comment line before the angle-bracketed hex.
+        $m = [regex]::Match($text, '/Contents\s*(?:%[^\r\n]*\r?\n\s*)?<([0-9A-Fa-f]+)>')
         if (-not $m.Success) { throw 'No /Contents hex string found in PDF.' }
         $padded = [System.Convert]::FromHexString($m.Groups[1].Value)
         # DER TLV: tag, then short- or long-form length.
@@ -232,5 +235,54 @@ Describe 'Set-VellumPdfSignature' {
         finally {
             if (-not $doc.PSObject.Properties['PSVellumDisposed']) { $doc.Dispose() }
         }
+    }
+}
+
+Describe 'Set-VellumPdfSignature RFC-3161 timestamp (PAdES B-T)' {
+    # These exercise staging and the fail-fast guards only. Saving with a real
+    # -TimestampUrl contacts the TSA over the network, so the B-T round trip is
+    # not unit-tested offline; constructing the HttpTimestampClient does not
+    # itself make a request.
+    It 'stages a TimestampClient on the signature settings when -TimestampUrl is given' {
+        $doc = New-VellumPdfDocument |
+            Add-VellumPdfParagraph -Text 'Timestamped.' |
+            Set-VellumPdfSignature -Certificate $script:cert `
+                -TimestampUrl 'http://timestamp.example/tsa'
+        try {
+            $settings = $doc.PSObject.Properties['PSVellumSignature'].Value
+            $settings.TimestampClient | Should -Not -BeNullOrEmpty
+            $settings.TimestampClient | Should -BeOfType ([VellumPdf.Signing.HttpTimestampClient])
+        }
+        finally { $doc.Dispose() }
+    }
+
+    It 'rejects a -TimestampUrl whose scheme is not http or https' {
+        $doc = New-VellumPdfDocument | Add-VellumPdfParagraph -Text 'Bad scheme.'
+        try {
+            { $doc | Set-VellumPdfSignature -Certificate $script:cert `
+                    -TimestampUrl 'ftp://timestamp.example/tsa' } |
+                Should -Throw '*http or https*'
+        }
+        finally { $doc.Dispose() }
+    }
+
+    It 'requires -TimestampUrl when -TimestampTimeout is given without it' {
+        $doc = New-VellumPdfDocument | Add-VellumPdfParagraph -Text 'No url.'
+        try {
+            { $doc | Set-VellumPdfSignature -Certificate $script:cert `
+                    -TimestampTimeout ([timespan]::FromSeconds(10)) } |
+                Should -Throw '*require -TimestampUrl*'
+        }
+        finally { $doc.Dispose() }
+    }
+
+    It 'requires -TimestampUrl when -TimestampRequestCertificate is given without it' {
+        $doc = New-VellumPdfDocument | Add-VellumPdfParagraph -Text 'No url.'
+        try {
+            { $doc | Set-VellumPdfSignature -Certificate $script:cert `
+                    -TimestampRequestCertificate $false } |
+                Should -Throw '*require -TimestampUrl*'
+        }
+        finally { $doc.Dispose() }
     }
 }

@@ -4,7 +4,7 @@ external help file: PSVellumPDF-Help.xml
 HelpUri: ''
 Locale: en-US
 Module Name: PSVellumPDF
-ms.date: 06-11-2026
+ms.date: 06-13-2026
 PlatyPS schema version: 2024-05-01
 title: Add-VellumPdfImage
 ---
@@ -29,10 +29,11 @@ Add-VellumPdfImage [-Path] <string> -Document <Document> [-Width <double>] [-Hei
 
 Wraps Document.Add(LayoutImage).
 Reads the image from -Path, selects the
-appropriate VellumPdf loader by file extension (JPEG, PNG, BMP, GIF, TIFF),
-constructs a LayoutImage, and adds it to the document.
+appropriate VellumPdf loader by file extension (JPEG, PNG, BMP, GIF, TIFF,
+JBIG2, JPEG 2000), constructs a LayoutImage, and adds it to the document.
 
-Supported extensions: .jpg/.jpeg, .png, .bmp, .gif, .tif/.tiff.
+Supported extensions: .jpg/.jpeg, .png, .bmp, .gif, .tif/.tiff,
+.jbig2/.jb2, and .jp2/.jpx/.j2k/.jpf (JPEG 2000).
 
 Optional -Width and -Height (in points) constrain the rendered size; when
 omitted the image renders at its natural size.
@@ -206,11 +207,11 @@ HelpMessage: ''
 
 File system path to the image file.
 Supported extensions are .jpg,
-.jpeg, .png, .bmp, .gif, .tif, and .tiff.
-The path is resolved
-relative to the current PowerShell provider location.
-Mandatory and
-positional (position 0).
+.jpeg, .png, .bmp, .gif, .tif, .tiff, .jbig2, .jb2, .jp2, .jpx, .j2k,
+and .jpf.
+The path is resolved relative to the current PowerShell
+provider location.
+Mandatory and positional (position 0).
 
 ```yaml
 Type: System.String
