@@ -106,8 +106,12 @@ function Save-VellumPdfDocument {
                         $reason = $_.Exception.Message
                         if ($_.Exception.InnerException) { $reason = $_.Exception.InnerException.Message }
                         if ($signature) {
-                            throw ("Save-VellumPdfDocument: failed to sign '$resolved': $reason " +
-                                'Check that the signing certificate is valid and still holds its private key.')
+                            $hint = 'Check that the signing certificate is valid and still holds its private key.'
+                            if ($signature.Value.TimestampClient) {
+                                $hint = 'Check that the signing certificate is valid and holds its private key, ' +
+                                    'and that the timestamp authority (-TimestampUrl) is reachable.'
+                            }
+                            throw "Save-VellumPdfDocument: failed to sign '$resolved': $reason $hint"
                         }
                         throw ("Save-VellumPdfDocument: failed to render '$resolved': $reason " +
                             'Check for extreme margin values or elements taller than the page.')
@@ -143,6 +147,13 @@ function Save-VellumPdfDocument {
                 $Document.Dispose()
                 if (-not $Document.PSObject.Properties['PSVellumDisposed']) {
                     $Document.PSObject.Properties.Add([psnoteproperty]::new('PSVellumDisposed', $true))
+                }
+                # An HttpClient stashed by Set-VellumPdfSignature -TimestampUrl was
+                # only needed for this signing write; dispose it with the document.
+                $clientProp = $Document.PSObject.Properties['PSVellumTimestampHttpClient']
+                if ($clientProp -and $clientProp.Value) {
+                    $clientProp.Value.Dispose()
+                    $clientProp.Value = $null
                 }
             }
         }

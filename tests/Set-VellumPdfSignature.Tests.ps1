@@ -285,4 +285,45 @@ Describe 'Set-VellumPdfSignature RFC-3161 timestamp (PAdES B-T)' {
         }
         finally { $doc.Dispose() }
     }
+
+    It 'replaces (does not orphan) the stashed HttpClient when re-staged with a new -TimestampUrl' {
+        $doc = New-VellumPdfDocument | Add-VellumPdfParagraph -Text 'Re-stage.'
+        try {
+            $doc | Set-VellumPdfSignature -Certificate $script:cert -TimestampUrl 'http://tsa-a.example/t' | Out-Null
+            $first = $doc.PSObject.Properties['PSVellumTimestampHttpClient'].Value
+            $first | Should -Not -BeNullOrEmpty
+            $doc | Set-VellumPdfSignature -Certificate $script:cert -TimestampUrl 'http://tsa-b.example/t' | Out-Null
+            $second = $doc.PSObject.Properties['PSVellumTimestampHttpClient'].Value
+            $second | Should -Not -BeNullOrEmpty
+            [object]::ReferenceEquals($first, $second) | Should -BeFalse
+            # The replaced client is disposed: a send on it now throws.
+            { $first.CancelPendingRequests() } | Should -Throw
+        }
+        finally { $doc.Dispose() }
+    }
+
+    It 'clears the stashed HttpClient when re-staged without -TimestampUrl' {
+        $doc = New-VellumPdfDocument | Add-VellumPdfParagraph -Text 'Drop ts.'
+        try {
+            $doc | Set-VellumPdfSignature -Certificate $script:cert -TimestampUrl 'http://tsa.example/t' | Out-Null
+            $doc.PSObject.Properties['PSVellumTimestampHttpClient'].Value | Should -Not -BeNullOrEmpty
+            $doc | Set-VellumPdfSignature -Certificate $script:cert | Out-Null
+            $doc.PSObject.Properties['PSVellumTimestampHttpClient'].Value | Should -BeNullOrEmpty
+            $doc.PSObject.Properties['PSVellumSignature'].Value.TimestampClient | Should -BeNullOrEmpty
+        }
+        finally { $doc.Dispose() }
+    }
+
+    It 'a TSA failure at save reports a timestamp-authority hint and leaves no file' {
+        # Loopback discard port: connection is refused fast and deterministically,
+        # with no external network dependency.
+        $out = Join-Path $TestDrive "tsafail-$([guid]::NewGuid()).pdf"
+        { New-VellumPdfDocument |
+                Add-VellumPdfParagraph -Text 'TSA down.' |
+                Set-VellumPdfSignature -Certificate $script:cert `
+                    -TimestampUrl 'http://127.0.0.1:9/tsa' -TimestampTimeout ([timespan]::FromSeconds(5)) |
+                Save-VellumPdfDocument -Path $out } |
+            Should -Throw '*timestamp authority*'
+        Test-Path $out | Should -BeFalse
+    }
 }
