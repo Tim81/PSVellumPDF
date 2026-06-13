@@ -1,6 +1,6 @@
 ﻿@{
     RootModule        = 'PSVellumPDF.psm1'
-    ModuleVersion     = '1.2.1'
+    ModuleVersion     = '1.2.2'
     GUID              = 'e51842c7-ddb1-4700-8ade-77055baa4f3a'
     Author            = 'Timothy van der Ham (@Tim81)'
     Copyright         = '© Timothy van der Ham. Licensed under Apache-2.0.'
@@ -60,7 +60,7 @@ This module generates new PDFs. It does not read, edit, split, or merge existing
             )
             LicenseUri   = 'https://www.apache.org/licenses/LICENSE-2.0'
             ProjectUri   = 'https://github.com/Tim81/PSVellumPDF'
-            ReleaseNotes = '1.2.1: adversarial-review follow-ups to 1.2.0. Timestamp HttpClient is now disposed with the document instead of leaking; a timestamp authority failure at save gives a TSA/network hint rather than a certificate one; the JBIG2/JPEG 2000 routing tests now assert the format-specific loader and real end-to-end embedding is covered. Help notes the PDF/A-2 ISO constraints on JPEG 2000/JBIG2 images. 1.2.0 (built on VellumPdf 1.5.3) added RFC-3161 timestamps (PAdES B-T) and JBIG2/JPEG 2000 image support. Full changelog: https://github.com/Tim81/PSVellumPDF/blob/main/CHANGELOG.md'
+            ReleaseNotes = '1.2.2: built on VellumPdf 1.5.4 (was 1.5.3). JPEG 2000 and JBIG2 images now compose with PDF/A-2: the engine embeds the JP2 metadata boxes veraPDF requires (VellumPDF#91), so a PDF/A-2b document with such an image is conformant. CI now veraPDF-validates PDF/A-2b samples with an embedded JPEG 2000 and JBIG2 image. No wrapper API change. Full changelog: https://github.com/Tim81/PSVellumPDF/blob/main/CHANGELOG.md'
         }
     }
 }

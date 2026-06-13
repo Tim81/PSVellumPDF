@@ -10,12 +10,12 @@ function Add-VellumPdfImage {
         Supported extensions: .jpg/.jpeg, .png, .bmp, .gif, .tif/.tiff,
         .jbig2/.jb2, and .jp2/.jpx/.j2k/.jpf (JPEG 2000).
 
-        Note for PDF/A: JPEG 2000 and JBIG2 images embed in any document, but
-        PDF/A-2 places extra ISO constraints on them (for JPEG 2000, the colour
-        channels must number 1, 3, or 4 and share one bit depth in the range
-        1-38). Whether a PDF/A document with such an image is conformant depends
-        on the source image meeting those constraints; validate with veraPDF if
-        archival conformance matters.
+        Note for PDF/A: JPEG 2000 and JBIG2 images compose with PDF/A-2. The
+        bundled engine (VellumPdf 1.5.4+) embeds the JP2 box metadata that
+        PDF/A-2 clause 6.2.8.3 requires, and CI validates a PDF/A-2b document
+        with each image type through veraPDF. The JPEG 2000 source must still
+        satisfy PDF/A-2's own rules - 1, 3, or 4 colour channels, all sharing a
+        single bit depth.
 
         Optional -Width and -Height (in points) constrain the rendered size; when
         omitted the image renders at its natural size. -Alignment positions the
