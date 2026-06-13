@@ -1,6 +1,6 @@
 ﻿@{
     RootModule        = 'PSVellumPDF.psm1'
-    ModuleVersion     = '1.2.0'
+    ModuleVersion     = '1.2.1'
     GUID              = 'e51842c7-ddb1-4700-8ade-77055baa4f3a'
     Author            = 'Timothy van der Ham (@Tim81)'
     Copyright         = '© Timothy van der Ham. Licensed under Apache-2.0.'
@@ -60,7 +60,7 @@ This module generates new PDFs. It does not read, edit, split, or merge existing
             )
             LicenseUri   = 'https://www.apache.org/licenses/LICENSE-2.0'
             ProjectUri   = 'https://github.com/Tim81/PSVellumPDF'
-            ReleaseNotes = '1.2.0: built on VellumPdf 1.5.3 (was 1.2.0). Set-VellumPdfSignature gains RFC-3161 timestamps (-TimestampUrl, -TimestampTimeout, -TimestampRequestCertificate), upgrading PAdES B-B signatures to B-T. Add-VellumPdfImage now accepts JBIG2 (.jbig2/.jb2) and JPEG 2000 (.jp2/.jpx/.j2k/.jpf) images, and the upstream engine adds more image codecs (interlaced/16-bit PNG, more TIFF compressions) plus font, colour, and accessibility improvements that existing pipelines pick up transparently. Full changelog: https://github.com/Tim81/PSVellumPDF/blob/main/CHANGELOG.md'
+            ReleaseNotes = '1.2.1: adversarial-review follow-ups to 1.2.0. Timestamp HttpClient is now disposed with the document instead of leaking; a timestamp authority failure at save gives a TSA/network hint rather than a certificate one; the JBIG2/JPEG 2000 routing tests now assert the format-specific loader and real end-to-end embedding is covered. Help notes the PDF/A-2 ISO constraints on JPEG 2000/JBIG2 images. 1.2.0 (built on VellumPdf 1.5.3) added RFC-3161 timestamps (PAdES B-T) and JBIG2/JPEG 2000 image support. Full changelog: https://github.com/Tim81/PSVellumPDF/blob/main/CHANGELOG.md'
         }
     }
 }
