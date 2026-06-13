@@ -6,6 +6,34 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [1.2.1] - 2026-06-13
+
+Adversarial-review follow-ups to 1.2.0. No new features; behaviour, tests, and
+docs only.
+
+### Fixed
+- The `HttpClient` backing a `-TimestampUrl` timestamp is now disposed when the
+  document is (and replaced cleanly when a signature is re-staged), instead of
+  being orphaned - removes a connection-pool leak in long-lived sessions that
+  generate many signed documents.
+- A timestamp-authority failure during `Save-VellumPdfDocument` now ends with a
+  hint pointing at the TSA/network (`-TimestampUrl` reachable?) instead of the
+  signing certificate. The atomic write still leaves no file behind on failure.
+
+### Changed
+- `Add-VellumPdfImage` help now notes that JPEG 2000 and JBIG2 images embed in
+  any document, but PDF/A-2 imposes extra ISO constraints on them (for JPEG
+  2000: 1, 3, or 4 colour channels sharing one bit depth in 1-38), so PDF/A
+  conformance with such an image depends on the source meeting those rules.
+
+### Tests
+- The JBIG2/JPEG 2000 routing tests now assert the format-specific loader
+  message, so a misroute to a different loader is caught (the previous
+  `*failed to load*` assertion passed for any loader).
+- Added end-to-end tests that embed minimal valid JBIG2 and JPEG 2000 streams
+  and assert the saved PDF uses `/JBIG2Decode` / `/JPXDecode`; added
+  HttpClient-lifecycle and TSA-failure tests for signing.
+
 ## [1.2.0] - 2026-06-13
 
 Built on VellumPdf 1.5.3 (was 1.2.0).
@@ -134,7 +162,8 @@ First public release, built on VellumPdf 1.1.0 (.NET 10).
 - Quality gates: PSScriptAnalyzer, Pester (94% coverage), 3-OS CI, locked
   NuGet restore, SHA-pinned actions, PSGallery release pipeline.
 
-[Unreleased]: https://github.com/Tim81/PSVellumPDF/compare/v1.2.0...HEAD
+[Unreleased]: https://github.com/Tim81/PSVellumPDF/compare/v1.2.1...HEAD
+[1.2.1]: https://github.com/Tim81/PSVellumPDF/compare/v1.2.0...v1.2.1
 [1.2.0]: https://github.com/Tim81/PSVellumPDF/compare/v1.1.1...v1.2.0
 [1.1.1]: https://github.com/Tim81/PSVellumPDF/compare/v1.1.0...v1.1.1
 [1.1.0]: https://github.com/Tim81/PSVellumPDF/compare/v1.0.0...v1.1.0

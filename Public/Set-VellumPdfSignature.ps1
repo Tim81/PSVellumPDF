@@ -143,22 +143,45 @@ function Set-VellumPdfSignature {
         if ($PSBoundParameters.ContainsKey('SignerName'))  { $settings.SignerName  = $SignerName }
         if ($PSBoundParameters.ContainsKey('SigningTime')) { $settings.SigningTime = $SigningTime }
 
+        # Validate the timestamp parameters BEFORE mutating any document state
+        # below, so a bad -TimestampUrl on a re-stage leaves the previously
+        # staged signature (and its HttpClient) intact.
         if ($PSBoundParameters.ContainsKey('TimestampUrl')) {
             if (-not $TimestampUrl.IsAbsoluteUri -or $TimestampUrl.Scheme -notin @('http', 'https')) {
                 throw ("Set-VellumPdfSignature: -TimestampUrl must be an absolute http or https URL; " +
                     "got '$TimestampUrl'.")
             }
-            # The HttpTimestampClient holds this HttpClient and is invoked later by
-            # Save-VellumPdfDocument, so it must outlive this cmdlet; do not dispose
-            # it here. Process exit reclaims it.
-            $httpClient = [System.Net.Http.HttpClient]::new()
-            $settings.TimestampClient = [VellumPdf.Signing.HttpTimestampClient]::new(
-                $TimestampUrl, $httpClient, $TimestampRequestCertificate, $TimestampTimeout)
         }
         elseif ($PSBoundParameters.ContainsKey('TimestampTimeout') -or
                 $PSBoundParameters.ContainsKey('TimestampRequestCertificate')) {
             throw ('Set-VellumPdfSignature: -TimestampTimeout and ' +
                 '-TimestampRequestCertificate require -TimestampUrl.')
+        }
+
+        # Dispose any HttpClient stashed by a previous timestamp staging on this
+        # document before replacing the staged signature, so re-staging does not
+        # orphan a live HttpClient.
+        $clientProp = $Document.PSObject.Properties['PSVellumTimestampHttpClient']
+        if ($clientProp -and $clientProp.Value) {
+            $clientProp.Value.Dispose()
+            $clientProp.Value = $null
+        }
+
+        if ($PSBoundParameters.ContainsKey('TimestampUrl')) {
+            # The HttpTimestampClient holds this HttpClient and is invoked later
+            # by Save-VellumPdfDocument, so it must outlive this cmdlet. It is
+            # stashed on the document and disposed when the document is (see
+            # Save-VellumPdfDocument), or replaced by the next staging above.
+            $httpClient = [System.Net.Http.HttpClient]::new()
+            $settings.TimestampClient = [VellumPdf.Signing.HttpTimestampClient]::new(
+                $TimestampUrl, $httpClient, $TimestampRequestCertificate, $TimestampTimeout)
+            if ($clientProp) {
+                $clientProp.Value = $httpClient
+            }
+            else {
+                $Document.PSObject.Properties.Add(
+                    [psnoteproperty]::new('PSVellumTimestampHttpClient', $httpClient))
+            }
         }
 
         # Stage for Save-VellumPdfDocument; Set-* semantics allow replacing a
