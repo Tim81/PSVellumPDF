@@ -60,7 +60,7 @@ This module generates new PDFs. It does not read, edit, split, or merge existing
             )
             LicenseUri   = 'https://www.apache.org/licenses/LICENSE-2.0'
             ProjectUri   = 'https://github.com/Tim81/PSVellumPDF'
-            ReleaseNotes = '1.2.0: built on VellumPdf 1.5.2 (was 1.2.0). Set-VellumPdfSignature gains RFC-3161 timestamps (-TimestampUrl, -TimestampTimeout, -TimestampRequestCertificate), upgrading PAdES B-B signatures to B-T. Add-VellumPdfImage now accepts JBIG2 (.jbig2/.jb2) and JPEG 2000 (.jp2/.jpx/.j2k/.jpf) images, and the upstream engine adds more image codecs (interlaced/16-bit PNG, more TIFF compressions) plus font, colour, and accessibility improvements that existing pipelines pick up transparently. Full changelog: https://github.com/Tim81/PSVellumPDF/blob/main/CHANGELOG.md'
+            ReleaseNotes = '1.2.0: built on VellumPdf 1.5.3 (was 1.2.0). Set-VellumPdfSignature gains RFC-3161 timestamps (-TimestampUrl, -TimestampTimeout, -TimestampRequestCertificate), upgrading PAdES B-B signatures to B-T. Add-VellumPdfImage now accepts JBIG2 (.jbig2/.jb2) and JPEG 2000 (.jp2/.jpx/.j2k/.jpf) images, and the upstream engine adds more image codecs (interlaced/16-bit PNG, more TIFF compressions) plus font, colour, and accessibility improvements that existing pipelines pick up transparently. Full changelog: https://github.com/Tim81/PSVellumPDF/blob/main/CHANGELOG.md'
         }
     }
 }

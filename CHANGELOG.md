@@ -8,7 +8,7 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [1.2.0] - 2026-06-13
 
-Built on VellumPdf 1.5.2 (was 1.2.0).
+Built on VellumPdf 1.5.3 (was 1.2.0).
 
 ### Added
 - `Set-VellumPdfSignature` RFC-3161 timestamps: `-TimestampUrl` contacts a
@@ -22,9 +22,12 @@ Built on VellumPdf 1.5.2 (was 1.2.0).
   `.jpx`, `.j2k`, `.jpf`) images, using the VellumPdf 1.4.0 codecs.
 
 ### Changed
-- VellumPdf 1.3.0-1.5.2 widen image support (interlaced and 16-bit PNG; TIFF
+- VellumPdf 1.3.0-1.5.3 widen image support (interlaced and 16-bit PNG; TIFF
   LZW/JPEG/Group-3/Group-4; JBIG2; JPEG 2000) and harden the image, font, and
   signing code. Existing pipelines pick these up without changes.
+- 1.5.3 drops the proprietary `%VELLUM_SIG_CONTENTS` comment from the signature
+  `/Contents`, so PAdES-signed PDF/A-2b output passes veraPDF 1.30+ clause
+  6.4.3-1 again (the signature bytes and `/ByteRange` are unchanged).
 
 ### Notes
 - AcroForm interactive form fields and outline expand/collapse state

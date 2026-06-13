@@ -123,11 +123,13 @@ vendors `tests/assets/DejaVuSans.ttf` for this.
 
 ## Roadmap
 
-**1.2.0 is published on the PowerShell Gallery** (built on VellumPdf 1.5.2):
+**1.2.0 is published on the PowerShell Gallery** (built on VellumPdf 1.5.3):
 RFC-3161 timestamps on `Set-VellumPdfSignature` (PAdES B-T) and JBIG2 / JPEG 2000
 support on `Add-VellumPdfImage`, plus the transparent engine gains from
-1.3.0-1.5.2 (more image codecs, font/colour/accessibility hardening). 1.1.0 had
-added PAdES signing (#24) and custom PDF/A output intents (`Set-VellumPdfOutputIntent`).
+1.3.0-1.5.3 (more image codecs, font/colour/accessibility hardening, and the
+1.5.3 fix that restores signed PDF/A-2b veraPDF conformance — see
+[VellumPDF#89](https://github.com/Tim81/VellumPDF/issues/89)). 1.1.0 had added
+PAdES signing (#24) and custom PDF/A output intents (`Set-VellumPdfOutputIntent`).
 
 The milestone epic is
 [#29 "Epic: v1.1.0 — signing, conformance, barcodes"](https://github.com/Tim81/PSVellumPDF/issues/29);
