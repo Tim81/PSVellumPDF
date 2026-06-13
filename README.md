@@ -3,17 +3,21 @@
 [![CI](https://github.com/Tim81/PSVellumPDF/actions/workflows/ci.yml/badge.svg)](https://github.com/Tim81/PSVellumPDF/actions/workflows/ci.yml)
 [![PowerShell Gallery](https://img.shields.io/powershellgallery/v/PSVellumPDF)](https://www.powershellgallery.com/packages/PSVellumPDF)
 
-PowerShell module for generating PDFs with the
-[VellumPdf](https://github.com/Tim81/VellumPDF) .NET 10 library — a modern,
-zero-dependency PDF engine with PDF/A archival support.
+PowerShell module for creating PDF files on Windows, Linux, and macOS, built on
+the [VellumPdf](https://github.com/Tim81/VellumPDF) .NET 10 library: a
+zero-dependency PDF engine with PDF/A archival conformance and tagged,
+accessible-PDF output.
 
-> Status: **stable (1.1.0)**. The full VellumPdf layout API is wrapped:
-> documents, headings, paragraphs (incl. mixed-style runs, colour, hyperlinks,
-> line spacing), tables, lists, images, line separators, embedded TrueType
-> fonts, headers/footers, metadata, margins, bookmarks, encryption, **PAdES
-> digital signing**, and custom PDF/A output intents. PDF/A-2b output (plain
-> and signed) is validated with veraPDF in CI on every push. See the
-> [CHANGELOG](CHANGELOG.md) for release history.
+This module generates new PDFs. It does not read, edit, split, or merge existing
+files; VellumPdf is a write-only engine with no PDF parser.
+
+> Status: **stable (1.2.0)**, on VellumPdf 1.5.2. The full VellumPdf layout API
+> is wrapped: documents, headings, paragraphs (incl. mixed-style runs, colour,
+> hyperlinks, line spacing), tables, lists, images, line separators, embedded
+> TrueType fonts, headers/footers, metadata, margins, bookmarks, encryption,
+> **PAdES digital signing (with RFC-3161 timestamps)**, and custom PDF/A output
+> intents. PDF/A-2b output (plain and signed) is validated with veraPDF in CI on
+> every push. See the [CHANGELOG](CHANGELOG.md) for release history.
 
 ## Requirements
 
@@ -59,13 +63,13 @@ New-VellumPdfDocument -Conformance PdfA2b -PageSize A4 |
 | `New-VellumPdfTextRun` | Build a styled run (`-Text`, `-Font`, `-FontSize`, `-FontHandle`, `-Color`, `-LinkUri`, `-Leading`) for `-Run` paragraphs |
 | `Add-VellumPdfTable` | Add a table (`-Header`, `-Row`, `-ColumnWidth`, `-BorderWidth`, `-BorderColor`, `-HeaderBackground`, `-Font`, `-FontSize`, `-Alignment`, `-MarginTop/Bottom`) |
 | `Add-VellumPdfList` | Add an ordered/unordered list (`-Item`, `-Style`, `-Indent`, `-Font`, `-FontSize`, `-MarginTop/Bottom`) |
-| `Add-VellumPdfImage` | Embed an image (`-Path`, `-Width`, `-Height`, `-Alignment`, `-AltText`, `-MarginTop/Bottom`) |
+| `Add-VellumPdfImage` | Embed an image in JPEG, PNG, BMP, GIF, TIFF, JBIG2, or JPEG 2000 format (`-Path`, `-Width`, `-Height`, `-Alignment`, `-AltText`, `-MarginTop/Bottom`) |
 | `Add-VellumPdfLineSeparator` | Add a horizontal rule (`-LineWidth`, `-Color`, `-MarginTop/Bottom`) |
 | `Register-VellumPdfFont` | Load a TrueType font for embedding (`-Path` or `-FontBytes`); returns a handle for `-FontHandle` |
 | `Set-VellumPdfHeader` / `Set-VellumPdfFooter` | Running bands with `{page}`/`{pages}` tokens (`-Template`, `-Font`, `-FontSize`, `-Alignment`) |
 | `Set-VellumPdfDocumentInfo` | Document metadata (`-Title`, `-Author`, `-Subject`, `-Keywords`, `-Creator`, `-Producer`) |
 | `Protect-VellumPdfDocument` | Password protection (`-UserPassword`/`-OwnerPassword` as SecureString, `-Permission` flags, `-EncryptMetadata`) |
-| `Set-VellumPdfSignature` | Stage a PAdES digital signature (`-Certificate` with private key, `-Reason`, `-Location`, `-ContactInfo`, `-SignerName`, `-SigningTime`); applied by `Save-VellumPdfDocument` |
+| `Set-VellumPdfSignature` | Stage a PAdES digital signature (`-Certificate` with private key, `-Reason`, `-Location`, `-ContactInfo`, `-SignerName`, `-SigningTime`, and `-TimestampUrl`/`-TimestampTimeout`/`-TimestampRequestCertificate` for an RFC-3161 B-T timestamp); applied by `Save-VellumPdfDocument` |
 | `Set-VellumPdfOutputIntent` | Replace the default sRGB PDF/A output intent (`-IccProfilePath`/`-ComponentCount` or `-Cmyk`) |
 | `Save-VellumPdfDocument` | Write the `.pdf` — signing it if a signature is staged — and dispose the document (`-Path`, `-KeepOpen`) |
 
@@ -73,6 +77,19 @@ New-VellumPdfDocument -Conformance PdfA2b -PageSize A4 |
 Dangerous `-LinkUri` schemes (`javascript:`, `file:`, …) are rejected, and the
 cmdlets fail fast on stale (already-saved) documents and cross-document font
 handles.
+
+### Scope and limitations
+
+PSVellumPDF writes PDFs; it has no reader. Reading text or metadata from an
+existing PDF, editing one in place, and splitting or merging files are out of
+scope, because VellumPdf provides no parser to build them on.
+
+A few VellumPdf features stay unwrapped because they need low-level kernel
+`PdfPage` references that the layout `Document` does not expose: AcroForm
+interactive form fields, outline expand/collapse state
+(`PdfOutlineEntry.IsExpanded`), internal go-to links, and standalone outline
+entries. Bookmarks still come from heading `-BookmarkTitle`/`-Level`, and
+external links from `-LinkUri`.
 
 `Get-Help <function> -Full` documents each one. A generated markdown reference
 lives in [docs/PSVellumPDF](docs/PSVellumPDF), and runnable demo scripts in

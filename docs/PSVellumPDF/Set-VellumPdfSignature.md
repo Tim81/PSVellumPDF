@@ -4,7 +4,7 @@ external help file: PSVellumPDF-Help.xml
 HelpUri: ''
 Locale: en-US
 Module Name: PSVellumPDF
-ms.date: 06-11-2026
+ms.date: 06-13-2026
 PlatyPS schema version: 2024-05-01
 title: Set-VellumPdfSignature
 ---
@@ -22,6 +22,7 @@ Stages a PAdES digital signature to be applied when the document is saved.
 ```
 Set-VellumPdfSignature [-Certificate] <X509Certificate2> -Document <Document> [-Reason <string>]
  [-Location <string>] [-ContactInfo <string>] [-SignerName <string>] [-SigningTime <DateTimeOffset>]
+ [-TimestampUrl <uri>] [-TimestampTimeout <timespan>] [-TimestampRequestCertificate <bool>]
  [<CommonParameters>]
 ```
 
@@ -37,11 +38,16 @@ document through this module).
 
 The signature is a PAdES baseline signature (SubFilter
 ETSI.CAdES.detached).
-PDF/A conformance and signing compose: a PDF/A-2b
-document can be signed.
-Encryption and signing cannot be combined - the
-library rejects the combination at save time, and this cmdlet (and
-Protect-VellumPdfDocument) fail fast with a clear error instead.
+Supplying -TimestampUrl adds an RFC-3161 timestamp
+from a Time-Stamping Authority, upgrading the signature from PAdES B-B to
+PAdES B-T so the signing time is independently attested rather than
+claimed by the signer's clock.
+PDF/A conformance and signing compose: a
+PDF/A-2b document can be signed.
+Encryption and signing cannot be
+combined - the library rejects the combination at save time, and this
+cmdlet (and Protect-VellumPdfDocument) fail fast with a clear error
+instead.
 
 Calling Set-VellumPdfSignature again before saving replaces the staged
 signature settings, consistent with Set-* semantics.
@@ -73,6 +79,16 @@ New-VellumPdfDocument -Conformance PdfA2b |
     Set-VellumPdfSignature -Certificate $cert -Location 'Amsterdam' `
         -ContactInfo 'legal@acme.example' |
     Save-VellumPdfDocument -Path ./contract.pdf
+
+### EXAMPLE 3
+
+# PAdES B-T: add an RFC-3161 timestamp from a TSA (needs network at save)
+$cert = Get-PfxCertificate -FilePath ./signer.pfx
+New-VellumPdfDocument |
+    Add-VellumPdfParagraph -Text 'Timestamped content.' |
+    Set-VellumPdfSignature -Certificate $cert -Reason 'Approved' `
+        -TimestampUrl 'http://timestamp.digicert.com' |
+    Save-VellumPdfDocument -Path ./signed-bt.pdf
 
 ## PARAMETERS
 
@@ -219,9 +235,90 @@ HelpMessage: ''
 Optional claimed signing time recorded in the signature.
 When omitted the
 library uses the current time at save.
+A -TimestampUrl timestamp attests
+the time independently of this value.
 
 ```yaml
 Type: System.Nullable`1[System.DateTimeOffset]
+DefaultValue: ''
+SupportsWildcards: false
+Aliases: []
+ParameterSets:
+- Name: (All)
+  Position: Named
+  IsRequired: false
+  ValueFromPipeline: false
+  ValueFromPipelineByPropertyName: false
+  ValueFromRemainingArguments: false
+DontShow: false
+AcceptedValues: []
+HelpMessage: ''
+```
+
+### -TimestampRequestCertificate
+
+Whether to ask the TSA to embed its signing certificate in the timestamp
+token.
+Defaults to $true, which is what most verifiers need to validate
+the timestamp offline.
+Set to $false only for a TSA that rejects the
+request.
+Only meaningful with -TimestampUrl.
+
+```yaml
+Type: System.Boolean
+DefaultValue: True
+SupportsWildcards: false
+Aliases: []
+ParameterSets:
+- Name: (All)
+  Position: Named
+  IsRequired: false
+  ValueFromPipeline: false
+  ValueFromPipelineByPropertyName: false
+  ValueFromRemainingArguments: false
+DontShow: false
+AcceptedValues: []
+HelpMessage: ''
+```
+
+### -TimestampTimeout
+
+Optional timeout for the TSA HTTP request, as a TimeSpan.
+When omitted the
+underlying HttpClient default applies.
+Only meaningful with -TimestampUrl.
+
+```yaml
+Type: System.Nullable`1[System.TimeSpan]
+DefaultValue: ''
+SupportsWildcards: false
+Aliases: []
+ParameterSets:
+- Name: (All)
+  Position: Named
+  IsRequired: false
+  ValueFromPipeline: false
+  ValueFromPipelineByPropertyName: false
+  ValueFromRemainingArguments: false
+DontShow: false
+AcceptedValues: []
+HelpMessage: ''
+```
+
+### -TimestampUrl
+
+Optional RFC-3161 Time-Stamping Authority (TSA) URL.
+When supplied, the
+signature is timestamped over HTTP at save time, producing a PAdES B-T
+signature whose signing time a verifier can trust without relying on the
+signer's clock.
+Must be an http or https URL.
+The TSA is contacted during
+Save-VellumPdfDocument, so saving requires network access to the TSA.
+
+```yaml
+Type: System.Uri
 DefaultValue: ''
 SupportsWildcards: false
 Aliases: []

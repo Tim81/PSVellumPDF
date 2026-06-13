@@ -21,9 +21,9 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="VellumPdf.Layout" Version="1.2.0" />
+    <PackageReference Include="VellumPdf.Layout" Version="1.5.2" />
     <!-- VellumPdf.Kernel comes in transitively via VellumPdf.Layout. -->
-    <PackageReference Include="VellumPdf.Signing" Version="1.2.0" />
+    <PackageReference Include="VellumPdf.Signing" Version="1.5.2" />
   </ItemGroup>
 
 </Project>

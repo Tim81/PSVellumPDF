@@ -4,22 +4,22 @@
     "net10.0": {
       "VellumPdf.Layout": {
         "type": "Direct",
-        "requested": "[1.2.0, )",
-        "resolved": "1.2.0",
-        "contentHash": "FzunmZAn6zJo/TP+qLCzmBC9AGPhr+gze7NB+9d/v0eJa8XQ+HmTFzg/unW8fSsDda46B5Gh7N2Aye58ACtUbA==",
+        "requested": "[1.5.2, )",
+        "resolved": "1.5.2",
+        "contentHash": "a3R1h0djujVSPhXo3RQWOyrfEnwjV4Hhf4ZX630hwLa22kuwyRv299EP8Nm5ox3FH7Y3cqlWjTHEog7OhTHMyg==",
         "dependencies": {
-          "VellumPdf.Kernel": "1.2.0"
+          "VellumPdf.Kernel": "1.5.2"
         }
       },
       "VellumPdf.Signing": {
         "type": "Direct",
-        "requested": "[1.2.0, )",
-        "resolved": "1.2.0",
-        "contentHash": "BKeL4VUvq51J8Ve4PGfUERh9nCfF2pFqJ9t1OxLxnzGHluw9bX2X8bsKPf2WNmAGVKDqRvuVk+1C5q+PGW3uEg==",
+        "requested": "[1.5.2, )",
+        "resolved": "1.5.2",
+        "contentHash": "xInGOMH919NO4AguFLrPmlbh3FTxTE4fXcv5lETeP9zpG666kuUzR+Iuv1fCNOwDI8M9d1CscYcucswo7VE30A==",
         "dependencies": {
           "System.Security.Cryptography.Pkcs": "9.0.5",
-          "VellumPdf.Kernel": "1.2.0",
-          "VellumPdf.Layout": "1.2.0"
+          "VellumPdf.Kernel": "1.5.2",
+          "VellumPdf.Layout": "1.5.2"
         }
       },
       "System.Security.Cryptography.Pkcs": {
@@ -29,8 +29,8 @@
       },
       "VellumPdf.Kernel": {
         "type": "Transitive",
-        "resolved": "1.2.0",
-        "contentHash": "mG5c+npCkDgFjlf5nm13+tynKbF/wgMXGHEvALKqbkhXFdnm3Vk2S/quwumtoRrQk8AA8KiDDLTRqzvnKlR68A=="
+        "resolved": "1.5.2",
+        "contentHash": "vBZx0ymBN22Ds8hCUBT6G/kNlYZ2c7aVg2e+70wkOzhNHuaCO+sbi/BF+lmLkSZAzlKXElX+WvJdU0Z+2ag/5g=="
       }
     }
   }

@@ -81,16 +81,20 @@ Wrappers call these real types (namespaces matter — they are not all `VellumPd
 | `Set-VellumPdfHeader`/`Footer` | `Document.SetHeader/SetFooter(template, style, alignment)`; `{page}`/`{pages}` tokens resolved by `RunningBand.Resolve` |
 | `Set-VellumPdfDocumentInfo` | `Document.Info` (`PdfDocumentInfo` props) |
 | `Protect-VellumPdfDocument` | `Document.Encrypt(PdfEncryptionSettings)`; `PdfPermissions` flags; PDF/A + encryption is rejected (fail-fast in the cmdlet; the library only throws at `Save`) |
-| `Set-VellumPdfSignature` | stages a `VellumPdf.Signing.PdfSignatureSettings` as ETS note property `PSVellumSignature`; `Save-VellumPdfDocument` then calls `VellumPdf.Signing.SigningExtensions::Sign(doc, stream, settings)` instead of `Save` — signing IS the write step. PAdES `ETSI.CAdES.detached`; composes with PDF/A; mutually exclusive with encryption (fail-fast in both cmdlets) |
+| `Set-VellumPdfSignature` | stages a `VellumPdf.Signing.PdfSignatureSettings` as ETS note property `PSVellumSignature`; `Save-VellumPdfDocument` then calls `VellumPdf.Signing.SigningExtensions::Sign(doc, stream, settings)` instead of `Save` — signing IS the write step. PAdES `ETSI.CAdES.detached`; composes with PDF/A; mutually exclusive with encryption (fail-fast in both cmdlets). `-TimestampUrl` sets `.TimestampClient` to a `VellumPdf.Signing.HttpTimestampClient` (RFC-3161, PAdES B-T); the TSA is contacted at `Sign`/save time, so saving needs network |
 | `Set-VellumPdfOutputIntent` | `Document.SetPdfAOutputIntent(byte[], int, string, string)` / `UseCmykOutputIntent(string)`; PDF/A only — the library silently ignores the intent on non-conformant docs, so the cmdlet fails fast |
 | text styling | `VellumPdf.Layout.Core.TextStyle` (`.Font` = `VellumPdf.Fonts.Standard14::Helvetica` …, `.FontSize`, or `.FontRef` = `FontReference(EmbeddedFontHandle)` for embedded fonts) |
 | alignment | `VellumPdf.Layout.Core.HorizontalAlignment` (Left/Center/Right/Justify) |
 
 The full layout API is now wrapped. Not wrapped (and not wrappable at the layout
-level): internal go-to links and standalone outline entries — `PdfLinkAnnotation`/
-`PdfOutlineEntry` need kernel `PdfPage` refs that the layout `Document` does not
-expose; outlines come from heading `-BookmarkTitle`/`-Level`, external links from
-`-LinkUri`. PAdES signing (`VellumPdf.Signing`, wrapped since 1.1.0) depends on
+level): internal go-to links, standalone outline entries, outline expand/collapse
+state (`PdfOutlineEntry.IsExpanded`), and AcroForm interactive form fields
+(`PdfDocument.AddTextField`/`AddCheckBox`/`AddRadioButtonGroup`/…). All need
+kernel `PdfPage`/`PdfRectangle` refs that the layout `Document` does not expose
+(verified by reflection: `Document` exposes no kernel `PdfDocument` or pages).
+Outlines come from heading `-BookmarkTitle`/`-Level`, external links from
+`-LinkUri`. Reading, editing, splitting, and merging existing PDFs are also out
+of scope: VellumPdf is a generation-only engine with no parser. PAdES signing (`VellumPdf.Signing`, wrapped since 1.1.0) depends on
 `System.Security.Cryptography.Pkcs`, which resolves from `$PSHOME` (PowerShell
 ships it for its CMS cmdlets) — it is intentionally not copied into `./lib`.
 
@@ -119,15 +123,20 @@ vendors `tests/assets/DejaVuSans.ttf` for this.
 
 ## Roadmap
 
-**1.1.0 is published on the PowerShell Gallery** (built on VellumPdf 1.2.0):
-PAdES digital signing (#24, `Set-VellumPdfSignature`) and custom PDF/A output
-intents (`Set-VellumPdfOutputIntent`, from the 1.2.0 ICC colour work in #27).
+**1.2.0 is published on the PowerShell Gallery** (built on VellumPdf 1.5.2):
+RFC-3161 timestamps on `Set-VellumPdfSignature` (PAdES B-T) and JBIG2 / JPEG 2000
+support on `Add-VellumPdfImage`, plus the transparent engine gains from
+1.3.0-1.5.2 (more image codecs, font/colour/accessibility hardening). 1.1.0 had
+added PAdES signing (#24) and custom PDF/A output intents (`Set-VellumPdfOutputIntent`).
+
 The milestone epic is
 [#29 "Epic: v1.1.0 — signing, conformance, barcodes"](https://github.com/Tim81/PSVellumPDF/issues/29);
 still open in it: conformance-validator (#25) and barcodes (#26), both gated on
-upstream packages that have not shipped, further engine-capability adoption as
-upstream releases land (#27 — linearization, new image codecs remain), plus 1.x
-maintenance (#28 — note the PSGallery API key expires mid-2027).
+upstream packages that have not shipped; the new-image-codec part of #27 is now
+adopted (JBIG2/JPEG 2000), with linearization still remaining; plus 1.x
+maintenance (#28 — note the PSGallery API key expires mid-2027). AcroForm form
+fields and outline expand/collapse exist upstream but need kernel page access the
+layout `Document` does not expose (see the Architecture note above).
 
 User-visible changes belong in `CHANGELOG.md` (Unreleased section); releases
 move them under the version heading and feed the manifest ReleaseNotes. See
