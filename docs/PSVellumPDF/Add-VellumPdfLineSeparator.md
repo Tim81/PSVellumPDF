@@ -20,7 +20,7 @@ Adds a horizontal line separator to a VellumPdf document.
 ### __AllParameterSets
 
 ```
-Add-VellumPdfLineSeparator [-Document] <Document> [[-LineWidth] <double>] [[-Color] <double[]>]
+Add-VellumPdfLineSeparator [-Document] <Document> [[-LineWidth] <double>] [[-Color] <Object>]
  [[-MarginTop] <double>] [[-MarginBottom] <double>] [<CommonParameters>]
 ```
 
@@ -59,15 +59,14 @@ $doc | Add-VellumPdfLineSeparator -LineWidth 2.0 -Color 0.2,0.4,0.8 `
 
 ### -Color
 
-Line colour as three doubles representing Red, Green, and Blue channels,
-each in the 0.0..1.0 range (e.g.
-0,0,0 for black).
-Exactly three
-values must be supplied.
-When omitted the library default colour is used.
+Line colour, given as an R,G,B triple in 0..1 (e.g.
+0,0,0 for black), a
+hex string ('#3366cc' or '#36c'), or a colour name.
+When omitted the
+library default colour is used.
 
 ```yaml
-Type: System.Double[]
+Type: System.Object
 DefaultValue: ''
 SupportsWildcards: false
 Aliases: []

@@ -13,11 +13,11 @@ title: Add-VellumPdfImage
 
 ## SYNOPSIS
 
-Embeds an image file into a VellumPdf document.
+Embeds an image into a VellumPdf document, from a file or from memory.
 
 ## SYNTAX
 
-### __AllParameterSets
+### Path (Default)
 
 ```
 Add-VellumPdfImage [-Path] <string> -Document <Document> [-Width <double>] [-Height <double>]
@@ -25,15 +25,27 @@ Add-VellumPdfImage [-Path] <string> -Document <Document> [-Width <double>] [-Hei
  [<CommonParameters>]
 ```
 
+### Bytes
+
+```
+Add-VellumPdfImage -Document <Document> -ImageBytes <byte[]> -Format <string> [-Width <double>]
+ [-Height <double>] [-Alignment <string>] [-AltText <string>] [-MarginTop <double>]
+ [-MarginBottom <double>] [<CommonParameters>]
+```
+
 ## DESCRIPTION
 
 Wraps Document.Add(LayoutImage).
-Reads the image from -Path, selects the
-appropriate VellumPdf loader by file extension (JPEG, PNG, BMP, GIF, TIFF,
-JBIG2, JPEG 2000), constructs a LayoutImage, and adds it to the document.
+Reads the image from -Path (loader chosen
+by file extension) or from -ImageBytes with an explicit -Format, constructs
+a LayoutImage, and adds it to the document.
+Formats: JPEG, PNG, BMP, GIF,
+TIFF, JBIG2, JPEG 2000.
 
 Supported extensions: .jpg/.jpeg, .png, .bmp, .gif, .tif/.tiff,
 .jbig2/.jb2, and .jp2/.jpx/.j2k/.jpf (JPEG 2000).
+For -ImageBytes, pass
+-Format (Jpeg/Png/Bmp/Gif/Tiff/Jbig2/Jpeg2000) since there is no extension.
 
 Note for PDF/A: JPEG 2000 and JBIG2 images compose with PDF/A-2.
 The
@@ -69,6 +81,11 @@ New-VellumPdfDocument |
 
 $doc | Add-VellumPdfImage -Path ./photo.jpg -Width 200 -Height 150 `
        -Alignment Center -AltText 'Company photo'
+
+### EXAMPLE 3
+
+# Embed an in-memory PNG (e.g. a chart) without a temp file
+$doc | Add-VellumPdfImage -ImageBytes $pngBytes -Format Png -Width 150
 
 ## PARAMETERS
 
@@ -143,6 +160,28 @@ AcceptedValues: []
 HelpMessage: ''
 ```
 
+### -Format
+
+The format of -ImageBytes: Jpeg, Png, Bmp, Gif, Tiff, Jbig2, or Jpeg2000.
+Required with -ImageBytes (there is no extension to infer it from).
+
+```yaml
+Type: System.String
+DefaultValue: ''
+SupportsWildcards: false
+Aliases: []
+ParameterSets:
+- Name: Bytes
+  Position: Named
+  IsRequired: true
+  ValueFromPipeline: false
+  ValueFromPipelineByPropertyName: false
+  ValueFromRemainingArguments: false
+DontShow: false
+AcceptedValues: []
+HelpMessage: ''
+```
+
 ### -Height
 
 Rendered height of the image in points, between 1 and 100000.
@@ -158,6 +197,29 @@ ParameterSets:
 - Name: (All)
   Position: Named
   IsRequired: false
+  ValueFromPipeline: false
+  ValueFromPipelineByPropertyName: false
+  ValueFromRemainingArguments: false
+DontShow: false
+AcceptedValues: []
+HelpMessage: ''
+```
+
+### -ImageBytes
+
+Raw image bytes to embed (parameter set 'Bytes'), for images produced in
+memory rather than read from disk.
+Requires -Format.
+
+```yaml
+Type: System.Byte[]
+DefaultValue: ''
+SupportsWildcards: false
+Aliases: []
+ParameterSets:
+- Name: Bytes
+  Position: Named
+  IsRequired: true
   ValueFromPipeline: false
   ValueFromPipelineByPropertyName: false
   ValueFromRemainingArguments: false
@@ -214,12 +276,12 @@ HelpMessage: ''
 
 ### -Path
 
-File system path to the image file.
-Supported extensions are .jpg,
-.jpeg, .png, .bmp, .gif, .tif, .tiff, .jbig2, .jb2, .jp2, .jpx, .j2k,
-and .jpf.
-The path is resolved relative to the current PowerShell
-provider location.
+File system path to the image file (parameter set 'Path').
+Supported
+extensions are .jpg, .jpeg, .png, .bmp, .gif, .tif, .tiff, .jbig2, .jb2,
+.jp2, .jpx, .j2k, and .jpf.
+The path is resolved relative to the current
+PowerShell provider location.
 Mandatory and positional (position 0).
 
 ```yaml
@@ -228,7 +290,7 @@ DefaultValue: ''
 SupportsWildcards: false
 Aliases: []
 ParameterSets:
-- Name: (All)
+- Name: Path
   Position: 0
   IsRequired: true
   ValueFromPipeline: false

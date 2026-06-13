@@ -35,9 +35,9 @@ function Add-VellumPdfParagraph {
         the base-14 encoding warning is suppressed. Handles from a different
         document are rejected. Valid only in the 'Text' parameter set.
     .PARAMETER Color
-        Text colour as three doubles representing Red, Green, and Blue channels,
-        each in the 0.0..1.0 range (e.g. 1,0,0 for pure red). Exactly three
-        values must be supplied. Valid only in the 'Text' parameter set.
+        Text colour, given as an R,G,B triple in 0..1 (e.g. 1,0,0 for red), a hex
+        string ('#3366cc' or '#36c'), or a colour name. Valid only in the 'Text'
+        parameter set.
     .PARAMETER LinkUri
         Makes the entire paragraph a clickable external hyperlink. Only http,
         https, and mailto URLs are allowed; any other scheme - and relative or
@@ -94,10 +94,9 @@ function Add-VellumPdfParagraph {
         [Parameter(ParameterSetName = 'Text')]
         [VellumPdf.Fonts.EmbeddedFontHandle]$FontHandle,
 
+        # RGB triple (0..1), a hex string ('#3366cc'/'#36c'), or a colour name.
         [Parameter(ParameterSetName = 'Text')]
-        [ValidateCount(3, 3)]
-        [ValidateRange(0.0, 1.0)]
-        [double[]]$Color,
+        [object]$Color,
 
         [Parameter(ParameterSetName = 'Text')]
         [string]$LinkUri,
@@ -142,6 +141,7 @@ function Add-VellumPdfParagraph {
             Write-VellumPdfEncodingWarning -Text $Text -CommandName 'Add-VellumPdfParagraph'
         }
         $wantsColor   = $PSBoundParameters.ContainsKey('Color')
+        if ($wantsColor) { $Color = ConvertTo-VellumColor $Color }
         $wantsLink    = $PSBoundParameters.ContainsKey('LinkUri') -and ($LinkUri -ne '')
         $wantsLeading = $PSBoundParameters.ContainsKey('Leading')
         $wantsFont    = [bool]$Font -or $PSBoundParameters.ContainsKey('FontSize') -or $FontHandle

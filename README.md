@@ -11,7 +11,7 @@ accessible-PDF output.
 This module generates new PDFs. It does not read, edit, split, or merge existing
 files; VellumPdf is a write-only engine with no PDF parser.
 
-> Status: **stable (1.2.2)**, on VellumPdf 1.5.4. The full VellumPdf layout API
+> Status: **stable (1.3.0)**, on VellumPdf 1.5.4. The full VellumPdf layout API
 > is wrapped: documents, headings, paragraphs (incl. mixed-style runs, colour,
 > hyperlinks, line spacing), tables, lists, images, line separators, embedded
 > TrueType fonts, headers/footers, metadata, margins, bookmarks, encryption,
@@ -61,9 +61,9 @@ New-VellumPdfDocument -Conformance PdfA2b -PageSize A4 |
 | `Add-VellumPdfHeading` | Add a heading (`-Text`, `-Level`, `-Font`, `-FontSize`, `-Alignment`, `-BookmarkTitle`, `-FontHandle`, `-MarginTop/Bottom`) |
 | `Add-VellumPdfParagraph` | Add body text (`-Text`, `-Font`, `-FontSize`, `-Alignment`, `-FontHandle`, `-Color`, `-LinkUri`, `-Leading`, `-MarginTop/Bottom`) or mixed-style runs (`-Run`) |
 | `New-VellumPdfTextRun` | Build a styled run (`-Text`, `-Font`, `-FontSize`, `-FontHandle`, `-Color`, `-LinkUri`, `-Leading`) for `-Run` paragraphs |
-| `Add-VellumPdfTable` | Add a table (`-Header`, `-Row`, `-ColumnWidth`, `-BorderWidth`, `-BorderColor`, `-HeaderBackground`, `-Font`, `-FontSize`, `-Alignment`, `-MarginTop/Bottom`) |
-| `Add-VellumPdfList` | Add an ordered/unordered list (`-Item`, `-Style`, `-Indent`, `-Font`, `-FontSize`, `-MarginTop/Bottom`) |
-| `Add-VellumPdfImage` | Embed an image in JPEG, PNG, BMP, GIF, TIFF, JBIG2, or JPEG 2000 format (`-Path`, `-Width`, `-Height`, `-Alignment`, `-AltText`, `-MarginTop/Bottom`) |
+| `Add-VellumPdfTable` | Add a table — value arrays, `Import-Csv` records, or rich per-cell hashtables (`-Header`, `-Row`, `-ColumnWidth`, `-ColumnAlignment`, `-BorderWidth`, `-BorderColor`, `-HeaderBackground`, `-AlternateRowBackground`, `-Font`, `-FontSize`, `-Alignment`, `-MarginTop/Bottom`) |
+| `Add-VellumPdfList` | Add an ordered/unordered list, flat or nested (`-Item` strings or `@{Text;Children}`, `-Style`, `-Indent`, `-Font`, `-FontSize`, `-MarginTop/Bottom`) |
+| `Add-VellumPdfImage` | Embed an image from a file or memory — JPEG, PNG, BMP, GIF, TIFF, JBIG2, JPEG 2000 (`-Path` or `-ImageBytes`/`-Format`, `-Width`, `-Height`, `-Alignment`, `-AltText`, `-MarginTop/Bottom`) |
 | `Add-VellumPdfLineSeparator` | Add a horizontal rule (`-LineWidth`, `-Color`, `-MarginTop/Bottom`) |
 | `Register-VellumPdfFont` | Load a TrueType font for embedding (`-Path` or `-FontBytes`); returns a handle for `-FontHandle` |
 | `Set-VellumPdfHeader` / `Set-VellumPdfFooter` | Running bands with `{page}`/`{pages}` tokens (`-Template`, `-Font`, `-FontSize`, `-Alignment`) |

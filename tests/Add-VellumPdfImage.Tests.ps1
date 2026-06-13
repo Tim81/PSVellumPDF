@@ -147,6 +147,23 @@ Describe 'Add-VellumPdfImage' {
         $doc | Should -BeOfType 'VellumPdf.Layout.Document'
         $doc.Dispose()
     }
+
+    It 'embeds an in-memory image via -ImageBytes -Format' {
+        $bytes = [System.Convert]::FromBase64String($script:Png1x1Base64)
+        New-VellumPdfDocument |
+            Add-VellumPdfImage -ImageBytes $bytes -Format Png -Width 50 |
+            Save-VellumPdfDocument -Path $script:outPath
+
+        $raw = [System.Text.Encoding]::Latin1.GetString([System.IO.File]::ReadAllBytes($script:outPath))
+        $raw | Should -BeLike '%PDF-*'
+        $raw | Should -Match '/Image'
+    }
+
+    It 'reports a load failure against the supplied bytes (not a path)' {
+        { New-VellumPdfDocument |
+                Add-VellumPdfImage -ImageBytes ([byte[]](1, 2, 3, 4)) -Format Png } |
+            Should -Throw '*supplied image bytes*'
+    }
 }
 
 Describe 'Add-VellumPdfImage end-to-end for JBIG2 and JPEG 2000' {
