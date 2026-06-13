@@ -97,6 +97,28 @@ Describe 'Add-VellumPdfImage' {
             Should -Throw -ExpectedMessage '*unsupported image extension*'
     }
 
+    It 'routes .jp2 to the JPEG 2000 loader (load failure, not unsupported-extension)' {
+        # A valid JPEG 2000 asset is impractical to vendor; feeding garbage with
+        # a .jp2 extension proves the extension reaches JpxImageLoader, because
+        # the error is the loader rejecting the bytes rather than the cmdlet
+        # rejecting the extension.
+        $jp2 = Join-Path $TestDrive 'sample.jp2'
+        [System.IO.File]::WriteAllBytes($jp2, [byte[]](1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12))
+        # A "failed to load" error (not "unsupported image extension") means the
+        # .jp2 extension was routed to JpxImageLoader, which then rejected the bytes.
+        { Add-VellumPdfImage -Document (New-VellumPdfDocument) -Path $jp2 } |
+            Should -Throw -ExpectedMessage '*failed to load*'
+    }
+
+    It 'routes .jb2 to the JBIG2 loader (load failure, not unsupported-extension)' {
+        $jb2 = Join-Path $TestDrive 'sample.jb2'
+        [System.IO.File]::WriteAllBytes($jb2, [byte[]](1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12))
+        # A "failed to load" error (not "unsupported image extension") means the
+        # .jb2 extension was routed to Jbig2ImageLoader, which then rejected the bytes.
+        { Add-VellumPdfImage -Document (New-VellumPdfDocument) -Path $jb2 } |
+            Should -Throw -ExpectedMessage '*failed to load*'
+    }
+
     It 'throws a clear error when the file does not exist' {
         $missing = Join-Path $TestDrive 'nonexistent.png'
         { Add-VellumPdfImage -Document (New-VellumPdfDocument) -Path $missing } |

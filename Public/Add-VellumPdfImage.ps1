@@ -4,10 +4,11 @@ function Add-VellumPdfImage {
         Embeds an image file into a VellumPdf document.
     .DESCRIPTION
         Wraps Document.Add(LayoutImage). Reads the image from -Path, selects the
-        appropriate VellumPdf loader by file extension (JPEG, PNG, BMP, GIF, TIFF),
-        constructs a LayoutImage, and adds it to the document.
+        appropriate VellumPdf loader by file extension (JPEG, PNG, BMP, GIF, TIFF,
+        JBIG2, JPEG 2000), constructs a LayoutImage, and adds it to the document.
 
-        Supported extensions: .jpg/.jpeg, .png, .bmp, .gif, .tif/.tiff.
+        Supported extensions: .jpg/.jpeg, .png, .bmp, .gif, .tif/.tiff,
+        .jbig2/.jb2, and .jp2/.jpx/.j2k/.jpf (JPEG 2000).
 
         Optional -Width and -Height (in points) constrain the rendered size; when
         omitted the image renders at its natural size. -Alignment positions the
@@ -24,9 +25,9 @@ function Add-VellumPdfImage {
         instance is returned after the image is added, enabling chaining.
     .PARAMETER Path
         File system path to the image file. Supported extensions are .jpg,
-        .jpeg, .png, .bmp, .gif, .tif, and .tiff. The path is resolved
-        relative to the current PowerShell provider location. Mandatory and
-        positional (position 0).
+        .jpeg, .png, .bmp, .gif, .tif, .tiff, .jbig2, .jb2, .jp2, .jpx, .j2k,
+        and .jpf. The path is resolved relative to the current PowerShell
+        provider location. Mandatory and positional (position 0).
     .PARAMETER Width
         Rendered width of the image in points, between 1 and 100000. When
         omitted the image is rendered at its natural width.
@@ -105,9 +106,16 @@ function Add-VellumPdfImage {
                 '.gif'  { [VellumPdf.Images.GifImageLoader]::Load($bytes) }
                 '.tif'  { [VellumPdf.Images.TiffImageLoader]::Load($bytes) }
                 '.tiff' { [VellumPdf.Images.TiffImageLoader]::Load($bytes) }
+                '.jbig2' { [VellumPdf.Images.Jbig2ImageLoader]::Load($bytes) }
+                '.jb2'   { [VellumPdf.Images.Jbig2ImageLoader]::Load($bytes) }
+                '.jp2'  { [VellumPdf.Images.JpxImageLoader]::Load($bytes) }
+                '.jpx'  { [VellumPdf.Images.JpxImageLoader]::Load($bytes) }
+                '.j2k'  { [VellumPdf.Images.JpxImageLoader]::Load($bytes) }
+                '.jpf'  { [VellumPdf.Images.JpxImageLoader]::Load($bytes) }
                 default {
                     throw ("Add-VellumPdfImage: unsupported image extension '$ext'. " +
-                        "Supported extensions are: .jpg, .jpeg, .png, .bmp, .gif, .tif, .tiff.")
+                        "Supported extensions are: .jpg, .jpeg, .png, .bmp, .gif, .tif, " +
+                        ".tiff, .jbig2, .jb2, .jp2, .jpx, .j2k, .jpf.")
                 }
             }
         }
