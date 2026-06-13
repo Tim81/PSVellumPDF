@@ -172,7 +172,18 @@ function Set-VellumPdfSignature {
             # by Save-VellumPdfDocument, so it must outlive this cmdlet. It is
             # stashed on the document and disposed when the document is (see
             # Save-VellumPdfDocument), or replaced by the next staging above.
-            $httpClient = [System.Net.Http.HttpClient]::new()
+            #
+            # -TimestampUrl is user-supplied, so harden the client: a TSA does
+            # not legitimately redirect, and following one would let a hostile
+            # URL bounce the save-time request at an internal host (SSRF). Disable
+            # auto-redirect and bound the request so a black-hole TSA cannot stall
+            # Save indefinitely.
+            $handler = [System.Net.Http.SocketsHttpHandler]::new()
+            $handler.AllowAutoRedirect = $false
+            $httpClient = [System.Net.Http.HttpClient]::new($handler, $true)
+            if ($PSBoundParameters.ContainsKey('TimestampTimeout')) {
+                $httpClient.Timeout = $TimestampTimeout
+            }
             $settings.TimestampClient = [VellumPdf.Signing.HttpTimestampClient]::new(
                 $TimestampUrl, $httpClient, $TimestampRequestCertificate, $TimestampTimeout)
             if ($clientProp) {

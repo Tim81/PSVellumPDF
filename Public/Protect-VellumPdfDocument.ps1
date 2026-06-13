@@ -46,6 +46,10 @@ function Protect-VellumPdfDocument {
           PrintHighRes  - high-resolution (faithful) printing
           All           - all of the above (default)
         Multiple values are combined as flags. Example: -Permission Print,Copy
+        Defaults to All. Note that an owner password with the default All and no
+        user password leaves the document fully open (the cmdlet warns in that
+        case). PDF permission flags are advisory: a reader may ignore them, and
+        anyone with the owner password can remove them.
     .PARAMETER EncryptMetadata
         When specified, document metadata (XMP) is also encrypted. When omitted the
         library default applies (metadata is encrypted by default).
@@ -113,6 +117,19 @@ function Protect-VellumPdfDocument {
         if (-not $PSBoundParameters.ContainsKey('UserPassword') -and
             -not $PSBoundParameters.ContainsKey('OwnerPassword')) {
             throw 'Protect-VellumPdfDocument: at least one of -UserPassword or -OwnerPassword must be supplied.'
+        }
+
+        # Owner-password-only protection with the default (All) permission set
+        # opens the document with no password and grants every permission - i.e.
+        # nothing is actually restricted. That is rarely the intent of "protect
+        # with an owner password", so warn the caller to narrow -Permission.
+        if ($PSBoundParameters.ContainsKey('OwnerPassword') -and
+            -not $PSBoundParameters.ContainsKey('UserPassword') -and
+            -not $PSBoundParameters.ContainsKey('Permission')) {
+            Write-Warning ('Protect-VellumPdfDocument: an owner password with no user password and the ' +
+                'default -Permission All opens the document without a password and grants every ' +
+                'permission, so nothing is restricted. Pass -Permission to limit operations. PDF ' +
+                'permission flags are advisory - a reader may ignore them, and the owner password removes them.')
         }
 
         # Fail fast: PDF/A forbids encryption (ISO 19005-2 section 6.3.1).

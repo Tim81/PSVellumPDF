@@ -178,8 +178,11 @@ HelpMessage: ''
 ### -LinkUri
 
 Makes this run a clickable external hyperlink in the rendered PDF.
-javascript, vbscript, data, and file URI schemes are rejected; a
-whitespace-only value is treated as no link.
+Only
+http, https, and mailto URLs are allowed; any other scheme - and
+relative or scheme-relative URIs - is rejected.
+A whitespace-only value
+is treated as no link.
 
 ```yaml
 Type: System.String

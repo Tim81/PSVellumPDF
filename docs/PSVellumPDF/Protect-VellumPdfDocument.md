@@ -172,6 +172,12 @@ Valid values:
   All           - all of the above (default)
 Multiple values are combined as flags.
 Example: -Permission Print,Copy
+Defaults to All.
+Note that an owner password with the default All and no
+user password leaves the document fully open (the cmdlet warns in that
+case).
+PDF permission flags are advisory: a reader may ignore them, and
+anyone with the owner password can remove them.
 
 ```yaml
 Type: System.String[]
