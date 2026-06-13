@@ -35,9 +35,10 @@ function New-VellumPdfTextRun {
         each in the 0.0..1.0 range (e.g. 1,0,0 for pure red). Exactly three
         values must be supplied.
     .PARAMETER LinkUri
-        Makes this run a clickable external hyperlink in the rendered PDF.
-        javascript, vbscript, data, and file URI schemes are rejected; a
-        whitespace-only value is treated as no link.
+        Makes this run a clickable external hyperlink in the rendered PDF. Only
+        http, https, and mailto URLs are allowed; any other scheme - and
+        relative or scheme-relative URIs - is rejected. A whitespace-only value
+        is treated as no link.
     .PARAMETER Leading
         Extra vertical line spacing in points added below each line of this run.
         When omitted the document-level leading applies.

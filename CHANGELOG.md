@@ -6,6 +6,30 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [1.2.3] - 2026-06-13
+
+Security hardening. No new cmdlets or parameters.
+
+### Security
+- `-LinkUri` (on `Add-VellumPdfParagraph` and `New-VellumPdfTextRun`) now uses a
+  scheme allowlist: only `http`, `https`, and `mailto` URLs are accepted. Any
+  other scheme, and relative or scheme-relative (`//host`) URIs, are rejected,
+  so a generated document cannot carry an unanticipated protocol-handler link.
+  Previously only `javascript`/`vbscript`/`data`/`file` were blocked. The
+  whitespace/control-character normalisation that defeats `java<TAB>script:`
+  smuggling is kept.
+- The RFC-3161 timestamp HTTP client built for `Set-VellumPdfSignature
+  -TimestampUrl` no longer follows redirects and applies `-TimestampTimeout` to
+  the client itself, reducing the SSRF/stall surface of the user-supplied,
+  save-time TSA request.
+- `Protect-VellumPdfDocument` now warns when an owner password is set with no
+  user password and the default `-Permission All` - that combination opens the
+  document with no password and every permission, so nothing is restricted. The
+  help also notes that PDF permission flags are advisory.
+
+### Changed
+- Gallery `Description` rewritten for readability (same facts, less dense).
+
 ## [1.2.2] - 2026-06-13
 
 Built on VellumPdf 1.5.4 (was 1.5.3). No wrapper API change.
@@ -187,7 +211,8 @@ First public release, built on VellumPdf 1.1.0 (.NET 10).
 - Quality gates: PSScriptAnalyzer, Pester (94% coverage), 3-OS CI, locked
   NuGet restore, SHA-pinned actions, PSGallery release pipeline.
 
-[Unreleased]: https://github.com/Tim81/PSVellumPDF/compare/v1.2.2...HEAD
+[Unreleased]: https://github.com/Tim81/PSVellumPDF/compare/v1.2.3...HEAD
+[1.2.3]: https://github.com/Tim81/PSVellumPDF/compare/v1.2.2...v1.2.3
 [1.2.2]: https://github.com/Tim81/PSVellumPDF/compare/v1.2.1...v1.2.2
 [1.2.1]: https://github.com/Tim81/PSVellumPDF/compare/v1.2.0...v1.2.1
 [1.2.0]: https://github.com/Tim81/PSVellumPDF/compare/v1.1.1...v1.2.0

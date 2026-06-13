@@ -246,9 +246,12 @@ HelpMessage: ''
 ### -LinkUri
 
 Makes the entire paragraph a clickable external hyperlink.
-javascript,
-vbscript, data, and file URI schemes are rejected; a whitespace-only
-value is treated as no link.
+Only http,
+https, and mailto URLs are allowed; any other scheme - and relative or
+scheme-relative URIs - is rejected so a generated document cannot carry
+an active or local-resource link.
+A whitespace-only value is treated as
+no link.
 Valid only in the 'Text' parameter set.
 
 ```yaml
