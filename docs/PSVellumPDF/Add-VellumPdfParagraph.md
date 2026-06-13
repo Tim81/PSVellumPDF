@@ -21,7 +21,7 @@ Adds a paragraph of text to a VellumPdf document.
 
 ```
 Add-VellumPdfParagraph [-Text] <string> -Document <Document> [-Font <string>] [-FontSize <double>]
- [-FontHandle <EmbeddedFontHandle>] [-Color <double[]>] [-LinkUri <string>] [-Leading <double>]
+ [-FontHandle <EmbeddedFontHandle>] [-Color <Object>] [-LinkUri <string>] [-Leading <double>]
  [-Alignment <string>] [-MarginTop <double>] [-MarginBottom <double>] [<CommonParameters>]
 ```
 
@@ -97,15 +97,14 @@ HelpMessage: ''
 
 ### -Color
 
-Text colour as three doubles representing Red, Green, and Blue channels,
-each in the 0.0..1.0 range (e.g.
-1,0,0 for pure red).
-Exactly three
-values must be supplied.
-Valid only in the 'Text' parameter set.
+Text colour, given as an R,G,B triple in 0..1 (e.g.
+1,0,0 for red), a hex
+string ('#3366cc' or '#36c'), or a colour name.
+Valid only in the 'Text'
+parameter set.
 
 ```yaml
-Type: System.Double[]
+Type: System.Object
 DefaultValue: ''
 SupportsWildcards: false
 Aliases: []

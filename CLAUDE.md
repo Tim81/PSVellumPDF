@@ -63,6 +63,12 @@ logic of its own.
   call `$doc.Dispose()`.
 - **`Private/New-VellumTextStyle.ps1`** centralizes font/size → `TextStyle`
   construction so the public functions stay consistent.
+- **`Private/ConvertTo-VellumColor.ps1`** normalizes every public colour
+  parameter (an 0..1 triple, a `#RRGGBB`/`#RGB` hex string, or a curated colour
+  name) to a `[double[3]]`. Public colour params are typed `[object]` and pass
+  through it; do NOT re-add `[ValidateCount]`/`[ValidateRange]` to those params.
+  Cast components with `[double]$v`, never `[string]`+`TryParse` (that misreads
+  `0.2` as `2` where `.` is a thousands separator).
 
 ### Mapping to the VellumPdf API
 
@@ -123,7 +129,13 @@ vendors `tests/assets/DejaVuSans.ttf` for this.
 
 ## Roadmap
 
-**1.2.2 is published on the PowerShell Gallery** (built on VellumPdf 1.5.4):
+**1.3.0 is published on the PowerShell Gallery** (built on VellumPdf 1.5.4):
+usability features — `Add-VellumPdfTable` takes `Import-Csv` records and rich
+per-cell hashtables plus `-AlternateRowBackground`/`-ColumnAlignment`; colour
+params accept hex/names via `ConvertTo-VellumColor`; `Add-VellumPdfList` nests via
+`@{Text;Children}`; `Add-VellumPdfImage` gains `-ImageBytes`/`-Format`. 1.2.3 was
+a security hardening patch (LinkUri allowlist, TSA client, owner-password warning).
+Earlier, **1.2.2** (built on VellumPdf 1.5.4):
 RFC-3161 timestamps on `Set-VellumPdfSignature` (PAdES B-T) and JBIG2 / JPEG 2000
 support on `Add-VellumPdfImage`, with both image codecs now composing with
 PDF/A-2 (the 1.5.4 fix embeds the JP2 metadata veraPDF needs —

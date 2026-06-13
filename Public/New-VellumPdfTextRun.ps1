@@ -31,9 +31,8 @@ function New-VellumPdfTextRun {
         Handles are document-scoped; passing a handle from a different document
         is rejected by the content cmdlet.
     .PARAMETER Color
-        Text colour as three doubles representing Red, Green, and Blue channels,
-        each in the 0.0..1.0 range (e.g. 1,0,0 for pure red). Exactly three
-        values must be supplied.
+        Text colour, given as an R,G,B triple in 0..1 (e.g. 1,0,0 for red), a hex
+        string ('#3366cc' or '#36c'), or a colour name (red, navy, orange, ...).
     .PARAMETER LinkUri
         Makes this run a clickable external hyperlink in the rendered PDF. Only
         http, https, and mailto URLs are allowed; any other scheme - and
@@ -68,9 +67,8 @@ function New-VellumPdfTextRun {
 
         [VellumPdf.Fonts.EmbeddedFontHandle]$FontHandle,
 
-        [ValidateCount(3, 3)]
-        [ValidateRange(0.0, 1.0)]
-        [double[]]$Color,
+        # RGB triple (0..1), a hex string ('#3366cc'/'#36c'), or a colour name.
+        [object]$Color,
 
         [string]$LinkUri,
 
@@ -90,7 +88,7 @@ function New-VellumPdfTextRun {
     if ($PSBoundParameters.ContainsKey('Font'))       { $styleParams['Font']       = $Font }
     if ($PSBoundParameters.ContainsKey('FontSize'))   { $styleParams['FontSize']   = $FontSize }
     if ($PSBoundParameters.ContainsKey('FontHandle')) { $styleParams['FontHandle'] = $FontHandle }
-    if ($PSBoundParameters.ContainsKey('Color'))      { $styleParams['Color']      = $Color }
+    if ($PSBoundParameters.ContainsKey('Color'))      { $styleParams['Color']      = ConvertTo-VellumColor $Color }
     if ($PSBoundParameters.ContainsKey('LinkUri'))    { $styleParams['LinkUri']    = $LinkUri }
     if ($PSBoundParameters.ContainsKey('Leading'))    { $styleParams['Leading']    = $Leading }
 

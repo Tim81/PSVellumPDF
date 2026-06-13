@@ -99,11 +99,59 @@ Describe 'Add-VellumPdfTable' {
         $head | Should -Be '%PDF-'
     }
 
-    It 'rejects PSCustomObject rows (Import-Csv) with a conversion hint' {
+    It 'accepts PSCustomObject rows (Import-Csv) and derives the header from property names' {
+        $records = @(
+            [pscustomobject]@{ Name = 'Alice'; Score = 'NINETYFIVE' }
+            [pscustomobject]@{ Name = 'Bob';   Score = 'EIGHTYTWO' }
+        )
+        # The previous behaviour threw on PSCustomObject rows; not throwing and
+        # producing a valid PDF proves records are now accepted and rendered.
+        New-VellumPdfDocument |
+            Add-VellumPdfTable -Row $records |
+            Save-VellumPdfDocument -Path $script:outPath
+
+        Test-Path $script:outPath | Should -BeTrue
+        (Get-Item $script:outPath).Length | Should -BeGreaterThan 0
+        $head = [System.Text.Encoding]::ASCII.GetString(
+            [System.IO.File]::ReadAllBytes($script:outPath)[0..4])
+        $head | Should -Be '%PDF-'
+    }
+
+    It 'renders rich cells (ColSpan, Background, Alignment) and produces a valid PDF' {
+        New-VellumPdfDocument |
+            Add-VellumPdfTable -Header 'A', 'B' -Row @(
+                , @(
+                    @{ Text = 'Spanned total'; ColSpan = 2; Alignment = 'Right'; Background = '#eeeeee' }
+                )
+            ) |
+            Save-VellumPdfDocument -Path $script:outPath
+
+        (Get-Item $script:outPath).Length | Should -BeGreaterThan 0
+        $head = [System.Text.Encoding]::ASCII.GetString(
+            [System.IO.File]::ReadAllBytes($script:outPath)[0..4])
+        $head | Should -Be '%PDF-'
+    }
+
+    It 'applies -AlternateRowBackground and -ColumnAlignment by name/hex' {
+        $rows = @(
+            [object[]]@('a', '1'), [object[]]@('b', '2'), [object[]]@('c', '3')
+        )
+        New-VellumPdfDocument |
+            Add-VellumPdfTable -Row $rows -AlternateRowBackground 'silver' `
+                -ColumnAlignment 'Left', 'Right' -BorderColor '#000000' |
+            Save-VellumPdfDocument -Path $script:outPath
+
+        (Get-Item $script:outPath).Length | Should -BeGreaterThan 0
+        $head = [System.Text.Encoding]::ASCII.GetString(
+            [System.IO.File]::ReadAllBytes($script:outPath)[0..4])
+        $head | Should -Be '%PDF-'
+    }
+
+    It 'rejects a rich cell missing the Text key' {
         $doc = New-VellumPdfDocument
         try {
-            $csvish = @([pscustomobject]@{ Name = 'Alice'; Score = 95 })
-            { $doc | Add-VellumPdfTable -Row $csvish } | Should -Throw '*PSCustomObject*'
+            { $doc | Add-VellumPdfTable -Row @(, @(@{ ColSpan = 2 })) } |
+                Should -Throw "*'Text' key*"
         }
         finally { $doc.Dispose() }
     }

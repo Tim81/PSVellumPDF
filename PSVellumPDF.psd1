@@ -1,6 +1,6 @@
 ﻿@{
     RootModule        = 'PSVellumPDF.psm1'
-    ModuleVersion     = '1.2.3'
+    ModuleVersion     = '1.3.0'
     GUID              = 'e51842c7-ddb1-4700-8ade-77055baa4f3a'
     Author            = 'Timothy van der Ham (@Tim81)'
     Copyright         = '© Timothy van der Ham. Licensed under Apache-2.0.'
@@ -56,7 +56,7 @@ PSVellumPDF only writes new PDFs. It cannot read, edit, split, or merge an exist
             )
             LicenseUri   = 'https://www.apache.org/licenses/LICENSE-2.0'
             ProjectUri   = 'https://github.com/Tim81/PSVellumPDF'
-            ReleaseNotes = '1.2.3: security hardening, no API additions. -LinkUri now allows only http, https, and mailto URLs; any other scheme, and relative or scheme-relative URIs, is rejected (previously only javascript/vbscript/data/file were blocked). The RFC-3161 timestamp HTTP client no longer follows redirects and honours -TimestampTimeout, shrinking the SSRF surface of the save-time TSA call. Protect-VellumPdfDocument warns when an owner password is set with no user password and the default -Permission All, which leaves the document unrestricted. Full changelog: https://github.com/Tim81/PSVellumPDF/blob/main/CHANGELOG.md'
+            ReleaseNotes = '1.3.0: usability features, no breaking changes. Add-VellumPdfTable accepts PSCustomObject rows straight from Import-Csv (header derived from property names) and rich per-cell hashtables (Text/ColSpan/RowSpan/Background/Alignment/Font/FontSize/Color), plus -AlternateRowBackground (zebra striping) and -ColumnAlignment. Every colour parameter now also accepts a hex string (#3366cc/#36c) or a colour name, not just an 0..1 triple. Add-VellumPdfList builds nested lists from hashtable items with Children. Add-VellumPdfImage gains -ImageBytes/-Format for in-memory images. Full changelog: https://github.com/Tim81/PSVellumPDF/blob/main/CHANGELOG.md'
         }
     }
 }

@@ -18,8 +18,12 @@ function Add-VellumPdfList {
         The live VellumPdf document flowing through the pipeline. The same
         instance is returned after the list is added, enabling chaining.
     .PARAMETER Item
-        A string array of list item labels. Each element becomes one list item.
-        Empty strings are permitted. Mandatory.
+        The list items. Each element is either a string (a leaf item) or a
+        hashtable describing a nested item:
+            @{ Text = 'Parent'; Children = @('Child A', @{ Text = 'Child B';
+               Children = @('Grandchild') }) }
+        Children nest to any depth via ListItem.AddChild. Empty strings are
+        permitted. Mandatory.
     .PARAMETER Style
         The list marker style. Unordered uses bullet points; OrderedDecimal,
         OrderedAlpha, and OrderedRoman use numbered, alphabetic, and Roman
@@ -46,6 +50,12 @@ function Add-VellumPdfList {
     .EXAMPLE
         $doc | Add-VellumPdfList -Item 'First','Second','Third' `
                -Style OrderedDecimal -Indent 20 -Font Helvetica -FontSize 11
+    .EXAMPLE
+        # Nested list
+        $doc | Add-VellumPdfList -Item @(
+            'Fruit',
+            @{ Text = 'Vegetables'; Children = @('Carrot', 'Potato') }
+        )
     .OUTPUTS
         VellumPdf.Layout.Document (the same instance, for chaining)
     #>
@@ -55,9 +65,10 @@ function Add-VellumPdfList {
         [Parameter(Mandatory, ValueFromPipeline)]
         [VellumPdf.Layout.Document]$Document,
 
+        # Each element is a string (a leaf item) or a hashtable describing a
+        # nested item: @{ Text = 'Parent'; Children = @('child', @{ Text = ... }) }.
         [Parameter(Mandatory)]
-        [AllowEmptyString()]
-        [string[]]$Item,
+        [object[]]$Item,
 
         [ValidateSet('Unordered', 'OrderedDecimal', 'OrderedAlpha', 'OrderedRoman')]
         [string]$Style = 'Unordered',
@@ -82,7 +93,24 @@ function Add-VellumPdfList {
 
     process {
         Assert-VellumPdfDocumentOpen -Document $Document -CommandName 'Add-VellumPdfList'
-        Write-VellumPdfEncodingWarning -Text $Item -CommandName 'Add-VellumPdfList'
+
+        # Gather every label (recursing into nested children) for the encoding
+        # warning, which scans for characters the base-14 fonts cannot render.
+        $collectText = {
+            param($spec)
+            if ($spec -is [System.Collections.IDictionary]) {
+                if (-not $spec.Contains('Text')) {
+                    throw "Add-VellumPdfList: a nested-item hashtable must include a 'Text' key."
+                }
+                [string]$spec['Text']
+                if ($spec['Children']) { foreach ($c in @($spec['Children'])) { & $collectText $c } }
+            }
+            else {
+                [string]$spec
+            }
+        }
+        Write-VellumPdfEncodingWarning -Text @(foreach ($spec in $Item) { & $collectText $spec }) `
+            -CommandName 'Add-VellumPdfList'
         $listStyle = [VellumPdf.Layout.Elements.ListStyle]::$Style
 
         # Build an empty typed list to satisfy the IEnumerable<ListItem> ctor param.
@@ -106,9 +134,23 @@ function Add-VellumPdfList {
             $textStyle = New-VellumTextStyle -Font $effFont -FontSize $effSize
         }
 
-        # Add each item; pass $null style to let each item use DefaultStyle.
-        foreach ($text in $Item) {
-            [void]$list.Add($text, $textStyle)
+        # Build each item (recursing into Children via ListItem.AddChild). A
+        # $null style lets the item fall back to the list DefaultStyle.
+        $buildItem = {
+            param($spec)
+            if ($spec -is [System.Collections.IDictionary]) {
+                $li = [VellumPdf.Layout.Elements.ListItem]::new([string]$spec['Text'], $textStyle)
+                if ($spec['Children']) {
+                    foreach ($child in @($spec['Children'])) {
+                        [void]$li.AddChild((& $buildItem $child))
+                    }
+                }
+                return $li
+            }
+            return [VellumPdf.Layout.Elements.ListItem]::new([string]$spec, $textStyle)
+        }
+        foreach ($spec in $Item) {
+            [void]$list.Add((& $buildItem $spec))
         }
 
         Set-VellumPdfElementMargin -Element $list -Top $MarginTop -Bottom $MarginBottom `

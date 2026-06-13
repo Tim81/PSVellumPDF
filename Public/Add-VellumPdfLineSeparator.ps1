@@ -22,9 +22,9 @@ function Add-VellumPdfLineSeparator {
         Thickness of the horizontal rule in points, between 0.1 and 50. When
         omitted the VellumPdf library default line width is used.
     .PARAMETER Color
-        Line colour as three doubles representing Red, Green, and Blue channels,
-        each in the 0.0..1.0 range (e.g. 0,0,0 for black). Exactly three
-        values must be supplied. When omitted the library default colour is used.
+        Line colour, given as an R,G,B triple in 0..1 (e.g. 0,0,0 for black), a
+        hex string ('#3366cc' or '#36c'), or a colour name. When omitted the
+        library default colour is used.
     .PARAMETER MarginTop
         Extra spacing in points above the separator element. Does not affect
         the left/right page margins.
@@ -52,9 +52,8 @@ function Add-VellumPdfLineSeparator {
         [ValidateRange(0.1, 50)]
         [double]$LineWidth,
 
-        [ValidateCount(3, 3)]
-        [ValidateRange(0.0, 1.0)]
-        [double[]]$Color,
+        # RGB triple (0..1), a hex string ('#3366cc'/'#36c'), or a colour name.
+        [object]$Color,
 
         [ValidateRange(0, 10000)]
         [double]$MarginTop,
@@ -73,7 +72,8 @@ function Add-VellumPdfLineSeparator {
         }
 
         if ($PSBoundParameters.ContainsKey('Color')) {
-            $sep.Color = [VellumPdf.Layout.Core.ColorRgb]::new($Color[0], $Color[1], $Color[2])
+            $rgb = ConvertTo-VellumColor $Color
+            $sep.Color = [VellumPdf.Layout.Core.ColorRgb]::new($rgb[0], $rgb[1], $rgb[2])
         }
 
         Set-VellumPdfElementMargin -Element $sep -Top $MarginTop -Bottom $MarginBottom `

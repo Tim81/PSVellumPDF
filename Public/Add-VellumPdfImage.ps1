@@ -1,14 +1,16 @@
 function Add-VellumPdfImage {
     <#
     .SYNOPSIS
-        Embeds an image file into a VellumPdf document.
+        Embeds an image into a VellumPdf document, from a file or from memory.
     .DESCRIPTION
-        Wraps Document.Add(LayoutImage). Reads the image from -Path, selects the
-        appropriate VellumPdf loader by file extension (JPEG, PNG, BMP, GIF, TIFF,
-        JBIG2, JPEG 2000), constructs a LayoutImage, and adds it to the document.
+        Wraps Document.Add(LayoutImage). Reads the image from -Path (loader chosen
+        by file extension) or from -ImageBytes with an explicit -Format, constructs
+        a LayoutImage, and adds it to the document. Formats: JPEG, PNG, BMP, GIF,
+        TIFF, JBIG2, JPEG 2000.
 
         Supported extensions: .jpg/.jpeg, .png, .bmp, .gif, .tif/.tiff,
-        .jbig2/.jb2, and .jp2/.jpx/.j2k/.jpf (JPEG 2000).
+        .jbig2/.jb2, and .jp2/.jpx/.j2k/.jpf (JPEG 2000). For -ImageBytes, pass
+        -Format (Jpeg/Png/Bmp/Gif/Tiff/Jbig2/Jpeg2000) since there is no extension.
 
         Note for PDF/A: JPEG 2000 and JBIG2 images compose with PDF/A-2. The
         bundled engine (VellumPdf 1.5.4+) embeds the JP2 box metadata that
@@ -31,10 +33,16 @@ function Add-VellumPdfImage {
         The live VellumPdf document flowing through the pipeline. The same
         instance is returned after the image is added, enabling chaining.
     .PARAMETER Path
-        File system path to the image file. Supported extensions are .jpg,
-        .jpeg, .png, .bmp, .gif, .tif, .tiff, .jbig2, .jb2, .jp2, .jpx, .j2k,
-        and .jpf. The path is resolved relative to the current PowerShell
-        provider location. Mandatory and positional (position 0).
+        File system path to the image file (parameter set 'Path'). Supported
+        extensions are .jpg, .jpeg, .png, .bmp, .gif, .tif, .tiff, .jbig2, .jb2,
+        .jp2, .jpx, .j2k, and .jpf. The path is resolved relative to the current
+        PowerShell provider location. Mandatory and positional (position 0).
+    .PARAMETER ImageBytes
+        Raw image bytes to embed (parameter set 'Bytes'), for images produced in
+        memory rather than read from disk. Requires -Format.
+    .PARAMETER Format
+        The format of -ImageBytes: Jpeg, Png, Bmp, Gif, Tiff, Jbig2, or Jpeg2000.
+        Required with -ImageBytes (there is no extension to infer it from).
     .PARAMETER Width
         Rendered width of the image in points, between 1 and 100000. When
         omitted the image is rendered at its natural width.
@@ -61,17 +69,29 @@ function Add-VellumPdfImage {
     .EXAMPLE
         $doc | Add-VellumPdfImage -Path ./photo.jpg -Width 200 -Height 150 `
                -Alignment Center -AltText 'Company photo'
+    .EXAMPLE
+        # Embed an in-memory PNG (e.g. a chart) without a temp file
+        $doc | Add-VellumPdfImage -ImageBytes $pngBytes -Format Png -Width 150
     .OUTPUTS
         VellumPdf.Layout.Document (the same instance, for chaining)
     #>
-    [CmdletBinding()]
+    [CmdletBinding(DefaultParameterSetName = 'Path')]
     [OutputType([VellumPdf.Layout.Document])]
     param(
         [Parameter(Mandatory, ValueFromPipeline)]
         [VellumPdf.Layout.Document]$Document,
 
-        [Parameter(Mandatory, Position = 0)]
+        [Parameter(Mandatory, Position = 0, ParameterSetName = 'Path')]
         [string]$Path,
+
+        # In-memory image bytes (e.g. a chart or QR rendered by another library).
+        [Parameter(Mandatory, ParameterSetName = 'Bytes')]
+        [byte[]]$ImageBytes,
+
+        # Image format of -ImageBytes, since there is no file extension to infer it.
+        [Parameter(Mandatory, ParameterSetName = 'Bytes')]
+        [ValidateSet('Jpeg', 'Png', 'Bmp', 'Gif', 'Tiff', 'Jbig2', 'Jpeg2000')]
+        [string]$Format,
 
         [ValidateRange(1, 100000)]
         [double]$Width,
@@ -94,31 +114,26 @@ function Add-VellumPdfImage {
     process {
         Assert-VellumPdfDocumentOpen -Document $Document -CommandName 'Add-VellumPdfImage'
 
-        $resolved = $ExecutionContext.SessionState.Path.GetUnresolvedProviderPathFromPSPath($Path)
-        if (-not [System.IO.File]::Exists($resolved)) {
-            throw "Add-VellumPdfImage: file not found: '$resolved'. Verify the path and try again."
+        # Resolve the bytes and a format key from either input set.
+        if ($PSCmdlet.ParameterSetName -eq 'Bytes') {
+            $bytes = $ImageBytes
+            $formatKey = $Format.ToLowerInvariant()
+            $source = 'the supplied image bytes'
         }
-
-        $ext = [System.IO.Path]::GetExtension($resolved).ToLowerInvariant()
-        $bytes = [System.IO.File]::ReadAllBytes($resolved)
-
-        # Loader errors ("Not a PNG file.") do not mention which file failed;
-        # rethrow with the path so batch scripts can identify the culprit.
-        try {
-            $xObject = switch ($ext) {
-                '.jpg'  { [VellumPdf.Images.JpegImageLoader]::Load($bytes) }
-                '.jpeg' { [VellumPdf.Images.JpegImageLoader]::Load($bytes) }
-                '.png'  { [VellumPdf.Images.PngImageLoader]::Load($bytes) }
-                '.bmp'  { [VellumPdf.Images.BmpImageLoader]::Load($bytes) }
-                '.gif'  { [VellumPdf.Images.GifImageLoader]::Load($bytes) }
-                '.tif'  { [VellumPdf.Images.TiffImageLoader]::Load($bytes) }
-                '.tiff' { [VellumPdf.Images.TiffImageLoader]::Load($bytes) }
-                '.jbig2' { [VellumPdf.Images.Jbig2ImageLoader]::Load($bytes) }
-                '.jb2'   { [VellumPdf.Images.Jbig2ImageLoader]::Load($bytes) }
-                '.jp2'  { [VellumPdf.Images.JpxImageLoader]::Load($bytes) }
-                '.jpx'  { [VellumPdf.Images.JpxImageLoader]::Load($bytes) }
-                '.j2k'  { [VellumPdf.Images.JpxImageLoader]::Load($bytes) }
-                '.jpf'  { [VellumPdf.Images.JpxImageLoader]::Load($bytes) }
+        else {
+            $resolved = $ExecutionContext.SessionState.Path.GetUnresolvedProviderPathFromPSPath($Path)
+            if (-not [System.IO.File]::Exists($resolved)) {
+                throw "Add-VellumPdfImage: file not found: '$resolved'. Verify the path and try again."
+            }
+            $bytes = [System.IO.File]::ReadAllBytes($resolved)
+            $source = "'$resolved'"
+            $ext = [System.IO.Path]::GetExtension($resolved).ToLowerInvariant()
+            $formatKey = switch ($ext) {
+                '.jpg' { 'jpeg' }   '.jpeg' { 'jpeg' }   '.png' { 'png' }
+                '.bmp' { 'bmp' }    '.gif' { 'gif' }
+                '.tif' { 'tiff' }   '.tiff' { 'tiff' }
+                '.jbig2' { 'jbig2' } '.jb2' { 'jbig2' }
+                '.jp2' { 'jpeg2000' } '.jpx' { 'jpeg2000' } '.j2k' { 'jpeg2000' } '.jpf' { 'jpeg2000' }
                 default {
                     throw ("Add-VellumPdfImage: unsupported image extension '$ext'. " +
                         "Supported extensions are: .jpg, .jpeg, .png, .bmp, .gif, .tif, " +
@@ -126,10 +141,24 @@ function Add-VellumPdfImage {
                 }
             }
         }
+
+        # Loader errors ("Not a PNG file.") do not mention the source; rethrow
+        # with it so batch scripts can identify the culprit.
+        try {
+            $xObject = switch ($formatKey) {
+                'jpeg'     { [VellumPdf.Images.JpegImageLoader]::Load($bytes) }
+                'png'      { [VellumPdf.Images.PngImageLoader]::Load($bytes) }
+                'bmp'      { [VellumPdf.Images.BmpImageLoader]::Load($bytes) }
+                'gif'      { [VellumPdf.Images.GifImageLoader]::Load($bytes) }
+                'tiff'     { [VellumPdf.Images.TiffImageLoader]::Load($bytes) }
+                'jbig2'    { [VellumPdf.Images.Jbig2ImageLoader]::Load($bytes) }
+                'jpeg2000' { [VellumPdf.Images.JpxImageLoader]::Load($bytes) }
+            }
+        }
         catch {
             if ($_.Exception.Message -like 'Add-VellumPdfImage:*') { throw }
             $inner = if ($_.Exception.InnerException) { $_.Exception.InnerException.Message } else { $_.Exception.Message }
-            throw "Add-VellumPdfImage: failed to load '$resolved': $inner"
+            throw "Add-VellumPdfImage: failed to load $($source): $inner"
         }
 
         $layoutImage = [VellumPdf.Layout.Elements.LayoutImage]::new($xObject)
