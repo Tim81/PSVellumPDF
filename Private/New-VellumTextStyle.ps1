@@ -54,6 +54,9 @@ function New-VellumTextStyle {
             throw ("-LinkUri uses $what; only http, https, and mailto URLs are allowed in " +
                 "generated documents (got '$LinkUri').")
         }
+        # Store the normalised value so embedded whitespace/control/format chars
+        # never reach the /URI action (a valid URL has none of them anyway).
+        $LinkUri = $normalized
     }
 
     if (-not $Font -and -not $PSBoundParameters.ContainsKey('FontSize') -and -not $FontHandle `

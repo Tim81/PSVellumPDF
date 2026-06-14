@@ -96,6 +96,18 @@ Describe 'LinkUri hygiene' {
         $raw | Should -Not -Match '/URI'
     }
 
+    It 'stores the link with embedded whitespace/control characters stripped' {
+        $out = Join-Path $TestDrive 'clean-link.pdf'
+        # Tab between the slash and the path; the stored /URI must not contain it.
+        $script:doc |
+            Add-VellumPdfParagraph -Text 'ok' -LinkUri "https://example.com/`tpath" |
+            Save-VellumPdfDocument -Path $out
+        $script:doc = $null
+        $raw = [System.Text.Encoding]::Latin1.GetString([System.IO.File]::ReadAllBytes($out))
+        $raw | Should -Match 'example\.com/path'
+        $raw | Should -Not -Match "example\.com/`tpath"
+    }
+
     It 'still allows https and mailto links' {
         $out = Join-Path $TestDrive 'ok-link.pdf'
         $run = New-VellumPdfTextRun -Text 'mail' -LinkUri 'mailto:someone@example.com'

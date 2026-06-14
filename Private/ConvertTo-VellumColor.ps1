@@ -51,22 +51,28 @@ function ConvertTo-VellumColor {
 
     $text = ([string]$Color).Trim()
 
-    # Hex: #RRGGBB / RRGGBB, or shorthand #RGB / RGB.
-    $hex = $text.TrimStart('#')
-    if ($hex -match '^[0-9a-fA-F]{6}$') {
-        return [double[]]@(
-            [Convert]::ToInt32($hex.Substring(0, 2), 16) / 255.0
-            [Convert]::ToInt32($hex.Substring(2, 2), 16) / 255.0
-            [Convert]::ToInt32($hex.Substring(4, 2), 16) / 255.0
-        )
-    }
-    if ($hex -match '^[0-9a-fA-F]{3}$') {
-        # Each nibble doubles: 'abc' -> 'aabbcc'.
-        return [double[]]@(
-            [Convert]::ToInt32("$($hex[0])$($hex[0])", 16) / 255.0
-            [Convert]::ToInt32("$($hex[1])$($hex[1])", 16) / 255.0
-            [Convert]::ToInt32("$($hex[2])$($hex[2])", 16) / 255.0
-        )
+    # Hex MUST be #-prefixed: #RRGGBB or #RGB shorthand. Requiring the '#' avoids
+    # the trap where a bare number like '255' parses as hex (-> '225555') instead
+    # of being rejected; a caller meaning an 8-bit channel would get a silently
+    # wrong colour.
+    if ($text.StartsWith('#')) {
+        $hex = $text.Substring(1)
+        if ($hex -match '^[0-9a-fA-F]{6}$') {
+            return [double[]]@(
+                [Convert]::ToInt32($hex.Substring(0, 2), 16) / 255.0
+                [Convert]::ToInt32($hex.Substring(2, 2), 16) / 255.0
+                [Convert]::ToInt32($hex.Substring(4, 2), 16) / 255.0
+            )
+        }
+        if ($hex -match '^[0-9a-fA-F]{3}$') {
+            # Each nibble doubles: '#abc' -> 'aabbcc'.
+            return [double[]]@(
+                [Convert]::ToInt32("$($hex[0])$($hex[0])", 16) / 255.0
+                [Convert]::ToInt32("$($hex[1])$($hex[1])", 16) / 255.0
+                [Convert]::ToInt32("$($hex[2])$($hex[2])", 16) / 255.0
+            )
+        }
+        throw "ConvertTo-VellumColor: '$Color' is not a valid hex colour. Use #RRGGBB or #RGB."
     }
 
     # Curated named colours (HTML basic 16 plus common aliases).

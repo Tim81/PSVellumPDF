@@ -1,6 +1,6 @@
 ﻿@{
     RootModule        = 'PSVellumPDF.psm1'
-    ModuleVersion     = '1.3.0'
+    ModuleVersion     = '1.3.1'
     GUID              = 'e51842c7-ddb1-4700-8ade-77055baa4f3a'
     Author            = 'Timothy van der Ham (@Tim81)'
     Copyright         = '© Timothy van der Ham. Licensed under Apache-2.0.'
@@ -56,7 +56,7 @@ PSVellumPDF only writes new PDFs. It cannot read, edit, split, or merge an exist
             )
             LicenseUri   = 'https://www.apache.org/licenses/LICENSE-2.0'
             ProjectUri   = 'https://github.com/Tim81/PSVellumPDF'
-            ReleaseNotes = '1.3.0: usability features, no breaking changes. Add-VellumPdfTable accepts PSCustomObject rows straight from Import-Csv (header derived from property names) and rich per-cell hashtables (Text/ColSpan/RowSpan/Background/Alignment/Font/FontSize/Color), plus -AlternateRowBackground (zebra striping) and -ColumnAlignment. Every colour parameter now also accepts a hex string (#3366cc/#36c) or a colour name, not just an 0..1 triple. Add-VellumPdfList builds nested lists from hashtable items with Children. Add-VellumPdfImage gains -ImageBytes/-Format for in-memory images. Full changelog: https://github.com/Tim81/PSVellumPDF/blob/main/CHANGELOG.md'
+            ReleaseNotes = '1.3.1: hardening of the 1.3.0 features. Rich table cells now validate Font/FontSize/ColSpan/RowSpan (a bad value used to fail cryptically or silently); a colour-only cell keeps the table font instead of falling back to Helvetica. Hex colours now require a leading # (so a bare number like 255 is no longer misread as hex). Add-VellumPdfTable fails fast when rows mix record and cell-array shapes. -LinkUri is stored with embedded whitespace/control characters removed. Nested lists cap their depth to avoid an overflow on cyclic input. Full changelog: https://github.com/Tim81/PSVellumPDF/blob/main/CHANGELOG.md'
         }
     }
 }

@@ -198,6 +198,15 @@ Describe 'ConvertTo-VellumColor (private helper)' {
         { InModuleScope PSVellumPDF { ConvertTo-VellumColor 'notacolour' } } | Should -Throw '*unrecognised colour*'
     }
 
+    It 'does not treat a bare number as hex (hex requires #)' {
+        # '255' must NOT silently become hex 225555; require a leading # for hex.
+        { InModuleScope PSVellumPDF { ConvertTo-VellumColor '255' } } | Should -Throw '*unrecognised colour*'
+    }
+
+    It 'throws a hex-specific error for a #-prefixed non-hex value' {
+        { InModuleScope PSVellumPDF { ConvertTo-VellumColor '#xyz' } } | Should -Throw '*not a valid hex colour*'
+    }
+
     It 'throws on an out-of-range component' {
         { InModuleScope PSVellumPDF { ConvertTo-VellumColor @(2.5, 0, 0) } } | Should -Throw '*between 0 and 1*'
     }

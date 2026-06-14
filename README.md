@@ -11,7 +11,7 @@ accessible-PDF output.
 This module generates new PDFs. It does not read, edit, split, or merge existing
 files; VellumPdf is a write-only engine with no PDF parser.
 
-> Status: **stable (1.3.0)**, on VellumPdf 1.5.4. The full VellumPdf layout API
+> Status: **stable (1.3.1)**, on VellumPdf 1.5.4. The full VellumPdf layout API
 > is wrapped: documents, headings, paragraphs (incl. mixed-style runs, colour,
 > hyperlinks, line spacing), tables, lists, images, line separators, embedded
 > TrueType fonts, headers/footers, metadata, margins, bookmarks, encryption,

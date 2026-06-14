@@ -159,9 +159,22 @@ function Add-VellumPdfTable {
         #   - cell arrays: an array per row, each element a scalar or a rich-cell
         #     hashtable (@{ Text=...; ColSpan=...; Background=...; Alignment=... }).
         # The first row decides the mode.
-        $recordMode = $Row.Count -gt 0 -and (
-            ($Row[0] -is [System.Management.Automation.PSCustomObject]) -or
-            ($Row[0] -is [System.Collections.IDictionary]))
+        $isRecord = {
+            param($r)
+            ($r -is [System.Management.Automation.PSCustomObject]) -or ($r -is [System.Collections.IDictionary])
+        }
+        $recordMode = $Row.Count -gt 0 -and (& $isRecord $Row[0])
+
+        # All rows must be the same shape. Mixing records and cell-arrays would
+        # otherwise render silently-wrong output (an object stringified into one
+        # cell, or array cells read by property name as all-empty).
+        for ($i = 1; $i -lt $Row.Count; $i++) {
+            if ((& $isRecord $Row[$i]) -ne $recordMode) {
+                throw ('Add-VellumPdfTable: -Row mixes record rows (PSCustomObject/hashtable) and ' +
+                    "cell-array rows; row $i does not match the shape of the first row. Use one shape " +
+                    'for all rows.')
+            }
+        }
 
         # Resolve a single cell value to a spec hashtable carrying at least Text.
         $toSpec = {
@@ -207,16 +220,22 @@ function Add-VellumPdfTable {
 
         $table = [VellumPdf.Layout.Elements.Table.TableElement]::new()
 
-        # Apply default cell style when font or size is requested. Gaps are
-        # filled from the document defaults: a style without a font renders in
-        # the library-global Helvetica, not the document default.
-        $wantsStyle = [bool]$Font -or $PSBoundParameters.ContainsKey('FontSize')
-        if ($wantsStyle) {
-            $default = Resolve-VellumPdfDefault -Document $Document
-            $effFont = if ($Font) { $Font } else { $default.Font }
-            $effSize = if ($PSBoundParameters.ContainsKey('FontSize')) { $FontSize } else { $default.FontSize }
+        # Effective table font/size: the -Font/-FontSize overrides, else the
+        # document defaults. A TextStyle without a font renders in the
+        # library-global Helvetica, so these fill the gap for the default cell
+        # style AND for rich cells that set only Colour (see $buildCell).
+        $default = Resolve-VellumPdfDefault -Document $Document
+        $effFont = if ($Font) { $Font } else { $default.Font }
+        $effSize = if ($PSBoundParameters.ContainsKey('FontSize')) { $FontSize } else { $default.FontSize }
+        if ([bool]$Font -or $PSBoundParameters.ContainsKey('FontSize')) {
             $table.DefaultCellStyle = New-VellumTextStyle -Font $effFont -FontSize $effSize
         }
+
+        # The base-14 font names a rich cell's Font key may use (same set as the
+        # -Font parameter's ValidateSet, which does not reach per-cell hashtables).
+        $fontNames = @('Courier', 'CourierBold', 'CourierBoldOblique', 'CourierOblique',
+            'Helvetica', 'HelveticaBold', 'HelveticaBoldOblique', 'HelveticaOblique',
+            'Symbol', 'TimesBold', 'TimesBoldItalic', 'TimesItalic', 'TimesRoman', 'ZapfDingbats')
 
         # Apply border width.
         if ($PSBoundParameters.ContainsKey('BorderWidth')) {
@@ -233,22 +252,52 @@ function Add-VellumPdfTable {
         $headerBg = if ($PSBoundParameters.ContainsKey('HeaderBackground')) { & $toRgb $HeaderBackground }
         $altBg    = if ($PSBoundParameters.ContainsKey('AlternateRowBackground')) { & $toRgb $AlternateRowBackground }
 
-        # Builds a styled Cell from a spec hashtable at a column index.
+        # Builds a styled Cell from a spec hashtable at a column index. Rich-cell
+        # values are validated here because the -Font/-FontSize/-Alignment
+        # parameter guards do not reach per-cell hashtables.
         $buildCell = {
             param($spec, $colIndex)
             $cell = [VellumPdf.Layout.Elements.Table.Cell]::new([string]$spec['Text'])
+
             $align = if ($spec['Alignment']) { [string]$spec['Alignment'] }
                 elseif ($ColumnAlignment -and $colIndex -lt $ColumnAlignment.Count) { $ColumnAlignment[$colIndex] }
                 else { $Alignment }
+            if ($align -notin @('Left', 'Center', 'Right', 'Justify')) {
+                throw "Add-VellumPdfTable: rich-cell Alignment '$align' is invalid; use Left, Center, Right, or Justify."
+            }
             $cell.Alignment = [VellumPdf.Layout.Core.HorizontalAlignment]::$align
-            if ($spec['ColSpan']) { $cell.ColSpan = [int]$spec['ColSpan'] }
-            if ($spec['RowSpan']) { $cell.RowSpan = [int]$spec['RowSpan'] }
+
+            foreach ($spanKey in 'ColSpan', 'RowSpan') {
+                if ($null -ne $spec[$spanKey]) {
+                    $span = $spec[$spanKey] -as [int]
+                    if ($null -eq $span -or $span -lt 1) {
+                        throw "Add-VellumPdfTable: rich-cell $spanKey must be a positive integer; got '$($spec[$spanKey])'."
+                    }
+                    $cell.$spanKey = $span
+                }
+            }
+
             if ($spec['Background']) { $cell.Background = & $toRgb $spec['Background'] }
-            if ($spec['Font'] -or $spec['FontSize'] -or $spec['Color']) {
-                $cellStyle = @{}
-                if ($spec['Font'])     { $cellStyle['Font']     = [string]$spec['Font'] }
-                if ($spec['FontSize']) { $cellStyle['FontSize'] = [double]$spec['FontSize'] }
-                if ($spec['Color'])    { $cellStyle['Color']    = ConvertTo-VellumColor $spec['Color'] }
+
+            if ($spec['Font'] -or $null -ne $spec['FontSize'] -or $spec['Color']) {
+                if ($spec['Font'] -and [string]$spec['Font'] -notin $fontNames) {
+                    throw ("Add-VellumPdfTable: rich-cell Font '$($spec['Font'])' is not a base-14 font name. " +
+                        "Valid names: $($fontNames -join ', ').")
+                }
+                if ($null -ne $spec['FontSize']) {
+                    $size = $spec['FontSize'] -as [double]
+                    if ($null -eq $size -or $size -lt 1 -or $size -gt 1000) {
+                        throw "Add-VellumPdfTable: rich-cell FontSize must be between 1 and 1000; got '$($spec['FontSize'])'."
+                    }
+                }
+                # Fill the font/size gap from the table's effective default so a
+                # Colour-only cell keeps the table font instead of falling back to
+                # the library-global Helvetica.
+                $cellStyle = @{
+                    Font     = if ($spec['Font']) { [string]$spec['Font'] } else { $effFont }
+                    FontSize = if ($null -ne $spec['FontSize']) { [double]$spec['FontSize'] } else { $effSize }
+                }
+                if ($spec['Color']) { $cellStyle['Color'] = ConvertTo-VellumColor $spec['Color'] }
                 $cell.Style = New-VellumTextStyle @cellStyle
             }
             $cell
