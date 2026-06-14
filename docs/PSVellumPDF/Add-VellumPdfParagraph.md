@@ -4,7 +4,7 @@ external help file: PSVellumPDF-Help.xml
 HelpUri: ''
 Locale: en-US
 Module Name: PSVellumPDF
-ms.date: 06-13-2026
+ms.date: 06-14-2026
 PlatyPS schema version: 2024-05-01
 title: Add-VellumPdfParagraph
 ---
@@ -22,14 +22,15 @@ Adds a paragraph of text to a VellumPdf document.
 ```
 Add-VellumPdfParagraph [-Text] <string> -Document <Document> [-Font <string>] [-FontSize <double>]
  [-FontHandle <EmbeddedFontHandle>] [-Color <Object>] [-LinkUri <string>] [-Leading <double>]
- [-Alignment <string>] [-MarginTop <double>] [-MarginBottom <double>] [<CommonParameters>]
+ [-Alignment <string>] [-Language <string>] [-MarginTop <double>] [-MarginBottom <double>]
+ [<CommonParameters>]
 ```
 
 ### Runs
 
 ```
 Add-VellumPdfParagraph [-Run] <TextRun[]> -Document <Document> [-Alignment <string>]
- [-MarginTop <double>] [-MarginBottom <double>] [<CommonParameters>]
+ [-Language <string>] [-MarginTop <double>] [-MarginBottom <double>] [<CommonParameters>]
 ```
 
 ## DESCRIPTION
@@ -67,6 +68,11 @@ $doc | Add-VellumPdfParagraph -Text 'Red heading.' -Color 1,0,0
 $run1 = New-VellumPdfTextRun -Text 'Normal '
 $run2 = New-VellumPdfTextRun -Text 'Bold' -Font HelveticaBold
 $doc | Add-VellumPdfParagraph -Run $run1, $run2
+
+### EXAMPLE 4
+
+# Paragraph with BCP-47 language tag
+$doc | Add-VellumPdfParagraph -Text 'Bonjour le monde.' -Language 'fr-FR'
 
 ## PARAMETERS
 
@@ -208,6 +214,32 @@ SupportsWildcards: false
 Aliases: []
 ParameterSets:
 - Name: Text
+  Position: Named
+  IsRequired: false
+  ValueFromPipeline: false
+  ValueFromPipelineByPropertyName: false
+  ValueFromRemainingArguments: false
+DontShow: false
+AcceptedValues: []
+HelpMessage: ''
+```
+
+### -Language
+
+BCP-47 language tag (e.g.
+'en-US', 'es-ES') applied to the paragraph
+element.
+Enables per-element language metadata in tagged and PDF/UA
+documents.
+Applies to both parameter sets.
+
+```yaml
+Type: System.String
+DefaultValue: ''
+SupportsWildcards: false
+Aliases: []
+ParameterSets:
+- Name: (All)
   Position: Named
   IsRequired: false
   ValueFromPipeline: false

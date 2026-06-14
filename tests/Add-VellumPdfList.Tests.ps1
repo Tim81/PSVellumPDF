@@ -194,4 +194,78 @@ Describe 'Add-VellumPdfList' {
         }
         finally { $doc.Dispose() }
     }
+
+    It 'produces a valid PDF with -FontHandle (embedded TrueType font) and asserts /FontFile2' {
+        $fontPath = Join-Path $PSScriptRoot 'assets' 'DejaVuSans.ttf'
+        $doc = New-VellumPdfDocument
+        $handle = Register-VellumPdfFont -Document $doc -Path $fontPath
+        $doc |
+            Add-VellumPdfList -Item 'Embedded one', 'Embedded two' -FontHandle $handle |
+            Save-VellumPdfDocument -Path $script:outPath
+
+        Test-Path $script:outPath | Should -BeTrue
+        (Get-Item $script:outPath).Length | Should -BeGreaterThan 0
+
+        $head = [System.Text.Encoding]::ASCII.GetString(
+            [System.IO.File]::ReadAllBytes($script:outPath)[0..4])
+        $head | Should -Be '%PDF-'
+
+        $raw = [System.Text.Encoding]::Latin1.GetString(
+            [System.IO.File]::ReadAllBytes($script:outPath))
+        $raw | Should -Match '/FontFile2'
+    }
+
+    It 'produces a valid PDF with -FontHandle and -FontSize together' {
+        $fontPath = Join-Path $PSScriptRoot 'assets' 'DejaVuSans.ttf'
+        $doc = New-VellumPdfDocument
+        $handle = Register-VellumPdfFont -Document $doc -Path $fontPath
+        $doc |
+            Add-VellumPdfList -Item 'Sized one', 'Sized two' -FontHandle $handle -FontSize 14 |
+            Save-VellumPdfDocument -Path $script:outPath
+
+        $head = [System.Text.Encoding]::ASCII.GetString(
+            [System.IO.File]::ReadAllBytes($script:outPath)[0..4])
+        $head | Should -Be '%PDF-'
+    }
+
+    It 'throws when -FontHandle and -Font are both supplied' {
+        $fontPath = Join-Path $PSScriptRoot 'assets' 'DejaVuSans.ttf'
+        $doc = New-VellumPdfDocument
+        try {
+            $handle = Register-VellumPdfFont -Document $doc -Path $fontPath
+            { $doc | Add-VellumPdfList -Item 'A' -FontHandle $handle -Font Helvetica } |
+                Should -Throw '*mutually exclusive*'
+        }
+        finally { $doc.Dispose() }
+    }
+
+    It 'produces a valid PDF with -Language and asserts /Lang in the output' {
+        New-VellumPdfDocument -Tagged |
+            Add-VellumPdfList -Item 'Premier', 'Deuxieme', 'Troisieme' -Language 'fr-FR' |
+            Save-VellumPdfDocument -Path $script:outPath
+
+        Test-Path $script:outPath | Should -BeTrue
+        (Get-Item $script:outPath).Length | Should -BeGreaterThan 0
+
+        $head = [System.Text.Encoding]::ASCII.GetString(
+            [System.IO.File]::ReadAllBytes($script:outPath)[0..4])
+        $head | Should -Be '%PDF-'
+
+        $raw = [System.Text.Encoding]::Latin1.GetString(
+            [System.IO.File]::ReadAllBytes($script:outPath))
+        $raw | Should -Match '/Lang'
+    }
+
+    It 'applies -Language to nested list items' {
+        New-VellumPdfDocument -Tagged |
+            Add-VellumPdfList -Item @(
+                'Parent item',
+                @{ Text = 'Nested parent'; Children = @('Child item') }
+            ) -Language 'en-GB' |
+            Save-VellumPdfDocument -Path $script:outPath
+
+        $head = [System.Text.Encoding]::ASCII.GetString(
+            [System.IO.File]::ReadAllBytes($script:outPath)[0..4])
+        $head | Should -Be '%PDF-'
+    }
 }

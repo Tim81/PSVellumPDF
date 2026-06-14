@@ -4,7 +4,7 @@ external help file: PSVellumPDF-Help.xml
 HelpUri: ''
 Locale: en-US
 Module Name: PSVellumPDF
-ms.date: 06-13-2026
+ms.date: 06-14-2026
 PlatyPS schema version: 2024-05-01
 title: Add-VellumPdfList
 ---
@@ -21,8 +21,8 @@ Adds an ordered or unordered list to a VellumPdf document.
 
 ```
 Add-VellumPdfList [-Document] <Document> [-Item] <Object[]> [[-Style] <string>] [[-Indent] <double>]
- [[-Font] <string>] [[-FontSize] <double>] [[-MarginTop] <double>] [[-MarginBottom] <double>]
- [<CommonParameters>]
+ [[-Font] <string>] [[-FontHandle] <EmbeddedFontHandle>] [[-FontSize] <double>]
+ [[-Language] <string>] [[-MarginTop] <double>] [[-MarginBottom] <double>] [<CommonParameters>]
 ```
 
 ## DESCRIPTION
@@ -35,6 +35,16 @@ An optional -Indent adjusts the left indent
 for the list.
 An optional -Font/-FontSize override applies a TextStyle to
 every item; when omitted the document default font is used.
+
+Use -FontHandle (from Register-VellumPdfFont) instead of -Font to render
+list items in an embedded TrueType font.
+Required for Unicode text and
+PDF/A documents.
+-Font and -FontHandle are mutually exclusive.
+
+-Language sets the BCP-47 language tag (e.g.
+'en-US') on each list item,
+enabling per-item language metadata in tagged and accessible PDFs.
 
 -MarginTop and -MarginBottom apply spacing above and below the list
 without affecting the left/right margins already set on the element.
@@ -62,6 +72,17 @@ $doc | Add-VellumPdfList -Item @(
     'Fruit',
     @{ Text = 'Vegetables'; Children = @('Carrot', 'Potato') }
 )
+
+### EXAMPLE 4
+
+# Embedded-font list (Unicode-safe, required for PDF/A)
+$handle = Register-VellumPdfFont -Document $doc -Path ./DejaVuSans.ttf
+$doc | Add-VellumPdfList -Item 'Item one','Item two' -FontHandle $handle
+
+### EXAMPLE 5
+
+# List with BCP-47 language tag on each item
+$doc | Add-VellumPdfList -Item 'Premier','Deuxieme' -Language 'fr-FR'
 
 ## PARAMETERS
 
@@ -93,6 +114,7 @@ HelpMessage: ''
 A base-14 font name applied to every list item.
 When omitted the
 document default font is used.
+Mutually exclusive with -FontHandle.
 
 ```yaml
 Type: System.String
@@ -102,6 +124,33 @@ Aliases: []
 ParameterSets:
 - Name: (All)
   Position: 4
+  IsRequired: false
+  ValueFromPipeline: false
+  ValueFromPipelineByPropertyName: false
+  ValueFromRemainingArguments: false
+DontShow: false
+AcceptedValues: []
+HelpMessage: ''
+```
+
+### -FontHandle
+
+An EmbeddedFontHandle returned by Register-VellumPdfFont for this
+document.
+When supplied every list item uses the embedded TrueType font
+and the base-14 encoding warning is suppressed.
+Handles from a different
+document are rejected.
+Mutually exclusive with -Font.
+
+```yaml
+Type: VellumPdf.Fonts.EmbeddedFontHandle
+DefaultValue: ''
+SupportsWildcards: false
+Aliases: []
+ParameterSets:
+- Name: (All)
+  Position: 5
   IsRequired: false
   ValueFromPipeline: false
   ValueFromPipelineByPropertyName: false
@@ -124,7 +173,7 @@ SupportsWildcards: false
 Aliases: []
 ParameterSets:
 - Name: (All)
-  Position: 5
+  Position: 6
   IsRequired: false
   ValueFromPipeline: false
   ValueFromPipelineByPropertyName: false
@@ -186,6 +235,29 @@ AcceptedValues: []
 HelpMessage: ''
 ```
 
+### -Language
+
+BCP-47 language tag (e.g.
+'en-US', 'fr-FR') applied to each list item.
+Enables per-item language metadata in tagged and PDF/UA documents.
+
+```yaml
+Type: System.String
+DefaultValue: ''
+SupportsWildcards: false
+Aliases: []
+ParameterSets:
+- Name: (All)
+  Position: 7
+  IsRequired: false
+  ValueFromPipeline: false
+  ValueFromPipelineByPropertyName: false
+  ValueFromRemainingArguments: false
+DontShow: false
+AcceptedValues: []
+HelpMessage: ''
+```
+
 ### -MarginBottom
 
 Extra spacing in points below the list element.
@@ -199,7 +271,7 @@ SupportsWildcards: false
 Aliases: []
 ParameterSets:
 - Name: (All)
-  Position: 7
+  Position: 9
   IsRequired: false
   ValueFromPipeline: false
   ValueFromPipelineByPropertyName: false
@@ -222,7 +294,7 @@ SupportsWildcards: false
 Aliases: []
 ParameterSets:
 - Name: (All)
-  Position: 6
+  Position: 8
   IsRequired: false
   ValueFromPipeline: false
   ValueFromPipelineByPropertyName: false

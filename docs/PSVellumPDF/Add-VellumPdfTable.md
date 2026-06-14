@@ -4,7 +4,7 @@ external help file: PSVellumPDF-Help.xml
 HelpUri: ''
 Locale: en-US
 Module Name: PSVellumPDF
-ms.date: 06-13-2026
+ms.date: 06-14-2026
 PlatyPS schema version: 2024-05-01
 title: Add-VellumPdfTable
 ---
@@ -20,10 +20,11 @@ Adds a table to a VellumPdf document.
 ### __AllParameterSets
 
 ```
-Add-VellumPdfTable [-Document] <Document> [[-Header] <string[]>] [-Row] <Object[]>
+Add-VellumPdfTable [-Document] <Document> [[-Header] <Object[]>] [-Row] <Object[]>
  [[-ColumnWidth] <double[]>] [[-BorderWidth] <double>] [[-BorderColor] <Object>]
  [[-HeaderBackground] <Object>] [[-AlternateRowBackground] <Object>] [[-ColumnAlignment] <string[]>]
- [[-Font] <string>] [[-FontSize] <double>] [[-Alignment] <string>] [[-MarginTop] <double>]
+ [[-Font] <string>] [[-FontSize] <double>] [[-FontHandle] <EmbeddedFontHandle>]
+ [[-Alignment] <string>] [[-CellPadding] <double[]>] [[-MarginTop] <double>]
  [[-MarginBottom] <double>] [<CommonParameters>]
 ```
 
@@ -46,7 +47,8 @@ Each element is a scalar (added as
     text) or a rich-cell hashtable for that one cell:
       @{ Text = 'Total'; ColSpan = 2; Alignment = 'Right';
          Background = '#eeeeee'; Font = 'HelveticaBold'; FontSize = 11;
-         Color = 'navy' }
+         FontHandle = $handle; Color = 'navy';
+         Padding = @(4, 8, 4, 8); Language = 'en-US' }
     Text is required; the rest are optional.
 
 Colour parameters (-BorderColor, -HeaderBackground, -AlternateRowBackground,
@@ -84,6 +86,23 @@ New-VellumPdfDocument |
 $doc | Add-VellumPdfTable -Row @(@('Cell1','Cell2')) `
        -ColumnWidth @(100, 200) -Font Helvetica -FontSize 10 -Alignment Center
 
+### EXAMPLE 3
+
+# Embedded font table with rich header cells and per-cell padding.
+$handle = Register-VellumPdfFont -Document $doc -Path ./fonts/DejaVuSans.ttf
+$richHeaders = @(
+    @{ Text = 'Name';  Background = '#336699'; Color = 'white'; FontHandle = $handle },
+    @{ Text = 'Score'; Background = '#336699'; Color = 'white'; FontHandle = $handle }
+)
+$rows = @(
+    @('Alice', '95'),
+    @('Bob',   '82')
+)
+New-VellumPdfDocument |
+    Add-VellumPdfTable -Header $richHeaders -Row $rows `
+        -FontHandle $handle -CellPadding @(4, 8, 4, 8) |
+    Save-VellumPdfDocument -Path ./report.pdf
+
 ## PARAMETERS
 
 ### -Alignment
@@ -100,7 +119,7 @@ SupportsWildcards: false
 Aliases: []
 ParameterSets:
 - Name: (All)
-  Position: 11
+  Position: 12
   IsRequired: false
   ValueFromPipeline: false
   ValueFromPipelineByPropertyName: false
@@ -169,6 +188,32 @@ Aliases: []
 ParameterSets:
 - Name: (All)
   Position: 4
+  IsRequired: false
+  ValueFromPipeline: false
+  ValueFromPipelineByPropertyName: false
+  ValueFromRemainingArguments: false
+DontShow: false
+AcceptedValues: []
+HelpMessage: ''
+```
+
+### -CellPadding
+
+Default padding applied to every cell in the table, as either a single
+uniform value (in points) or a four-element array in the order
+top, right, bottom, left.
+Each value must be a non-negative number.
+A
+cell's own Padding key overrides this per-cell.
+
+```yaml
+Type: System.Double[]
+DefaultValue: ''
+SupportsWildcards: false
+Aliases: []
+ParameterSets:
+- Name: (All)
+  Position: 13
   IsRequired: false
   ValueFromPipeline: false
   ValueFromPipelineByPropertyName: false
@@ -253,7 +298,9 @@ HelpMessage: ''
 
 A base-14 font name applied as the default cell style for all data
 cells.
-When omitted the document default font is used.
+Mutually exclusive with -FontHandle.
+When omitted the document
+default font is used.
 
 ```yaml
 Type: System.String
@@ -263,6 +310,33 @@ Aliases: []
 ParameterSets:
 - Name: (All)
   Position: 9
+  IsRequired: false
+  ValueFromPipeline: false
+  ValueFromPipelineByPropertyName: false
+  ValueFromRemainingArguments: false
+DontShow: false
+AcceptedValues: []
+HelpMessage: ''
+```
+
+### -FontHandle
+
+An EmbeddedFontHandle returned by Register-VellumPdfFont for this
+document.
+When supplied the table uses the embedded TrueType font as its
+default cell style, enabling Unicode text and PDF/A conformance.
+Handles
+from a different document are rejected.
+Mutually exclusive with -Font.
+
+```yaml
+Type: VellumPdf.Fonts.EmbeddedFontHandle
+DefaultValue: ''
+SupportsWildcards: false
+Aliases: []
+ParameterSets:
+- Name: (All)
+  Position: 11
   IsRequired: false
   ValueFromPipeline: false
   ValueFromPipelineByPropertyName: false
@@ -297,15 +371,18 @@ HelpMessage: ''
 
 ### -Header
 
-An optional string array of column header labels.
-When supplied, a
-styled header row is prepended to the table via AddHeaderRow().
-The
-count of header cells determines the expected column count for
--ColumnWidth mismatch warnings.
+An optional array of column header labels.
+Each element is either a
+plain string or a rich-cell hashtable (the same keys accepted by data
+cells: Text, Background, Alignment, Font, FontHandle, FontSize, Color,
+Padding, Language, ColSpan).
+When supplied, a styled header row is
+prepended to the table via AddHeaderRow().
+The count of header cells
+determines the expected column count for -ColumnWidth mismatch warnings.
 
 ```yaml
-Type: System.String[]
+Type: System.Object[]
 DefaultValue: ''
 SupportsWildcards: false
 Aliases: []
@@ -357,7 +434,7 @@ SupportsWildcards: false
 Aliases: []
 ParameterSets:
 - Name: (All)
-  Position: 13
+  Position: 15
   IsRequired: false
   ValueFromPipeline: false
   ValueFromPipelineByPropertyName: false
@@ -380,7 +457,7 @@ SupportsWildcards: false
 Aliases: []
 ParameterSets:
 - Name: (All)
-  Position: 12
+  Position: 14
   IsRequired: false
   ValueFromPipeline: false
   ValueFromPipelineByPropertyName: false

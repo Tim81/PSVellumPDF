@@ -54,6 +54,10 @@ function Add-VellumPdfParagraph {
     .PARAMETER Alignment
         Horizontal alignment of the paragraph text. Accepts Left, Center, Right,
         or Justify. Defaults to Left. Applies to both parameter sets.
+    .PARAMETER Language
+        BCP-47 language tag (e.g. 'en-US', 'es-ES') applied to the paragraph
+        element. Enables per-element language metadata in tagged and PDF/UA
+        documents. Applies to both parameter sets.
     .PARAMETER MarginTop
         Extra spacing in points above the paragraph element. Does not affect the
         left/right page margins. Applies to both parameter sets.
@@ -68,6 +72,9 @@ function Add-VellumPdfParagraph {
         $run1 = New-VellumPdfTextRun -Text 'Normal '
         $run2 = New-VellumPdfTextRun -Text 'Bold' -Font HelveticaBold
         $doc | Add-VellumPdfParagraph -Run $run1, $run2
+    .EXAMPLE
+        # Paragraph with BCP-47 language tag
+        $doc | Add-VellumPdfParagraph -Text 'Bonjour le monde.' -Language 'fr-FR'
     .OUTPUTS
         VellumPdf.Layout.Document (the same instance, for chaining)
     #>
@@ -113,6 +120,8 @@ function Add-VellumPdfParagraph {
         [ValidateSet('Left', 'Center', 'Right', 'Justify')]
         [string]$Alignment = 'Left',
 
+        [string]$Language,
+
         [ValidateRange(0, 10000)]
         [double]$MarginTop,
 
@@ -130,6 +139,7 @@ function Add-VellumPdfParagraph {
             $paragraph = [VellumPdf.Layout.Elements.Paragraph]::new(
                 [System.Collections.Generic.List[VellumPdf.Layout.Elements.TextRun]]$Run)
             $paragraph.Alignment = [VellumPdf.Layout.Core.HorizontalAlignment]::$Alignment
+            if ($PSBoundParameters.ContainsKey('Language')) { $paragraph.Language = $Language }
             Set-VellumPdfElementMargin -Element $paragraph -Top $MarginTop -Bottom $MarginBottom `
                 -BoundParameters $PSBoundParameters
             [void]$Document.Add($paragraph)
@@ -148,6 +158,7 @@ function Add-VellumPdfParagraph {
         $wantsStyle   = $wantsFont -or $wantsColor -or $wantsLink -or $wantsLeading
 
         if (-not $wantsStyle -and $Alignment -eq 'Left' `
+                -and -not $PSBoundParameters.ContainsKey('Language') `
                 -and -not $PSBoundParameters.ContainsKey('MarginTop') `
                 -and -not $PSBoundParameters.ContainsKey('MarginBottom')) {
             # No overrides at all: use the document's default font.
@@ -177,6 +188,7 @@ function Add-VellumPdfParagraph {
 
         $paragraph = [VellumPdf.Layout.Elements.Paragraph]::new($Text, $style)
         $paragraph.Alignment = [VellumPdf.Layout.Core.HorizontalAlignment]::$Alignment
+        if ($PSBoundParameters.ContainsKey('Language')) { $paragraph.Language = $Language }
         Set-VellumPdfElementMargin -Element $paragraph -Top $MarginTop -Bottom $MarginBottom `
             -BoundParameters $PSBoundParameters
         [void]$Document.Add($paragraph)

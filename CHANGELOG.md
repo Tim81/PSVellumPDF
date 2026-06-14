@@ -6,6 +6,54 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added
+- `Add-VellumPdfTable -FontHandle`: pass an `EmbeddedFontHandle` (from
+  `Register-VellumPdfFont`) as the table's default cell font, mutually exclusive
+  with `-Font`. Per-cell rich hashtables also accept a `FontHandle` key. This
+  closes the headline gap: Unicode text and PDF/A documents can now contain a
+  styled table.
+- `Add-VellumPdfList -FontHandle`: embedded font for all list items (flat and
+  nested), mutually exclusive with `-Font`.
+- `Add-VellumPdfHeading -Color`: heading text colour (RGB triple, hex `#RRGGBB`/
+  `#RGB`, or a named colour via `ConvertTo-VellumColor`).
+- Rich header cells: `Add-VellumPdfTable -Header` now accepts per-cell hashtables
+  with the same keys as body cells (`Background`, `Alignment`, `Font`/`FontHandle`,
+  `FontSize`, `Color`, `Padding`, `Language`, `ColSpan`). Plain strings still work.
+- `Add-VellumPdfTable -CellPadding`: table-level default cell padding. Accept one
+  value (uniform) or four values (top, right, bottom, left). Per-cell `Padding`
+  key in rich-cell hashtables works the same way.
+- `Add-VellumPdfTable` rich cells gain `Language` (BCP-47 string) and `FontHandle`
+  keys.
+- `Add-VellumPdfHeading -Language`, `Add-VellumPdfParagraph -Language`,
+  `Add-VellumPdfList -Language`: BCP-47 language tag applied to the element,
+  for per-element accessibility tagging.
+- `New-VellumPdfDocument -Conformance PdfUA1`: PDF/UA-1 (ISO 32000-1 + WCAG
+  accessibility) added to the conformance ValidateSet. Requires embedded fonts
+  and `-Tagged`.
+- `New-VellumPdfDocument -PageWidthMm` / `-PageHeightMm`: custom page size in
+  millimetres (both required together, mutually exclusive with `-PageSize`).
+- `Save-VellumPdfDocument -PassThru`: returns the live `Document` instead of a
+  `FileInfo`, and implies `-KeepOpen`. The caller is responsible for disposing.
+- `Save-VellumPdfDocument -Force`: creates a missing parent directory instead of
+  failing.
+- `ConvertTo-VellumColor` named-colour palette extended by ~30 names: `darkblue`,
+  `lightblue`, `royalblue`, `steelblue`, `darkgreen`, `forestgreen`, `seagreen`,
+  `darkred`, `crimson`, `coral`, `salmon`, `gold`, `khaki`, `indigo`, `violet`,
+  `pink`, `brown`, `chocolate`, `tan`, `beige`, `ivory`, `lightgray`/`lightgrey`,
+  `darkgray`/`darkgrey`, `slategray`, `turquoise`, `lavender`, and others.
+
+### Changed
+- README (with a runnable Cookbook section) now ships in the published package.
+  The PowerShell Gallery package page renders it, so visitors see working
+  examples before installing.
+
+### Notes
+- CMYK colour (`ColorCmyk`) was investigated and deferred. The struct exists in
+  the library but no layout property (`TextStyle.Color`, `Cell.Background`,
+  `TableElement.BorderColor`, `LineSeparator.Color`) accepts it; all are strictly
+  `ColorRgb`. There is nothing to wrap until the upstream library adds a
+  CMYK-accepting colour property.
+
 ## [1.3.1] - 2026-06-14
 
 Hardening of the 1.3.0 features. No new parameters.
@@ -156,7 +204,7 @@ Built on VellumPdf 1.5.3 (was 1.2.0).
   (`PdfOutlineEntry.IsExpanded`) ship in VellumPdf but stay unwrapped: both need
   kernel `PdfPage` references that the layout `Document` this module drives does
   not expose, the same limit that keeps internal go-to links and standalone
-  outline entries out of scope. See CLAUDE.md.
+  outline entries out of scope. See CONTRIBUTING.md.
 
 ## [1.1.1] - 2026-06-11
 

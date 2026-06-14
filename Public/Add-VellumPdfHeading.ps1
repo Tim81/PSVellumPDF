@@ -35,6 +35,14 @@ function Add-VellumPdfHeading {
         document. When supplied the heading uses the embedded TrueType font and
         the base-14 encoding warning is suppressed. Handles from a different
         document are rejected.
+    .PARAMETER Color
+        Text colour for the heading, given as an R,G,B triple in 0..1
+        (e.g. 1,0,0 for red), a hex string ('#3366cc' or '#36c'), or a colour
+        name. Works with both -Font and -FontHandle.
+    .PARAMETER Language
+        BCP-47 language tag (e.g. 'en-US', 'de-DE') applied to the heading
+        element. Enables per-element language metadata in tagged and PDF/UA
+        documents.
     .PARAMETER MarginTop
         Extra spacing in points above the heading element. Does not affect the
         left/right page margins.
@@ -43,6 +51,12 @@ function Add-VellumPdfHeading {
         left/right page margins.
     .EXAMPLE
         $doc | Add-VellumPdfHeading -Text 'Chapter 1' -Level 1 -FontSize 18
+    .EXAMPLE
+        # Coloured heading
+        $doc | Add-VellumPdfHeading -Text 'Warning' -Level 2 -Color '#cc0000'
+    .EXAMPLE
+        # Heading with BCP-47 language tag
+        $doc | Add-VellumPdfHeading -Text 'Introduction' -Level 1 -Language 'en-US'
     .OUTPUTS
         VellumPdf.Layout.Document (the same instance, for chaining)
     #>
@@ -73,6 +87,11 @@ function Add-VellumPdfHeading {
 
         [VellumPdf.Fonts.EmbeddedFontHandle]$FontHandle,
 
+        # RGB triple (0..1), a hex string ('#3366cc'/'#36c'), or a colour name.
+        [object]$Color,
+
+        [string]$Language,
+
         [ValidateRange(0, 10000)]
         [double]$MarginTop,
 
@@ -88,16 +107,19 @@ function Add-VellumPdfHeading {
         if (-not $FontHandle) {
             Write-VellumPdfEncodingWarning -Text $Text -CommandName 'Add-VellumPdfHeading'
         }
+        $wantsColor = $PSBoundParameters.ContainsKey('Color')
         $styleParams = if ($FontHandle) {
             @{ FontHandle = $FontHandle; FontSize = $FontSize }
         } else {
             @{ Font = $Font; FontSize = $FontSize }
         }
+        if ($wantsColor) { $styleParams['Color'] = ConvertTo-VellumColor $Color }
         $style = New-VellumTextStyle @styleParams
         $heading = [VellumPdf.Layout.Elements.Heading]::new($Text, $style)
         $heading.Level = $Level
         $heading.Alignment = [VellumPdf.Layout.Core.HorizontalAlignment]::$Alignment
         if ($BookmarkTitle) { $heading.BookmarkTitle = $BookmarkTitle }
+        if ($PSBoundParameters.ContainsKey('Language')) { $heading.Language = $Language }
 
         Set-VellumPdfElementMargin -Element $heading -Top $MarginTop -Bottom $MarginBottom `
             -BoundParameters $PSBoundParameters

@@ -18,14 +18,29 @@ function New-VellumPdfDocument {
         -UseObjectStreams enables PDF cross-reference object streams, which
         reduces file size for documents with many objects.
     .PARAMETER Conformance
-        The PDF/A conformance level for the document. Use PdfA2b, PdfA2u, or
-        PdfA2a to produce an ISO 19005-2 compliant archive file; None (default)
-        produces a standard PDF without conformance requirements. Note that PDF/A
-        forbids encryption, so -Conformance is incompatible with
-        Protect-VellumPdfDocument.
+        The PDF conformance level for the document. Use PdfA2b, PdfA2u, or
+        PdfA2a to produce an ISO 19005-2 compliant archive file; use PdfUA1 to
+        produce an ISO 14289-1 (PDF/UA) accessibility-conformant document; None
+        (default) produces a standard PDF without conformance requirements. Note
+        that PDF/A and PDF/UA both forbid encryption, so these conformance levels
+        are incompatible with Protect-VellumPdfDocument. Like PDF/A, PDF/UA
+        requires embedded fonts (Register-VellumPdfFont / -FontHandle) and a
+        tagged document (-Tagged) to fully validate.
     .PARAMETER PageSize
         The paper size for every page in the document. Accepts standard ISO and
-        US names (A0-A6, Ledger, Legal, Letter). Defaults to A4.
+        US names (A0-A6, Ledger, Legal, Letter). Defaults to A4. Mutually
+        exclusive with -PageWidthMm / -PageHeightMm.
+    .PARAMETER PageWidthMm
+        Custom page width in millimetres. Must be supplied together with
+        -PageHeightMm. Mutually exclusive with -PageSize. Valid range: 1 to
+        5080 mm. The 5080 mm ceiling is 14400 points (200 inches), the maximum
+        page dimension in PDF default user space (ISO 32000-1 Annex C); larger
+        pages would need a UserUnit scale that this engine does not emit, and
+        would not render in many viewers.
+    .PARAMETER PageHeightMm
+        Custom page height in millimetres. Must be supplied together with
+        -PageWidthMm. Mutually exclusive with -PageSize. Valid range: 1 to
+        5080 mm (see -PageWidthMm for the rationale).
     .PARAMETER DefaultFont
         The base-14 font name stored as the document-wide default. Content
         cmdlets that receive no explicit -Font fill the gap from this value
@@ -68,6 +83,18 @@ function New-VellumPdfDocument {
             Add-VellumPdfParagraph -Text 'Body text.' |
             Save-VellumPdfDocument -Path ./report.pdf
     .EXAMPLE
+        # PDF/UA accessibility document (requires embedded font and -Tagged).
+        $fh = New-VellumPdfDocument -Conformance PdfUA1 -Tagged -Language 'en-US' |
+            Register-VellumPdfFont -Path ./fonts/DejaVuSans.ttf
+        $fh.Document |
+            Add-VellumPdfHeading -Text 'Accessible Report' -FontHandle $fh -Level 1 |
+            Save-VellumPdfDocument -Path ./accessible.pdf
+    .EXAMPLE
+        # Custom page size 148 x 210 mm (A5 portrait).
+        New-VellumPdfDocument -PageWidthMm 148 -PageHeightMm 210 |
+            Add-VellumPdfParagraph -Text 'A5 custom size.' |
+            Save-VellumPdfDocument -Path ./a5-custom.pdf
+    .EXAMPLE
         New-VellumPdfDocument -Margin 30
     .EXAMPLE
         New-VellumPdfDocument -Margin 30 -MarginLeft 50
@@ -79,11 +106,17 @@ function New-VellumPdfDocument {
     [CmdletBinding()]
     [OutputType([VellumPdf.Layout.Document])]
     param(
-        [ValidateSet('None', 'PdfA2b', 'PdfA2u', 'PdfA2a')]
+        [ValidateSet('None', 'PdfA2b', 'PdfA2u', 'PdfA2a', 'PdfUA1')]
         [string]$Conformance = 'None',
 
         [ValidateSet('A0', 'A1', 'A2', 'A3', 'A4', 'A5', 'A6', 'Ledger', 'Legal', 'Letter')]
         [string]$PageSize = 'A4',
+
+        [ValidateRange(1, 5080)]
+        [double]$PageWidthMm,
+
+        [ValidateRange(1, 5080)]
+        [double]$PageHeightMm,
 
         [ValidateSet('Courier', 'CourierBold', 'CourierBoldOblique', 'CourierOblique',
             'Helvetica', 'HelveticaBold', 'HelveticaBoldOblique', 'HelveticaOblique',
@@ -117,9 +150,24 @@ function New-VellumPdfDocument {
         [switch]$UseObjectStreams
     )
 
+    $hasWidthMm  = $PSBoundParameters.ContainsKey('PageWidthMm')
+    $hasHeightMm = $PSBoundParameters.ContainsKey('PageHeightMm')
+    $hasPageSize = $PSBoundParameters.ContainsKey('PageSize')
+
+    if ($hasWidthMm -ne $hasHeightMm) {
+        throw 'New-VellumPdfDocument: -PageWidthMm and -PageHeightMm must be supplied together.'
+    }
+    if (($hasWidthMm -or $hasHeightMm) -and $hasPageSize) {
+        throw 'New-VellumPdfDocument: -PageWidthMm/-PageHeightMm and -PageSize are mutually exclusive.'
+    }
+
     $doc = [VellumPdf.Layout.Document]::new()
     $doc.Conformance = [VellumPdf.Document.PdfConformance]::$Conformance
-    $doc.PageSize = [VellumPdf.Document.PageSize]::$PageSize
+    if ($hasWidthMm) {
+        $doc.PageSize = [VellumPdf.Document.PageSize]::Mm($PageWidthMm, $PageHeightMm)
+    } else {
+        $doc.PageSize = [VellumPdf.Document.PageSize]::$PageSize
+    }
     if ($Tagged) { $doc.Tagged = $true }
     if ($Language) { $doc.Language = $Language }
     if ($UseObjectStreams) { $doc.UseObjectStreams = $true }
