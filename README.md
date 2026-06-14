@@ -233,7 +233,7 @@ Each script writes its output PDF beside itself and prints the path.
 ./build.ps1 Clean   # remove ./lib and build output
 ```
 
-See [CLAUDE.md](https://github.com/Tim81/PSVellumPDF/blob/main/CLAUDE.md) for architecture and contribution conventions.
+See [CONTRIBUTING.md](https://github.com/Tim81/PSVellumPDF/blob/main/CONTRIBUTING.md) for architecture and contribution conventions.
 
 ## License
 

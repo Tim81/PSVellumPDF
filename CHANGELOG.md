@@ -204,7 +204,7 @@ Built on VellumPdf 1.5.3 (was 1.2.0).
   (`PdfOutlineEntry.IsExpanded`) ship in VellumPdf but stay unwrapped: both need
   kernel `PdfPage` references that the layout `Document` this module drives does
   not expose, the same limit that keeps internal go-to links and standalone
-  outline entries out of scope. See CLAUDE.md.
+  outline entries out of scope. See CONTRIBUTING.md.
 
 ## [1.1.1] - 2026-06-11
 
