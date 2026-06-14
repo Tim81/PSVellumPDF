@@ -4,7 +4,7 @@ external help file: PSVellumPDF-Help.xml
 HelpUri: ''
 Locale: en-US
 Module Name: PSVellumPDF
-ms.date: 06-13-2026
+ms.date: 06-14-2026
 PlatyPS schema version: 2024-05-01
 title: Save-VellumPdfDocument
 ---
@@ -20,8 +20,8 @@ Writes a VellumPdf document to a .pdf file and disposes it.
 ### __AllParameterSets
 
 ```
-Save-VellumPdfDocument [-Path] <string> -Document <Document> [-KeepOpen] [-WhatIf] [-Confirm]
- [<CommonParameters>]
+Save-VellumPdfDocument [-Path] <string> -Document <Document> [-KeepOpen] [-Force] [-PassThru]
+ [-WhatIf] [-Confirm] [<CommonParameters>]
 ```
 
 ## DESCRIPTION
@@ -39,6 +39,12 @@ for calling $doc.Dispose() yourself.
 With -WhatIf nothing is saved and the
 document is left open.
 
+Use -Force to automatically create a missing parent directory rather than
+throwing an error.
+Use -PassThru to receive the still-open Document object
+instead of a FileInfo; in this case the caller owns disposal (same
+responsibility as -KeepOpen).
+
 If the pipeline is aborted BEFORE this cmdlet runs (for example by an
 error in an earlier Add-VellumPdf* call, or -WarningAction Stop turning
 the encoding warning into a terminating error), the document is never
@@ -54,6 +60,22 @@ On success an existing file at -Path is overwritten.
 ### EXAMPLE 1
 
 $doc | Save-VellumPdfDocument -Path ./out.pdf
+
+### EXAMPLE 2
+
+# Create a nested output directory automatically.
+New-VellumPdfDocument |
+    Add-VellumPdfParagraph -Text 'Auto-dir.' |
+    Save-VellumPdfDocument -Path ./reports/2024/out.pdf -Force
+
+### EXAMPLE 3
+
+# Receive the Document object after saving for downstream use, then Dispose it.
+$doc = New-VellumPdfDocument |
+    Add-VellumPdfParagraph -Text 'Content.' |
+    Save-VellumPdfDocument -Path ./out.pdf -PassThru
+# $doc is still open here; inspect or pass it as needed, then dispose.
+$doc.Dispose()
 
 ## PARAMETERS
 
@@ -86,8 +108,8 @@ Accepts pipeline input.
 After saving,
 the document is disposed and stamped so subsequent cmdlet calls against
 the stale instance fail with a clear error.
-Use -KeepOpen to suppress
-disposal.
+Use -KeepOpen or -PassThru to
+suppress disposal.
 
 ```yaml
 Type: VellumPdf.Layout.Document
@@ -99,6 +121,30 @@ ParameterSets:
   Position: Named
   IsRequired: true
   ValueFromPipeline: true
+  ValueFromPipelineByPropertyName: false
+  ValueFromRemainingArguments: false
+DontShow: false
+AcceptedValues: []
+HelpMessage: ''
+```
+
+### -Force
+
+When specified and the parent directory of -Path does not exist, creates
+it (including any missing intermediate directories) before writing the
+file.
+Without -Force, a missing parent directory throws an error.
+
+```yaml
+Type: System.Management.Automation.SwitchParameter
+DefaultValue: False
+SupportsWildcards: false
+Aliases: []
+ParameterSets:
+- Name: (All)
+  Position: Named
+  IsRequired: false
+  ValueFromPipeline: false
   ValueFromPipelineByPropertyName: false
   ValueFromRemainingArguments: false
 DontShow: false
@@ -132,13 +178,47 @@ AcceptedValues: []
 HelpMessage: ''
 ```
 
+### -PassThru
+
+When specified, emits the still-open VellumPdf.Layout.Document instead of
+the System.IO.FileInfo for the written file.
+The document is NOT disposed
+(equivalent to -KeepOpen); the caller is responsible for calling
+$doc.Dispose() when finished.
+Useful when the document object itself is
+needed after saving (for example, to inspect properties or pass it to
+other tools).
+Note: the underlying library allows a Document to be saved
+only once; to produce a second PDF file, create a new document with
+New-VellumPdfDocument.
+Works with staged signatures (signing remains
+the write step).
+
+```yaml
+Type: System.Management.Automation.SwitchParameter
+DefaultValue: False
+SupportsWildcards: false
+Aliases: []
+ParameterSets:
+- Name: (All)
+  Position: Named
+  IsRequired: false
+  ValueFromPipeline: false
+  ValueFromPipelineByPropertyName: false
+  ValueFromRemainingArguments: false
+DontShow: false
+AcceptedValues: []
+HelpMessage: ''
+```
+
 ### -Path
 
 File system path for the output PDF file.
-The parent directory must
-already exist; an existing file at this path is overwritten.
-Mandatory
-and positional (position 0).
+An existing file at this path
+is overwritten.
+The parent directory must already exist unless -Force is
+specified.
+Mandatory and positional (position 0).
 
 ```yaml
 Type: System.String
@@ -193,7 +273,7 @@ This cmdlet supports the common parameters: -Debug, -ErrorAction, -ErrorVariable
 
 ## OUTPUTS
 
-### System.IO.FileInfo for the written file.
+### System.IO.FileInfo for the written file
 
 
 ### System.IO.FileInfo

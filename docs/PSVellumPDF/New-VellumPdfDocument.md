@@ -4,7 +4,7 @@ external help file: PSVellumPDF-Help.xml
 HelpUri: ''
 Locale: en-US
 Module Name: PSVellumPDF
-ms.date: 06-13-2026
+ms.date: 06-14-2026
 PlatyPS schema version: 2024-05-01
 title: New-VellumPdfDocument
 ---
@@ -20,10 +20,11 @@ Creates a new VellumPdf layout document.
 ### __AllParameterSets
 
 ```
-New-VellumPdfDocument [[-Conformance] <string>] [[-PageSize] <string>] [[-DefaultFont] <string>]
- [[-DefaultFontSize] <double>] [[-Language] <string>] [[-Margin] <double>] [[-MarginTop] <double>]
- [[-MarginRight] <double>] [[-MarginBottom] <double>] [[-MarginLeft] <double>] [-Tagged]
- [-UseObjectStreams] [<CommonParameters>]
+New-VellumPdfDocument [[-Conformance] <string>] [[-PageSize] <string>] [[-PageWidthMm] <double>]
+ [[-PageHeightMm] <double>] [[-DefaultFont] <string>] [[-DefaultFontSize] <double>]
+ [[-Language] <string>] [[-Margin] <double>] [[-MarginTop] <double>] [[-MarginRight] <double>]
+ [[-MarginBottom] <double>] [[-MarginLeft] <double>] [-Tagged] [-UseObjectStreams]
+ [<CommonParameters>]
 ```
 
 ## DESCRIPTION
@@ -57,9 +58,25 @@ New-VellumPdfDocument -Conformance PdfA2b |
 
 ### EXAMPLE 2
 
-New-VellumPdfDocument -Margin 30
+# PDF/UA accessibility document (requires embedded font and -Tagged).
+$fh = New-VellumPdfDocument -Conformance PdfUA1 -Tagged -Language 'en-US' |
+    Register-VellumPdfFont -Path ./fonts/DejaVuSans.ttf
+$fh.Document |
+    Add-VellumPdfHeading -Text 'Accessible Report' -FontHandle $fh -Level 1 |
+    Save-VellumPdfDocument -Path ./accessible.pdf
 
 ### EXAMPLE 3
+
+# Custom page size 148 x 210 mm (A5 portrait).
+New-VellumPdfDocument -PageWidthMm 148 -PageHeightMm 210 |
+    Add-VellumPdfParagraph -Text 'A5 custom size.' |
+    Save-VellumPdfDocument -Path ./a5-custom.pdf
+
+### EXAMPLE 4
+
+New-VellumPdfDocument -Margin 30
+
+### EXAMPLE 5
 
 New-VellumPdfDocument -Margin 30 -MarginLeft 50
 
@@ -67,13 +84,17 @@ New-VellumPdfDocument -Margin 30 -MarginLeft 50
 
 ### -Conformance
 
-The PDF/A conformance level for the document.
+The PDF conformance level for the document.
 Use PdfA2b, PdfA2u, or
-PdfA2a to produce an ISO 19005-2 compliant archive file; None (default)
-produces a standard PDF without conformance requirements.
-Note that PDF/A
-forbids encryption, so -Conformance is incompatible with
-Protect-VellumPdfDocument.
+PdfA2a to produce an ISO 19005-2 compliant archive file; use PdfUA1 to
+produce an ISO 14289-1 (PDF/UA) accessibility-conformant document; None
+(default) produces a standard PDF without conformance requirements.
+Note
+that PDF/A and PDF/UA both forbid encryption, so these conformance levels
+are incompatible with Protect-VellumPdfDocument.
+Like PDF/A, PDF/UA
+requires embedded fonts (Register-VellumPdfFont / -FontHandle) and a
+tagged document (-Tagged) to fully validate.
 
 ```yaml
 Type: System.String
@@ -107,7 +128,7 @@ SupportsWildcards: false
 Aliases: []
 ParameterSets:
 - Name: (All)
-  Position: 2
+  Position: 4
   IsRequired: false
   ValueFromPipeline: false
   ValueFromPipelineByPropertyName: false
@@ -132,7 +153,7 @@ SupportsWildcards: false
 Aliases: []
 ParameterSets:
 - Name: (All)
-  Position: 3
+  Position: 5
   IsRequired: false
   ValueFromPipeline: false
   ValueFromPipelineByPropertyName: false
@@ -156,7 +177,7 @@ SupportsWildcards: false
 Aliases: []
 ParameterSets:
 - Name: (All)
-  Position: 4
+  Position: 6
   IsRequired: false
   ValueFromPipeline: false
   ValueFromPipelineByPropertyName: false
@@ -181,7 +202,7 @@ SupportsWildcards: false
 Aliases: []
 ParameterSets:
 - Name: (All)
-  Position: 5
+  Position: 7
   IsRequired: false
   ValueFromPipeline: false
   ValueFromPipelineByPropertyName: false
@@ -204,7 +225,7 @@ SupportsWildcards: false
 Aliases: []
 ParameterSets:
 - Name: (All)
-  Position: 8
+  Position: 10
   IsRequired: false
   ValueFromPipeline: false
   ValueFromPipelineByPropertyName: false
@@ -227,7 +248,7 @@ SupportsWildcards: false
 Aliases: []
 ParameterSets:
 - Name: (All)
-  Position: 9
+  Position: 11
   IsRequired: false
   ValueFromPipeline: false
   ValueFromPipelineByPropertyName: false
@@ -250,7 +271,7 @@ SupportsWildcards: false
 Aliases: []
 ParameterSets:
 - Name: (All)
-  Position: 7
+  Position: 9
   IsRequired: false
   ValueFromPipeline: false
   ValueFromPipelineByPropertyName: false
@@ -273,7 +294,33 @@ SupportsWildcards: false
 Aliases: []
 ParameterSets:
 - Name: (All)
-  Position: 6
+  Position: 8
+  IsRequired: false
+  ValueFromPipeline: false
+  ValueFromPipelineByPropertyName: false
+  ValueFromRemainingArguments: false
+DontShow: false
+AcceptedValues: []
+HelpMessage: ''
+```
+
+### -PageHeightMm
+
+Custom page height in millimetres.
+Must be supplied together with
+-PageWidthMm.
+Mutually exclusive with -PageSize.
+Valid range: 1 to
+5080 mm (see -PageWidthMm for the rationale).
+
+```yaml
+Type: System.Double
+DefaultValue: 0
+SupportsWildcards: false
+Aliases: []
+ParameterSets:
+- Name: (All)
+  Position: 3
   IsRequired: false
   ValueFromPipeline: false
   ValueFromPipelineByPropertyName: false
@@ -289,6 +336,8 @@ The paper size for every page in the document.
 Accepts standard ISO and
 US names (A0-A6, Ledger, Legal, Letter).
 Defaults to A4.
+Mutually
+exclusive with -PageWidthMm / -PageHeightMm.
 
 ```yaml
 Type: System.String
@@ -298,6 +347,36 @@ Aliases: []
 ParameterSets:
 - Name: (All)
   Position: 1
+  IsRequired: false
+  ValueFromPipeline: false
+  ValueFromPipelineByPropertyName: false
+  ValueFromRemainingArguments: false
+DontShow: false
+AcceptedValues: []
+HelpMessage: ''
+```
+
+### -PageWidthMm
+
+Custom page width in millimetres.
+Must be supplied together with
+-PageHeightMm.
+Mutually exclusive with -PageSize.
+Valid range: 1 to
+5080 mm.
+The 5080 mm ceiling is 14400 points (200 inches), the maximum
+page dimension in PDF default user space (ISO 32000-1 Annex C); larger
+pages would need a UserUnit scale that this engine does not emit, and
+would not render in many viewers.
+
+```yaml
+Type: System.Double
+DefaultValue: 0
+SupportsWildcards: false
+Aliases: []
+ParameterSets:
+- Name: (All)
+  Position: 2
   IsRequired: false
   ValueFromPipeline: false
   ValueFromPipelineByPropertyName: false

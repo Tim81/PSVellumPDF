@@ -4,6 +4,11 @@
 BeforeAll {
     $manifest = Join-Path (Split-Path $PSScriptRoot -Parent) 'PSVellumPDF.psd1'
     Import-Module $manifest -Force
+
+    $script:fontPath = Join-Path $PSScriptRoot 'assets' 'DejaVuSans.ttf'
+    if (-not (Test-Path $script:fontPath)) {
+        throw "Test font asset not found at '$($script:fontPath)'. Cannot run embedded-font tests."
+    }
 }
 
 AfterAll {
@@ -216,5 +221,208 @@ Describe 'Add-VellumPdfTable' {
         $doc = New-VellumPdfDocument | Add-VellumPdfTable -Row $rows
         $doc | Should -BeOfType 'VellumPdf.Layout.Document'
         $doc.Dispose()
+    }
+
+    It 'produces a valid PDF when -FontHandle is used at table level (embedded font)' {
+        $doc = New-VellumPdfDocument
+        $handle = Register-VellumPdfFont -Document $doc -Path $script:fontPath
+        $rows = @(
+            [object[]]@('Alpha', 'One'),
+            [object[]]@('Beta',  'Two')
+        )
+        $doc |
+            Add-VellumPdfTable -Header @('Col1', 'Col2') -Row $rows -FontHandle $handle |
+            Save-VellumPdfDocument -Path $script:outPath
+
+        Test-Path $script:outPath | Should -BeTrue
+        (Get-Item $script:outPath).Length | Should -BeGreaterThan 0
+        $head = [System.Text.Encoding]::ASCII.GetString(
+            [System.IO.File]::ReadAllBytes($script:outPath)[0..4])
+        $head | Should -Be '%PDF-'
+
+        # The PDF must contain an embedded TrueType font stream (/FontFile2).
+        $pdfLatin1 = [System.Text.Encoding]::Latin1.GetString(
+            [System.IO.File]::ReadAllBytes($script:outPath))
+        $pdfLatin1 | Should -Match '/FontFile2'
+    }
+
+    It 'produces a valid PDF when a rich cell carries a FontHandle key' {
+        $doc = New-VellumPdfDocument
+        $handle = Register-VellumPdfFont -Document $doc -Path $script:fontPath
+        $doc |
+            Add-VellumPdfTable -Row @(
+                , @(
+                    @{ Text = 'Embedded cell'; FontHandle = $handle },
+                    @{ Text = 'Plain cell' }
+                )
+            ) |
+            Save-VellumPdfDocument -Path $script:outPath
+
+        (Get-Item $script:outPath).Length | Should -BeGreaterThan 0
+        $head = [System.Text.Encoding]::ASCII.GetString(
+            [System.IO.File]::ReadAllBytes($script:outPath)[0..4])
+        $head | Should -Be '%PDF-'
+        $pdfLatin1 = [System.Text.Encoding]::Latin1.GetString(
+            [System.IO.File]::ReadAllBytes($script:outPath))
+        $pdfLatin1 | Should -Match '/FontFile2'
+    }
+
+    It 'colour-only rich cell in a -FontHandle table inherits the embedded font' {
+        # A cell with only Color set should still use the embedded handle (not
+        # fall back to the library-global Helvetica) when the table has -FontHandle.
+        $doc = New-VellumPdfDocument
+        $handle = Register-VellumPdfFont -Document $doc -Path $script:fontPath
+        $doc |
+            Add-VellumPdfTable -FontHandle $handle -Row @(
+                , @(@{ Text = 'Tinted'; Color = 'navy' })
+            ) |
+            Save-VellumPdfDocument -Path $script:outPath
+
+        (Get-Item $script:outPath).Length | Should -BeGreaterThan 0
+        $head = [System.Text.Encoding]::ASCII.GetString(
+            [System.IO.File]::ReadAllBytes($script:outPath)[0..4])
+        $head | Should -Be '%PDF-'
+        $pdfLatin1 = [System.Text.Encoding]::Latin1.GetString(
+            [System.IO.File]::ReadAllBytes($script:outPath))
+        $pdfLatin1 | Should -Match '/FontFile2'
+    }
+
+    It 'rejects -Font and -FontHandle supplied together' {
+        $doc = New-VellumPdfDocument
+        $handle = Register-VellumPdfFont -Document $doc -Path $script:fontPath
+        try {
+            { $doc | Add-VellumPdfTable -Row @(,@('x')) -Font Helvetica -FontHandle $handle } |
+                Should -Throw '*mutually exclusive*'
+        }
+        finally { $doc.Dispose() }
+    }
+
+    It 'produces a valid PDF with rich header cells (Background, Color, Alignment)' {
+        $richHeaders = @(
+            @{ Text = 'Name';  Background = '#336699'; Color = 'white'; Alignment = 'Left'   },
+            @{ Text = 'Score'; Background = '#336699'; Color = 'white'; Alignment = 'Center' }
+        )
+        $rows = @(
+            [object[]]@('Alice', '95'),
+            [object[]]@('Bob',   '82')
+        )
+        New-VellumPdfDocument |
+            Add-VellumPdfTable -Header $richHeaders -Row $rows |
+            Save-VellumPdfDocument -Path $script:outPath
+
+        (Get-Item $script:outPath).Length | Should -BeGreaterThan 0
+        $head = [System.Text.Encoding]::ASCII.GetString(
+            [System.IO.File]::ReadAllBytes($script:outPath)[0..4])
+        $head | Should -Be '%PDF-'
+    }
+
+    It 'rich header cells with FontHandle produce a valid PDF with embedded font' {
+        $doc = New-VellumPdfDocument
+        $handle = Register-VellumPdfFont -Document $doc -Path $script:fontPath
+        $richHeaders = @(
+            @{ Text = 'Name';  FontHandle = $handle },
+            @{ Text = 'Value'; FontHandle = $handle }
+        )
+        $doc |
+            Add-VellumPdfTable -Header $richHeaders -Row @([object[]]@('x', '1')) |
+            Save-VellumPdfDocument -Path $script:outPath
+
+        (Get-Item $script:outPath).Length | Should -BeGreaterThan 0
+        $head = [System.Text.Encoding]::ASCII.GetString(
+            [System.IO.File]::ReadAllBytes($script:outPath)[0..4])
+        $head | Should -Be '%PDF-'
+        $pdfLatin1 = [System.Text.Encoding]::Latin1.GetString(
+            [System.IO.File]::ReadAllBytes($script:outPath))
+        $pdfLatin1 | Should -Match '/FontFile2'
+    }
+
+    It 'plain string headers still work after -Header became [object[]]' {
+        New-VellumPdfDocument |
+            Add-VellumPdfTable -Header @('ColA', 'ColB') -Row @([object[]]@('1', '2')) |
+            Save-VellumPdfDocument -Path $script:outPath
+
+        (Get-Item $script:outPath).Length | Should -BeGreaterThan 0
+        $head = [System.Text.Encoding]::ASCII.GetString(
+            [System.IO.File]::ReadAllBytes($script:outPath)[0..4])
+        $head | Should -Be '%PDF-'
+    }
+
+    It 'applies uniform -CellPadding and produces a valid PDF' {
+        New-VellumPdfDocument |
+            Add-VellumPdfTable -Row @([object[]]@('A', 'B')) -CellPadding @(6) |
+            Save-VellumPdfDocument -Path $script:outPath
+
+        (Get-Item $script:outPath).Length | Should -BeGreaterThan 0
+        $head = [System.Text.Encoding]::ASCII.GetString(
+            [System.IO.File]::ReadAllBytes($script:outPath)[0..4])
+        $head | Should -Be '%PDF-'
+    }
+
+    It 'applies four-value -CellPadding (top/right/bottom/left) and produces a valid PDF' {
+        New-VellumPdfDocument |
+            Add-VellumPdfTable -Row @([object[]]@('X', 'Y')) -CellPadding @(2, 8, 2, 8) |
+            Save-VellumPdfDocument -Path $script:outPath
+
+        (Get-Item $script:outPath).Length | Should -BeGreaterThan 0
+        $head = [System.Text.Encoding]::ASCII.GetString(
+            [System.IO.File]::ReadAllBytes($script:outPath)[0..4])
+        $head | Should -Be '%PDF-'
+    }
+
+    It 'rejects -CellPadding with an element count that is not 1 or 4' {
+        $doc = New-VellumPdfDocument
+        try {
+            { $doc | Add-VellumPdfTable -Row @(,@('x')) -CellPadding @(1, 2, 3) } |
+                Should -Throw '*1 value*4 values*'
+        }
+        finally { $doc.Dispose() }
+    }
+
+    It 'applies per-cell Padding (four values) and produces a valid PDF' {
+        New-VellumPdfDocument |
+            Add-VellumPdfTable -Row @(
+                , @(
+                    @{ Text = 'Padded'; Padding = @(4, 10, 4, 10) }
+                )
+            ) |
+            Save-VellumPdfDocument -Path $script:outPath
+
+        (Get-Item $script:outPath).Length | Should -BeGreaterThan 0
+        $head = [System.Text.Encoding]::ASCII.GetString(
+            [System.IO.File]::ReadAllBytes($script:outPath)[0..4])
+        $head | Should -Be '%PDF-'
+    }
+
+    It 'applies per-cell Language and produces a valid PDF' {
+        New-VellumPdfDocument |
+            Add-VellumPdfTable -Row @(
+                , @(
+                    @{ Text = 'English text'; Language = 'en-US' }
+                )
+            ) |
+            Save-VellumPdfDocument -Path $script:outPath
+
+        (Get-Item $script:outPath).Length | Should -BeGreaterThan 0
+        $head = [System.Text.Encoding]::ASCII.GetString(
+            [System.IO.File]::ReadAllBytes($script:outPath)[0..4])
+        $head | Should -Be '%PDF-'
+    }
+
+    It 'rejects a rich cell Padding with an element count that is not 1 or 4' {
+        $doc = New-VellumPdfDocument
+        try {
+            { $doc | Add-VellumPdfTable -Row @(, @(@{ Text = 'x'; Padding = @(1, 2, 3) })) } |
+                Should -Throw '*1 value*4 values*'
+        }
+        finally { $doc.Dispose() }
+    }
+
+    It 'rejects a rich cell Padding with a negative value' {
+        $doc = New-VellumPdfDocument
+        try {
+            { $doc | Add-VellumPdfTable -Row @(, @(@{ Text = 'x'; Padding = @(-1) })) } |
+                Should -Throw '*non-negative*'
+        }
+        finally { $doc.Dispose() }
     }
 }

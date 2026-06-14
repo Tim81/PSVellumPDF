@@ -4,7 +4,7 @@ external help file: PSVellumPDF-Help.xml
 HelpUri: ''
 Locale: en-US
 Module Name: PSVellumPDF
-ms.date: 06-13-2026
+ms.date: 06-14-2026
 PlatyPS schema version: 2024-05-01
 title: Add-VellumPdfHeading
 ---
@@ -22,8 +22,8 @@ Adds a heading to a VellumPdf document.
 ```
 Add-VellumPdfHeading [-Text] <string> -Document <Document> [-Level <int>] [-Font <string>]
  [-FontSize <double>] [-Alignment <string>] [-BookmarkTitle <string>]
- [-FontHandle <EmbeddedFontHandle>] [-MarginTop <double>] [-MarginBottom <double>]
- [<CommonParameters>]
+ [-FontHandle <EmbeddedFontHandle>] [-Color <Object>] [-Language <string>] [-MarginTop <double>]
+ [-MarginBottom <double>] [<CommonParameters>]
 ```
 
 ## DESCRIPTION
@@ -42,6 +42,16 @@ without affecting the left/right margins already set on the element.
 ### EXAMPLE 1
 
 $doc | Add-VellumPdfHeading -Text 'Chapter 1' -Level 1 -FontSize 18
+
+### EXAMPLE 2
+
+# Coloured heading
+$doc | Add-VellumPdfHeading -Text 'Warning' -Level 2 -Color '#cc0000'
+
+### EXAMPLE 3
+
+# Heading with BCP-47 language tag
+$doc | Add-VellumPdfHeading -Text 'Introduction' -Level 1 -Language 'en-US'
 
 ## PARAMETERS
 
@@ -78,6 +88,31 @@ entries; this parameter overrides the bookmark label for non-tagged docs.
 
 ```yaml
 Type: System.String
+DefaultValue: ''
+SupportsWildcards: false
+Aliases: []
+ParameterSets:
+- Name: (All)
+  Position: Named
+  IsRequired: false
+  ValueFromPipeline: false
+  ValueFromPipelineByPropertyName: false
+  ValueFromRemainingArguments: false
+DontShow: false
+AcceptedValues: []
+HelpMessage: ''
+```
+
+### -Color
+
+Text colour for the heading, given as an R,G,B triple in 0..1
+(e.g.
+1,0,0 for red), a hex string ('#3366cc' or '#36c'), or a colour
+name.
+Works with both -Font and -FontHandle.
+
+```yaml
+Type: System.Object
 DefaultValue: ''
 SupportsWildcards: false
 Aliases: []
@@ -174,6 +209,31 @@ Defaults to 16.
 ```yaml
 Type: System.Double
 DefaultValue: 16
+SupportsWildcards: false
+Aliases: []
+ParameterSets:
+- Name: (All)
+  Position: Named
+  IsRequired: false
+  ValueFromPipeline: false
+  ValueFromPipelineByPropertyName: false
+  ValueFromRemainingArguments: false
+DontShow: false
+AcceptedValues: []
+HelpMessage: ''
+```
+
+### -Language
+
+BCP-47 language tag (e.g.
+'en-US', 'de-DE') applied to the heading
+element.
+Enables per-element language metadata in tagged and PDF/UA
+documents.
+
+```yaml
+Type: System.String
+DefaultValue: ''
 SupportsWildcards: false
 Aliases: []
 ParameterSets:

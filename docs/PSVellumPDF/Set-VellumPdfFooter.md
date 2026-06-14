@@ -4,7 +4,7 @@ external help file: PSVellumPDF-Help.xml
 HelpUri: ''
 Locale: en-US
 Module Name: PSVellumPDF
-ms.date: 06-13-2026
+ms.date: 06-14-2026
 PlatyPS schema version: 2024-05-01
 title: Set-VellumPdfFooter
 ---

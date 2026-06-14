@@ -190,14 +190,16 @@ function Invoke-Stage {
     New-Item -ItemType Directory -Path $stageDir | Out-Null
 
     Write-Host '==> Staging publishable module layout...' -ForegroundColor Cyan
-    # Only what the module needs at runtime; Publish-PSResource packs the whole
-    # folder, so dev files (tests, build, dependencies, docs) must not be here.
+    # User-facing files: README.md (rendered by the PowerShell Gallery as the
+    # package landing page) and LICENSE. Dev files (tests/, build.ps1,
+    # dependencies/, docs/, examples/) are intentionally excluded.
     Copy-Item (Join-Path $root 'PSVellumPDF.psd1') $stageDir
     Copy-Item (Join-Path $root 'PSVellumPDF.psm1') $stageDir
     Copy-Item (Join-Path $root 'Public') $stageDir -Recurse
     Copy-Item (Join-Path $root 'Private') $stageDir -Recurse
     Copy-Item $libDir (Join-Path $stageDir 'lib') -Recurse
     Copy-Item (Join-Path $root 'LICENSE') $stageDir
+    Copy-Item (Join-Path $root 'README.md') $stageDir
 
     $manifest = Test-ModuleManifest (Join-Path $stageDir 'PSVellumPDF.psd1') -ErrorAction Stop
     Write-Host "==> Staged $($manifest.Name) $($manifest.Version) -> $stageDir" -ForegroundColor Green
