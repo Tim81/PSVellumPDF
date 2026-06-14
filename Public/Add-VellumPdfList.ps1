@@ -94,16 +94,23 @@ function Add-VellumPdfList {
     process {
         Assert-VellumPdfDocumentOpen -Document $Document -CommandName 'Add-VellumPdfList'
 
+        # Cap nesting depth so a cyclic/self-referential hashtable cannot recurse
+        # into an uncatchable StackOverflow that would kill the host.
+        $maxDepth = 64
+
         # Gather every label (recursing into nested children) for the encoding
         # warning, which scans for characters the base-14 fonts cannot render.
         $collectText = {
-            param($spec)
+            param($spec, $depth = 0)
+            if ($depth -gt $maxDepth) {
+                throw "Add-VellumPdfList: nested -Item exceeds the maximum depth of $maxDepth (cyclic input?)."
+            }
             if ($spec -is [System.Collections.IDictionary]) {
                 if (-not $spec.Contains('Text')) {
                     throw "Add-VellumPdfList: a nested-item hashtable must include a 'Text' key."
                 }
                 [string]$spec['Text']
-                if ($spec['Children']) { foreach ($c in @($spec['Children'])) { & $collectText $c } }
+                if ($spec['Children']) { foreach ($c in @($spec['Children'])) { & $collectText $c ($depth + 1) } }
             }
             else {
                 [string]$spec

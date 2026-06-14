@@ -156,6 +156,41 @@ Describe 'Add-VellumPdfTable' {
         finally { $doc.Dispose() }
     }
 
+    It 'validates rich-cell Font, FontSize, and ColSpan' {
+        $doc = New-VellumPdfDocument
+        try {
+            { $doc | Add-VellumPdfTable -Row @(, @(@{ Text = 'x'; FontSize = -5 })) } |
+                Should -Throw '*FontSize must be between*'
+            { $doc | Add-VellumPdfTable -Row @(, @(@{ Text = 'x'; FontSize = 99999 })) } |
+                Should -Throw '*FontSize must be between*'
+            { $doc | Add-VellumPdfTable -Row @(, @(@{ Text = 'x'; Font = 'Bogus' })) } |
+                Should -Throw '*not a base-14 font*'
+            { $doc | Add-VellumPdfTable -Row @(, @(@{ Text = 'x'; ColSpan = 0 })) } |
+                Should -Throw '*ColSpan must be a positive*'
+        }
+        finally { $doc.Dispose() }
+    }
+
+    It 'renders a colour-only rich cell to a valid PDF (keeps the table font)' {
+        New-VellumPdfDocument |
+            Add-VellumPdfTable -Font TimesRoman -Row @(, @(@{ Text = 'tinted'; Color = 'navy' })) |
+            Save-VellumPdfDocument -Path $script:outPath
+
+        (Get-Item $script:outPath).Length | Should -BeGreaterThan 0
+        $head = [System.Text.Encoding]::ASCII.GetString(
+            [System.IO.File]::ReadAllBytes($script:outPath)[0..4])
+        $head | Should -Be '%PDF-'
+    }
+
+    It 'rejects rows that mix record and cell-array shapes' {
+        $doc = New-VellumPdfDocument
+        try {
+            $mixed = @([pscustomobject]@{ A = 1; B = 2 }, [object[]]@('x', 'y'))
+            { $doc | Add-VellumPdfTable -Row $mixed } | Should -Throw '*mixes record*'
+        }
+        finally { $doc.Dispose() }
+    }
+
     It 'rejects out-of-range colour components' {
         $doc = New-VellumPdfDocument
         try {

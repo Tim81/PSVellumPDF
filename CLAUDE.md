@@ -129,10 +129,13 @@ vendors `tests/assets/DejaVuSans.ttf` for this.
 
 ## Roadmap
 
-**1.3.0 is published on the PowerShell Gallery** (built on VellumPdf 1.5.4):
-usability features — `Add-VellumPdfTable` takes `Import-Csv` records and rich
-per-cell hashtables plus `-AlternateRowBackground`/`-ColumnAlignment`; colour
-params accept hex/names via `ConvertTo-VellumColor`; `Add-VellumPdfList` nests via
+**1.3.1 is published on the PowerShell Gallery** (built on VellumPdf 1.5.4):
+hardening of the 1.3.0 features — rich-cell font/span validation and colour-only
+font-gap fix, hex colours require `#`, fail-fast on mixed table row shapes,
+`-LinkUri` stored stripped, and a nested-list depth cap. 1.3.0 added the usability
+features — `Add-VellumPdfTable` takes `Import-Csv` records and rich per-cell
+hashtables plus `-AlternateRowBackground`/`-ColumnAlignment`; colour params accept
+hex/names via `ConvertTo-VellumColor`; `Add-VellumPdfList` nests via
 `@{Text;Children}`; `Add-VellumPdfImage` gains `-ImageBytes`/`-Format`. 1.2.3 was
 a security hardening patch (LinkUri allowlist, TSA client, owner-password warning).
 Earlier, **1.2.2** (built on VellumPdf 1.5.4):

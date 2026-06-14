@@ -184,4 +184,14 @@ Describe 'Add-VellumPdfList' {
         }
         finally { $doc.Dispose() }
     }
+
+    It 'caps nesting depth on cyclic input instead of overflowing' {
+        $doc = New-VellumPdfDocument
+        try {
+            $cycle = @{ Text = 'loop' }
+            $cycle['Children'] = @($cycle)   # self-referential
+            { $doc | Add-VellumPdfList -Item @($cycle) } | Should -Throw '*maximum depth*'
+        }
+        finally { $doc.Dispose() }
+    }
 }

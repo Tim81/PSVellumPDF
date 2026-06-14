@@ -6,6 +6,28 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [1.3.1] - 2026-06-14
+
+Hardening of the 1.3.0 features. No new parameters.
+
+### Fixed
+- `Add-VellumPdfTable` rich cells now validate their `Font` (must be a base-14
+  name), `FontSize` (1..1000), and `ColSpan`/`RowSpan` (positive integers).
+  Previously a bad value failed with a cryptic library error or, for a negative
+  `FontSize`, succeeded silently.
+- A rich cell that sets only `Color` (no `Font`/`FontSize`) now keeps the table's
+  effective font instead of falling back to the library-global Helvetica.
+- `Add-VellumPdfTable` fails fast when `-Row` mixes record (PSCustomObject/
+  hashtable) and cell-array shapes, instead of rendering a silently-wrong table.
+- Colour parameters now require a leading `#` for hex (`#3366cc`/`#36c`). A bare
+  number such as `255` is no longer misread as hex (it would have become a dark
+  teal); it is rejected as an unrecognised colour.
+- `-LinkUri` is stored with embedded whitespace/control/format characters removed
+  (the scheme was already validated against the stripped value), so no malformed
+  URI reaches the `/URI` action.
+- `Add-VellumPdfList` caps nesting depth (64) so a cyclic/self-referential
+  hashtable raises a clear error instead of an uncatchable stack overflow.
+
 ## [1.3.0] - 2026-06-13
 
 Usability features. No breaking changes (existing call shapes still work).
@@ -234,7 +256,8 @@ First public release, built on VellumPdf 1.1.0 (.NET 10).
 - Quality gates: PSScriptAnalyzer, Pester (94% coverage), 3-OS CI, locked
   NuGet restore, SHA-pinned actions, PSGallery release pipeline.
 
-[Unreleased]: https://github.com/Tim81/PSVellumPDF/compare/v1.3.0...HEAD
+[Unreleased]: https://github.com/Tim81/PSVellumPDF/compare/v1.3.1...HEAD
+[1.3.1]: https://github.com/Tim81/PSVellumPDF/compare/v1.3.0...v1.3.1
 [1.3.0]: https://github.com/Tim81/PSVellumPDF/compare/v1.2.3...v1.3.0
 [1.2.3]: https://github.com/Tim81/PSVellumPDF/compare/v1.2.2...v1.2.3
 [1.2.2]: https://github.com/Tim81/PSVellumPDF/compare/v1.2.1...v1.2.2
