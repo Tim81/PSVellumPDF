@@ -4,22 +4,23 @@
     "net10.0": {
       "VellumPdf.Layout": {
         "type": "Direct",
-        "requested": "[1.5.4, )",
-        "resolved": "1.5.4",
-        "contentHash": "Q0gAOe+3Maa7FfM0h6RrtzJrVx7NRVprobS2HgQIzoWlrEYzmMHsr5wX4MQj8dmM+bP65AuQJZufpWYkubcaqw==",
+        "requested": "[1.10.0, )",
+        "resolved": "1.10.0",
+        "contentHash": "nFysD65BWkWYvEPm4i28wlw33Qw0nrOkgQoBYM0/MDoGttfI57kW5MFFV12oe5oTJX9yZ5BIu7V02MPMA3tQSw==",
         "dependencies": {
-          "VellumPdf.Kernel": "1.5.4"
+          "VellumPdf.Kernel": "1.10.0"
         }
       },
       "VellumPdf.Signing": {
         "type": "Direct",
-        "requested": "[1.5.4, )",
-        "resolved": "1.5.4",
-        "contentHash": "KHjoCKILt22B/EQP7A0Ld2IdRwxGuzUAGiGSY6rpAI4tYw741eU3SCIUBd+A6gbSkbMIdwbtmUMpniYK0LcbZA==",
+        "requested": "[1.10.0, )",
+        "resolved": "1.10.0",
+        "contentHash": "RHZ3+ktYv00mvWJb+GfltEmoxhTDPAQKhUMOR4fe/Ckilacy+J/cyVwh+B/QYRkAsJNXogxKgisOHs97R7G9fA==",
         "dependencies": {
           "System.Security.Cryptography.Pkcs": "9.0.5",
-          "VellumPdf.Kernel": "1.5.4",
-          "VellumPdf.Layout": "1.5.4"
+          "VellumPdf.Kernel": "1.10.0",
+          "VellumPdf.Layout": "1.10.0",
+          "VellumPdf.Reader": "1.10.0"
         }
       },
       "System.Security.Cryptography.Pkcs": {
@@ -29,8 +30,16 @@
       },
       "VellumPdf.Kernel": {
         "type": "Transitive",
-        "resolved": "1.5.4",
-        "contentHash": "edOG0F+w9cn01vR98Hhu7H0OHgugIS7jwJjg8wUJhvdCORFx/T3vLDvIjCCeVTSL8M/dHa7qaT10L8pHhQMjOA=="
+        "resolved": "1.10.0",
+        "contentHash": "9qm1DNOEzwVjEJO6CCUNdqSD05EaAFJvSqXUZK0bBSu9a2WjioQ5HuBa4V1QGYQQgd6qElPsdeAkyWvEZKzZNA=="
+      },
+      "VellumPdf.Reader": {
+        "type": "Transitive",
+        "resolved": "1.10.0",
+        "contentHash": "5/yBmpX9ivQC49MnZc6TMiQhivXe17QA3l/4P6+7xcp3OlHwKc+0+r58WEmddvx/kPMgsetlqZ7LqNycEnXc+w==",
+        "dependencies": {
+          "VellumPdf.Kernel": "1.10.0"
+        }
       }
     }
   }
