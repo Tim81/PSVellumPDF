@@ -4,11 +4,11 @@
     "net10.0": {
       "VellumPdf.Layout": {
         "type": "Direct",
-        "requested": "[1.5.4, )",
-        "resolved": "1.5.4",
-        "contentHash": "Q0gAOe+3Maa7FfM0h6RrtzJrVx7NRVprobS2HgQIzoWlrEYzmMHsr5wX4MQj8dmM+bP65AuQJZufpWYkubcaqw==",
+        "requested": "[2.0.0, )",
+        "resolved": "2.0.0",
+        "contentHash": "3Kn+B6wJHTx00S0cyK7GCO21PyGfIpA0zIU6QeffNRp5BNlkN5M/ikbtUXx/PewlUv+u4x5ZLIx0puvhg2oRyA==",
         "dependencies": {
-          "VellumPdf.Kernel": "1.5.4"
+          "VellumPdf.Kernel": "2.0.0"
         }
       },
       "VellumPdf.Signing": {
@@ -29,8 +29,8 @@
       },
       "VellumPdf.Kernel": {
         "type": "Transitive",
-        "resolved": "1.5.4",
-        "contentHash": "edOG0F+w9cn01vR98Hhu7H0OHgugIS7jwJjg8wUJhvdCORFx/T3vLDvIjCCeVTSL8M/dHa7qaT10L8pHhQMjOA=="
+        "resolved": "2.0.0",
+        "contentHash": "LNprn6Q6vCm/YZjS2rFvdEuCbRpkr8KiA2xFQ8tVlGsKoE4cxRdyjf2LCpc4rgSeZrLBK33EaPh2xe456l+ylQ=="
       }
     }
   }
