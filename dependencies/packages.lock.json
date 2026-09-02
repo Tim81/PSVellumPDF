@@ -4,33 +4,42 @@
     "net10.0": {
       "VellumPdf.Layout": {
         "type": "Direct",
-        "requested": "[1.5.4, )",
-        "resolved": "1.5.4",
-        "contentHash": "Q0gAOe+3Maa7FfM0h6RrtzJrVx7NRVprobS2HgQIzoWlrEYzmMHsr5wX4MQj8dmM+bP65AuQJZufpWYkubcaqw==",
+        "requested": "[2.3.0, )",
+        "resolved": "2.3.0",
+        "contentHash": "aINL5Px9kmvW8LW/YyRo1fSzm6RxbHeiZLoNIzJO4fNihSD10itd2fHS8b3wjdJvWPqwAQBtFOjXcZK3XCORJg==",
         "dependencies": {
-          "VellumPdf.Kernel": "1.5.4"
+          "VellumPdf.Kernel": "2.3.0"
         }
       },
       "VellumPdf.Signing": {
         "type": "Direct",
-        "requested": "[1.5.4, )",
-        "resolved": "1.5.4",
-        "contentHash": "KHjoCKILt22B/EQP7A0Ld2IdRwxGuzUAGiGSY6rpAI4tYw741eU3SCIUBd+A6gbSkbMIdwbtmUMpniYK0LcbZA==",
+        "requested": "[2.3.0, )",
+        "resolved": "2.3.0",
+        "contentHash": "EMCVfbKqq3M1EDRZBT+njM2M1HqkFZJHwx+KxAG8lyc+S0L8QW3dFo2HrDkPTp762CDR9p+IZyDROONfCATE8w==",
         "dependencies": {
-          "System.Security.Cryptography.Pkcs": "9.0.5",
-          "VellumPdf.Kernel": "1.5.4",
-          "VellumPdf.Layout": "1.5.4"
+          "System.Security.Cryptography.Pkcs": "10.0.11",
+          "VellumPdf.Kernel": "2.3.0",
+          "VellumPdf.Layout": "2.3.0",
+          "VellumPdf.Reader": "2.3.0"
         }
       },
       "System.Security.Cryptography.Pkcs": {
         "type": "Transitive",
-        "resolved": "9.0.5",
-        "contentHash": "7CmpoOp7auyc7fdVgZSUhR+QYMsF2XH+uKbjDYrvyTvehDlKuic+Hhv9RM+Wyf5xMnC28RrTGgzmo5fFt0Fmxg=="
+        "resolved": "10.0.11",
+        "contentHash": "8IV+rI3xN/Mkq9MsSX7VZTv9T9Wt+tyhHLwBX9VNZBk8m8kknEs1JeTSjI2x9M2L/fSja+c2WSE5n5Yy0GXdoQ=="
       },
       "VellumPdf.Kernel": {
         "type": "Transitive",
-        "resolved": "1.5.4",
-        "contentHash": "edOG0F+w9cn01vR98Hhu7H0OHgugIS7jwJjg8wUJhvdCORFx/T3vLDvIjCCeVTSL8M/dHa7qaT10L8pHhQMjOA=="
+        "resolved": "2.3.0",
+        "contentHash": "3qYHawKXluMcigIh0RvF9nQG1nXs4GLz/sksflZSTFDNB380Eos1n2J00pS9E20zQv7Neh3gYftnuXQEOsRh6w=="
+      },
+      "VellumPdf.Reader": {
+        "type": "Transitive",
+        "resolved": "2.3.0",
+        "contentHash": "ReipYwuDwiqVeZ8zxJXmBkvaAduptKgEYI8/fO8QAXHa1wSKBY9tMFYs8PuvKPzeHsmDspw+lHhQaVYMdpATGA==",
+        "dependencies": {
+          "VellumPdf.Kernel": "2.3.0"
+        }
       }
     }
   }
