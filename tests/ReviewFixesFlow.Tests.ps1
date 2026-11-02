@@ -356,3 +356,24 @@ Describe 'Output intents' {
         { New-Page 'None' | Add-VellumPdfShape Rectangle -X 1 -Y 1 -Width 5 -Height 5 -IccProfilePath $path -FillIcc 0.2, 0.4, 0.6 } | Should -Not -Throw
     }
 }
+
+Describe 'RGB under a CMYK output intent warns in page-document cmdlets too' {
+    BeforeAll {
+        function script:New-CmykIntentPage {
+            New-VellumPdfPageDocument -Conformance PdfA2b -Language en | Add-VellumPdfPage | Set-VellumPdfOutputIntent -Cmyk
+        }
+    }
+    It '<Name> warns once' -ForEach @(
+        @{ Name = 'Add-VellumPdfText'; Draw = { param($d) $d | Add-VellumPdfText 'x' -X 50 -Y 700 -Color red } }
+        @{ Name = 'Add-VellumPdfTextBox'; Draw = { param($d) $d | Add-VellumPdfTextBox 'x y' -X 50 -Y 700 -Width 200 -Color red } }
+        @{ Name = 'Add-VellumPdfPageList'; Draw = { param($d) $d | Add-VellumPdfPageList -X 50 -Y 700 -Width 200 -Item 'a' -Color red } }
+        @{ Name = 'Add-VellumPdfPageTable'; Draw = { param($d) $d | Add-VellumPdfPageTable -X 50 -Y 700 -Width 200 -Row @(, @('a', 'b')) -HeaderBackground '#eeeeee' -Header 'h1', 'h2' } }
+        @{ Name = 'Set-VellumPdfPageBand'; Draw = { param($d) $d | Set-VellumPdfPageBand -Position Footer -Template 'p {page}' -Color red } }
+        @{ Name = 'Add-VellumPdfPageBarcode'; Draw = { param($d) $d | Add-VellumPdfPageBarcode -Type QrCode -Content 'hi' -X 50 -Y 500 -AltText 'q' -Foreground navy } }
+    ) {
+        $doc = New-CmykIntentPage
+        $warnings = @(& $Draw $doc 3>&1 | Where-Object { $_ -is [System.Management.Automation.WarningRecord] })
+        $warnings.Count | Should -Be 1
+        $warnings[0].Message | Should -BeLike "$Name*output intent is CMYK*"
+    }
+}

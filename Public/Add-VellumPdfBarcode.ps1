@@ -273,6 +273,9 @@ function Add-VellumPdfBarcode {
             $isPdfA = (Get-VellumPdfConformanceRequirement -Document $Document).NeedsEmbeddedFonts
 
             # Option validation and symbol construction are shared with Add-VellumPdfPageBarcode.
+            if ($PSBoundParameters.ContainsKey('Foreground') -or $PSBoundParameters.ContainsKey('Background')) {
+                Write-VellumPdfRgbIntentWarning -Document $Document -CommandName 'Add-VellumPdfBarcode' -What 'an RGB barcode colour'
+            }
             $barcodes = @(New-VellumPdfBarcodeSet -Parameters $PSBoundParameters -IsPdfA $isPdfA -ParameterSetName $PSCmdlet.ParameterSetName)
 
             if ($FontHandle) {

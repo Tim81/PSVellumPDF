@@ -173,7 +173,7 @@ function Add-VellumPdfText {
                     [void]$canvas.Concat($cos, $sin, (0.0 - $sin), $cos, $anchorX, $anchorY)
                 }
                 if ($bound.ContainsKey('Color')) {
-                    $c = ConvertTo-VellumColor $Color
+                    $c = ConvertTo-VellumColor $Color -Document $Document -CommandName 'Add-VellumPdfText'
                     [void]$canvas.SetFillColorRgb($c[0], $c[1], $c[2])
                 }
                 Invoke-VellumPdfTagged -Document $Document -Canvas $canvas -PdfPage $pdfPage -Kind Structure -StructType $structType -Language $Language -Draw {

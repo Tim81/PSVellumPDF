@@ -183,7 +183,7 @@ function Add-VellumPdfTextBox {
             [void]$canvas.SaveState()
             try {
                 if ($bound.ContainsKey('Color')) {
-                    $c = ConvertTo-VellumColor $Color
+                    $c = ConvertTo-VellumColor $Color -Document $Document -CommandName 'Add-VellumPdfTextBox'
                     [void]$canvas.SetFillColorRgb($c[0], $c[1], $c[2])
                 }
                 if ($resolved.Handle) { $Document.RegisterEmbeddedFontUsage($pdfPage, $resolved.Handle) }

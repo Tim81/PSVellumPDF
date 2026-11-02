@@ -134,7 +134,7 @@ function Set-VellumPdfPageBand {
                 Write-VellumPdfEncodingWarning -Text ($Template -replace '\{pages?\}', '0') -CommandName 'Set-VellumPdfPageBand'
             }
             $rgb = $null
-            if ($PSBoundParameters.ContainsKey('Color')) { $rgb = ConvertTo-VellumColor $Color }
+            if ($PSBoundParameters.ContainsKey('Color')) { $rgb = ConvertTo-VellumColor $Color -Document $Document -CommandName 'Set-VellumPdfPageBand' }
             $prop.Value[$key] = [pscustomobject]@{
                 Position = $Position; Align = $Align; Template = $Template; FontSize = $FontSize
                 Resolved = $resolved; Rgb = $rgb; Inset = $Inset; Offset = $Offset

@@ -234,7 +234,7 @@ function Add-VellumPdfPageList {
             $canvas = Get-VellumPdfPageCanvas -Document $Document -Page $Page -CommandName 'Add-VellumPdfPageList'
             if ($resolved.Handle) { $Document.RegisterEmbeddedFontUsage($pdfPage, $resolved.Handle) }
             # A colour operator is written only for a colour that was asked for (DeviceRGB would fail PDF/A with a CMYK intent).
-            $rgb = if ($bound.ContainsKey('Color')) { ConvertTo-VellumColor $Color }
+            $rgb = if ($bound.ContainsKey('Color')) { ConvertTo-VellumColor $Color -Document $Document -CommandName 'Add-VellumPdfPageList' }
             $tagged = $Document.Tagged
             $oneLine = { param($text) , @([pscustomobject]@{ Words = [string[]]@($text); Last = $true }) }
             $drawLines = {

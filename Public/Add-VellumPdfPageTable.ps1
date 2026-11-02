@@ -205,8 +205,8 @@ function Add-VellumPdfPageTable {
                 [pscustomobject]@{
                     Text = $text; ColSpan = (& $span 'ColSpan'); RowSpan = (& $span 'RowSpan'); Align = [string]$align
                     # Colours are resolved here, before anything is drawn, so a bad value cannot leave half a table behind.
-                    Background = $(if ($isMap -and $null -ne (Get-VellumPdfPropertyValue -InputObject $spec -Name 'Background')) { ConvertTo-VellumColor (Get-VellumPdfPropertyValue -InputObject $spec -Name 'Background') })
-                    Color = $(if ($isMap -and $null -ne (Get-VellumPdfPropertyValue -InputObject $spec -Name 'Color')) { ConvertTo-VellumColor (Get-VellumPdfPropertyValue -InputObject $spec -Name 'Color') })
+                    Background = $(if ($isMap -and $null -ne (Get-VellumPdfPropertyValue -InputObject $spec -Name 'Background')) { ConvertTo-VellumColor (Get-VellumPdfPropertyValue -InputObject $spec -Name 'Background') -Document $Document -CommandName 'Add-VellumPdfPageTable' })
+                    Color = $(if ($isMap -and $null -ne (Get-VellumPdfPropertyValue -InputObject $spec -Name 'Color')) { ConvertTo-VellumColor (Get-VellumPdfPropertyValue -InputObject $spec -Name 'Color') -Document $Document -CommandName 'Add-VellumPdfPageTable' })
                     Row = 0; Col = 0; IsHeader = $false; Scope = $null; Lines = $null; Height = 0.0
                 }
             }
@@ -310,10 +310,10 @@ function Add-VellumPdfPageTable {
             if ($head.Handle -and $head.Handle -ne $body.Handle) { $Document.RegisterEmbeddedFontUsage($pdfPage, $head.Handle) }
             # Colour operators are written only for colours that were asked for: a default RGB operator would
             # fail PDF/A with a CMYK output intent.
-            $textRgb = if ($bound.ContainsKey('Color')) { ConvertTo-VellumColor $Color }
-            $borderRgb = if ($bound.ContainsKey('BorderColor')) { ConvertTo-VellumColor $BorderColor }
-            $headerBg = if ($bound.ContainsKey('HeaderBackground')) { ConvertTo-VellumColor $HeaderBackground }
-            $altBg = if ($bound.ContainsKey('AlternateRowBackground')) { ConvertTo-VellumColor $AlternateRowBackground }
+            $textRgb = if ($bound.ContainsKey('Color')) { ConvertTo-VellumColor $Color -Document $Document -CommandName 'Add-VellumPdfPageTable' }
+            $borderRgb = if ($bound.ContainsKey('BorderColor')) { ConvertTo-VellumColor $BorderColor -Document $Document -CommandName 'Add-VellumPdfPageTable' }
+            $headerBg = if ($bound.ContainsKey('HeaderBackground')) { ConvertTo-VellumColor $HeaderBackground -Document $Document -CommandName 'Add-VellumPdfPageTable' }
+            $altBg = if ($bound.ContainsKey('AlternateRowBackground')) { ConvertTo-VellumColor $AlternateRowBackground -Document $Document -CommandName 'Add-VellumPdfPageTable' }
 
             [void]$canvas.SaveState()
             try {
