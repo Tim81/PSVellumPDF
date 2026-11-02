@@ -193,21 +193,14 @@ function Add-VellumPdfList {
                 Color      = $listColor
                 Leading    = if ($PSBoundParameters.ContainsKey('Leading')) { $Leading }
             }
-            $listWantsStyle = [bool]$Font -or $PSBoundParameters.ContainsKey('FontSize') -or $FontHandle `
-                -or $listColor -or $PSBoundParameters.ContainsKey('Leading')
-
             $fontNames = [Enum]::GetNames([VellumPdf.Fonts.Standard14])
 
             # Builds the TextStyle for one item: the list-level values overlaid with
             # the item's own Font/FontSize/FontHandle/Color/Leading keys.
             $styleFor = {
                 param($spec)
-                $over = @('Font', 'FontSize', 'FontHandle', 'Color', 'Leading') | Where-Object {
-                    $spec -is [System.Collections.IDictionary] -and $null -ne $spec[$_]
-                }
                 # Always an explicit style: a TextStyle without a font would draw in the library-global
                 # Helvetica instead of the document's default font.
-
                 $handle = $FontHandle
                 if ($spec -is [System.Collections.IDictionary] -and $spec['FontHandle']) {
                     if ($spec['FontHandle'] -isnot [VellumPdf.Fonts.EmbeddedFontHandle]) {
