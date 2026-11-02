@@ -99,32 +99,37 @@ function Add-VellumPdfHeading {
     )
 
     process {
-        Assert-VellumPdfDocumentOpen -Document $Document -CommandName 'Add-VellumPdfHeading'
-        if ($FontHandle) {
-            Assert-VellumPdfFontHandle -FontHandle $FontHandle -Document $Document -CommandName 'Add-VellumPdfHeading'
-        }
-        if (-not $FontHandle) {
-            Write-VellumPdfEncodingWarning -Text $Text -CommandName 'Add-VellumPdfHeading'
-        }
-        $styleParams = if ($FontHandle) {
-            @{ FontHandle = $FontHandle; FontSize = $FontSize }
-        } else {
-            @{ Font = $Font; FontSize = $FontSize }
-        }
-        if ($PSBoundParameters.ContainsKey('Color'))   { $styleParams['Color'] = ConvertTo-VellumColor $Color }
-        if ($PSBoundParameters.ContainsKey('Leading')) { $styleParams['Leading'] = $Leading }
-        $style = New-VellumTextStyle @styleParams
-        $heading = [VellumPdf.Layout.Elements.Heading]::new($Text, $style)
-        # VellumPdf.Layout counts heading levels from 0 (0 = H1); the cmdlet takes 1..6.
-        $heading.Level = $Level - 1
-        $heading.Alignment = [VellumPdf.Layout.Core.HorizontalAlignment]::$Alignment
-        if ($BookmarkTitle) { $heading.BookmarkTitle = $BookmarkTitle }
-        if ($Language) { $heading.Language = $Language }
+        try {
+            Assert-VellumPdfDocumentOpen -Document $Document -CommandName 'Add-VellumPdfHeading'
+            if ($FontHandle) {
+                Assert-VellumPdfFontHandle -FontHandle $FontHandle -Document $Document -CommandName 'Add-VellumPdfHeading'
+            }
+            if (-not $FontHandle) {
+                Write-VellumPdfEncodingWarning -Text $Text -CommandName 'Add-VellumPdfHeading'
+            }
+            $styleParams = if ($FontHandle) {
+                @{ FontHandle = $FontHandle; FontSize = $FontSize }
+            } else {
+                @{ Font = $Font; FontSize = $FontSize }
+            }
+            if ($PSBoundParameters.ContainsKey('Color'))   { $styleParams['Color'] = ConvertTo-VellumColor $Color }
+            if ($PSBoundParameters.ContainsKey('Leading')) { $styleParams['Leading'] = $Leading }
+            $style = New-VellumTextStyle @styleParams
+            $heading = [VellumPdf.Layout.Elements.Heading]::new($Text, $style)
+            # VellumPdf.Layout counts heading levels from 0 (0 = H1); the cmdlet takes 1..6.
+            $heading.Level = $Level - 1
+            $heading.Alignment = [VellumPdf.Layout.Core.HorizontalAlignment]::$Alignment
+            if ($BookmarkTitle) { $heading.BookmarkTitle = $BookmarkTitle }
+            if ($Language) { $heading.Language = $Language }
 
-        Set-VellumPdfElementMargin -Element $heading -Top $MarginTop -Bottom $MarginBottom `
-            -BoundParameters $PSBoundParameters -Document $Document -DeferBottom
+            Set-VellumPdfElementMargin -Element $heading -Top $MarginTop -Bottom $MarginBottom `
+                -BoundParameters $PSBoundParameters -Document $Document -DeferBottom
 
-        [void]$Document.Add($heading)
-        $Document
+            [void]$Document.Add($heading)
+            $Document
+        }
+        catch {
+            $PSCmdlet.ThrowTerminatingError($_)
+        }
     }
 }

@@ -109,113 +109,118 @@ function Add-VellumPdfFormField {
     )
 
     process {
-        Assert-VellumPdfDocumentOpen -Document $Document -CommandName 'Add-VellumPdfFormField'
-        $bound = $PSBoundParameters
+        try {
+            Assert-VellumPdfDocumentOpen -Document $Document -CommandName 'Add-VellumPdfFormField'
+            $bound = $PSBoundParameters
 
-        if ($Document.Conformance -ne [VellumPdf.Document.PdfConformance]::None) {
-            throw ('Add-VellumPdfFormField: form fields draw with the non-embedded Helvetica font, which PDF/A forbids. ' +
-                'Create the page document without -Conformance to use forms.')
-        }
-        Write-VellumPdfUntaggedWarning -Document $Document -CommandName 'Add-VellumPdfFormField' -What 'a form field'
-        if (-not [double]::IsFinite($FontSize) -or $FontSize -le 0) {
-            throw "Add-VellumPdfFormField: -FontSize must be a finite number greater than 0; got $FontSize."
-        }
+            if ($Document.Conformance -ne [VellumPdf.Document.PdfConformance]::None) {
+                throw ('Add-VellumPdfFormField: form fields draw with the non-embedded Helvetica font, which PDF/A forbids. ' +
+                    'Create the page document without -Conformance to use forms.')
+            }
+            Write-VellumPdfUntaggedWarning -Document $Document -CommandName 'Add-VellumPdfFormField' -What 'a form field'
+            if (-not [double]::IsFinite($FontSize) -or $FontSize -le 0) {
+                throw "Add-VellumPdfFormField: -FontSize must be a finite number greater than 0; got $FontSize."
+            }
 
-        # Options that belong to one field type only.
-        $only = @{
-            Value = 'Text'; Multiline = 'Text'; Checked = 'CheckBox'; Option = 'Choice'; List = 'Choice'
-            RadioOption = 'Radio'; Caption = 'PushButton'
-        }
-        foreach ($n in $only.Keys) {
-            if ($bound.ContainsKey($n) -and $only[$n] -ne $Type) { throw "Add-VellumPdfFormField: -$n applies to -Type $($only[$n]) only." }
-        }
-        if ($bound.ContainsKey('Selected') -and $Type -notin 'Choice', 'Radio') {
-            throw 'Add-VellumPdfFormField: -Selected applies to -Type Choice and Radio only.'
-        }
+            # Options that belong to one field type only.
+            $only = @{
+                Value = 'Text'; Multiline = 'Text'; Checked = 'CheckBox'; Option = 'Choice'; List = 'Choice'
+                RadioOption = 'Radio'; Caption = 'PushButton'
+            }
+            foreach ($n in $only.Keys) {
+                if ($bound.ContainsKey($n) -and $only[$n] -ne $Type) { throw "Add-VellumPdfFormField: -$n applies to -Type $($only[$n]) only." }
+            }
+            if ($bound.ContainsKey('Selected') -and $Type -notin 'Choice', 'Radio') {
+                throw 'Add-VellumPdfFormField: -Selected applies to -Type Choice and Radio only.'
+            }
 
-        # The appearance stream can draw Latin-1 and the Windows-1252 punctuation; anything else makes Save fail
-        # (after the document is spent), so check here.
-        $assertDrawable = {
-            param([string]$What, [string]$Text)
-            foreach ($ch in $Text.ToCharArray()) {
-                $code = [int]$ch
-                if (-not (Test-VellumPdfWinAnsiChar -CodeUnit $code)) {
-                    throw ("Add-VellumPdfFormField: $What contains U+$($code.ToString('X4')), which the field appearance cannot draw " +
-                        '(Latin-1 and Windows-1252 punctuation only).')
-                }
-            }
-        }
-
-        $fieldOptions = [VellumPdf.Forms.FormFieldOptions]::new()
-        $fieldOptions.FontSize = $FontSize
-        if ($ReadOnly) { $fieldOptions.ReadOnly = $true }
-        if ($Required) { $fieldOptions.Required = $true }
-        if ($Multiline) { $fieldOptions.Multiline = $true }
-
-        $rect = {
-            param($x, $y, $w, $h, $what)
-            foreach ($v in $x, $y, $w, $h) {
-                if ($null -eq $v -or -not [double]::IsFinite([double]$v)) { throw "Add-VellumPdfFormField: $what needs finite X, Y, Width and Height." }
-            }
-            if ([double]$w -le 0 -or [double]$h -le 0) { throw "Add-VellumPdfFormField: $what needs a positive Width and Height." }
-            [VellumPdf.Document.PdfRectangle]::new([double]$x, [double]$y, [double]$x + [double]$w, [double]$y + [double]$h)
-        }
-
-        if ($Type -eq 'Radio') {
-            foreach ($n in 'Page', 'X', 'Y', 'Width', 'Height') {
-                if ($bound.ContainsKey($n)) {
-                    throw "Add-VellumPdfFormField: -$n does not apply to -Type Radio; give each button's own Page/X/Y/Width/Height in -RadioOption."
-                }
-            }
-        }
-        else {
-            foreach ($req in 'X', 'Y', 'Width', 'Height') {
-                if (-not $bound.ContainsKey($req)) { throw "Add-VellumPdfFormField: -Type $Type needs -$req." }
-            }
-            $pdfPage = Get-VellumPdfPage -Document $Document -Page $Page -CommandName 'Add-VellumPdfFormField'
-            $box = & $rect $X $Y $Width $Height "-Type $Type"
-        }
-
-        switch ($Type) {
-            'Text' {
-                & $assertDrawable '-Value' $Value
-                $Document.AddTextField($pdfPage, $Name, $box, $Value, $fieldOptions)
-            }
-            'CheckBox' { $Document.AddCheckBox($pdfPage, $Name, $box, [bool]$Checked, $fieldOptions) }
-            'Choice' {
-                if (-not $Option -or $Option.Count -eq 0) { throw 'Add-VellumPdfFormField: -Type Choice needs -Option.' }
-                foreach ($o in $Option) { & $assertDrawable "option '$o'" $o }
-                if ($bound.ContainsKey('Selected') -and $Selected -notin $Option) {
-                    throw "Add-VellumPdfFormField: -Selected '$Selected' is not one of the -Option entries."
-                }
-                $sel = if ($bound.ContainsKey('Selected')) { $Selected } else { $null }
-                $Document.AddChoiceField($pdfPage, $Name, $box, [string[]]$Option, $sel, (-not $List), $fieldOptions)
-            }
-            'PushButton' {
-                if (-not $bound.ContainsKey('Caption')) { throw 'Add-VellumPdfFormField: -Type PushButton needs -Caption.' }
-                & $assertDrawable '-Caption' $Caption
-                $Document.AddPushButton($pdfPage, $Name, $box, $Caption, $fieldOptions)
-            }
-            'Radio' {
-                if (-not $RadioOption -or $RadioOption.Count -eq 0) { throw 'Add-VellumPdfFormField: -Type Radio needs -RadioOption.' }
-                $buttons = [System.Collections.Generic.List[VellumPdf.Forms.RadioOption]]::new()
-                $i = 0
-                foreach ($ro in $RadioOption) {
-                    $i++
-                    if (-not $ro.ContainsKey('ExportValue') -or [string]::IsNullOrEmpty([string]$ro['ExportValue'])) {
-                        throw "Add-VellumPdfFormField: radio button $i needs an ExportValue."
+            # The appearance stream can draw Latin-1 and the Windows-1252 punctuation; anything else makes Save fail
+            # (after the document is spent), so check here.
+            $assertDrawable = {
+                param([string]$What, [string]$Text)
+                foreach ($ch in $Text.ToCharArray()) {
+                    $code = [int]$ch
+                    if (-not (Test-VellumPdfWinAnsiChar -CodeUnit $code)) {
+                        throw ("Add-VellumPdfFormField: $What contains U+$($code.ToString('X4')), which the field appearance cannot draw " +
+                            '(Latin-1 and Windows-1252 punctuation only).')
                     }
-                    $roPage = Get-VellumPdfPage -Document $Document -Page $(if ($ro.ContainsKey('Page')) { [int]$ro['Page'] } else { $Page }) -CommandName 'Add-VellumPdfFormField'
-                    $roBox = & $rect $ro['X'] $ro['Y'] $ro['Width'] $ro['Height'] "radio button $i"
-                    $buttons.Add([VellumPdf.Forms.RadioOption]::new($roPage, $roBox, [string]$ro['ExportValue']))
                 }
-                if ($bound.ContainsKey('Selected') -and $Selected -notin $buttons.ExportValue) {
-                    throw "Add-VellumPdfFormField: -Selected '$Selected' is not an ExportValue of any radio button."
-                }
-                $sel = if ($bound.ContainsKey('Selected')) { $Selected } else { $null }
-                $Document.AddRadioButtonGroup($Name, $buttons, $sel, $fieldOptions)
             }
+
+            $fieldOptions = [VellumPdf.Forms.FormFieldOptions]::new()
+            $fieldOptions.FontSize = $FontSize
+            if ($ReadOnly) { $fieldOptions.ReadOnly = $true }
+            if ($Required) { $fieldOptions.Required = $true }
+            if ($Multiline) { $fieldOptions.Multiline = $true }
+
+            $rect = {
+                param($x, $y, $w, $h, $what)
+                foreach ($v in $x, $y, $w, $h) {
+                    if ($null -eq $v -or -not [double]::IsFinite([double]$v)) { throw "Add-VellumPdfFormField: $what needs finite X, Y, Width and Height." }
+                }
+                if ([double]$w -le 0 -or [double]$h -le 0) { throw "Add-VellumPdfFormField: $what needs a positive Width and Height." }
+                [VellumPdf.Document.PdfRectangle]::new([double]$x, [double]$y, [double]$x + [double]$w, [double]$y + [double]$h)
+            }
+
+            if ($Type -eq 'Radio') {
+                foreach ($n in 'Page', 'X', 'Y', 'Width', 'Height') {
+                    if ($bound.ContainsKey($n)) {
+                        throw "Add-VellumPdfFormField: -$n does not apply to -Type Radio; give each button's own Page/X/Y/Width/Height in -RadioOption."
+                    }
+                }
+            }
+            else {
+                foreach ($req in 'X', 'Y', 'Width', 'Height') {
+                    if (-not $bound.ContainsKey($req)) { throw "Add-VellumPdfFormField: -Type $Type needs -$req." }
+                }
+                $pdfPage = Get-VellumPdfPage -Document $Document -Page $Page -CommandName 'Add-VellumPdfFormField'
+                $box = & $rect $X $Y $Width $Height "-Type $Type"
+            }
+
+            switch ($Type) {
+                'Text' {
+                    & $assertDrawable '-Value' $Value
+                    $Document.AddTextField($pdfPage, $Name, $box, $Value, $fieldOptions)
+                }
+                'CheckBox' { $Document.AddCheckBox($pdfPage, $Name, $box, [bool]$Checked, $fieldOptions) }
+                'Choice' {
+                    if (-not $Option -or $Option.Count -eq 0) { throw 'Add-VellumPdfFormField: -Type Choice needs -Option.' }
+                    foreach ($o in $Option) { & $assertDrawable "option '$o'" $o }
+                    if ($bound.ContainsKey('Selected') -and $Selected -notin $Option) {
+                        throw "Add-VellumPdfFormField: -Selected '$Selected' is not one of the -Option entries."
+                    }
+                    $sel = if ($bound.ContainsKey('Selected')) { $Selected } else { $null }
+                    $Document.AddChoiceField($pdfPage, $Name, $box, [string[]]$Option, $sel, (-not $List), $fieldOptions)
+                }
+                'PushButton' {
+                    if (-not $bound.ContainsKey('Caption')) { throw 'Add-VellumPdfFormField: -Type PushButton needs -Caption.' }
+                    & $assertDrawable '-Caption' $Caption
+                    $Document.AddPushButton($pdfPage, $Name, $box, $Caption, $fieldOptions)
+                }
+                'Radio' {
+                    if (-not $RadioOption -or $RadioOption.Count -eq 0) { throw 'Add-VellumPdfFormField: -Type Radio needs -RadioOption.' }
+                    $buttons = [System.Collections.Generic.List[VellumPdf.Forms.RadioOption]]::new()
+                    $i = 0
+                    foreach ($ro in $RadioOption) {
+                        $i++
+                        if (-not $ro.ContainsKey('ExportValue') -or [string]::IsNullOrEmpty([string]$ro['ExportValue'])) {
+                            throw "Add-VellumPdfFormField: radio button $i needs an ExportValue."
+                        }
+                        $roPage = Get-VellumPdfPage -Document $Document -Page $(if ($ro.ContainsKey('Page')) { [int]$ro['Page'] } else { $Page }) -CommandName 'Add-VellumPdfFormField'
+                        $roBox = & $rect $ro['X'] $ro['Y'] $ro['Width'] $ro['Height'] "radio button $i"
+                        $buttons.Add([VellumPdf.Forms.RadioOption]::new($roPage, $roBox, [string]$ro['ExportValue']))
+                    }
+                    if ($bound.ContainsKey('Selected') -and $Selected -notin $buttons.ExportValue) {
+                        throw "Add-VellumPdfFormField: -Selected '$Selected' is not an ExportValue of any radio button."
+                    }
+                    $sel = if ($bound.ContainsKey('Selected')) { $Selected } else { $null }
+                    $Document.AddRadioButtonGroup($Name, $buttons, $sel, $fieldOptions)
+                }
+            }
+            $Document
         }
-        $Document
+        catch {
+            $PSCmdlet.ThrowTerminatingError($_)
+        }
     }
 }

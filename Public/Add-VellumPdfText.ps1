@@ -106,60 +106,65 @@ function Add-VellumPdfText {
     )
 
     process {
-        Assert-VellumPdfDocumentOpen -Document $Document -CommandName 'Add-VellumPdfText'
-        if (-not [double]::IsFinite($X) -or -not [double]::IsFinite($Y)) { throw 'Add-VellumPdfText: -X and -Y must be finite.' }
-        if ($Text -match '[\r\n]') { throw 'Add-VellumPdfText: -Text must be a single line; use New-VellumPdfDocument for wrapped text.' }
-
-        $resolved = Get-VellumPdfPageFont -Document $Document -FontHandle $FontHandle -Font $Font -CommandName 'Add-VellumPdfText'
-        if (-not $resolved.Handle -and $Document.Conformance -eq [VellumPdf.Document.PdfConformance]::None) {
-            Write-VellumPdfEncodingWarning -Text $Text -CommandName 'Add-VellumPdfText'
-        }
-        $canvas = Get-VellumPdfPageCanvas -Document $Document -Page $Page -CommandName 'Add-VellumPdfText'
-        $pdfPage = $Document.Pages[$Page - 1]
-        $bound = $PSBoundParameters
-        if (-not $Document.Tagged -and ($bound.ContainsKey('Role') -or $bound.ContainsKey('Language'))) {
-            Write-Verbose 'Add-VellumPdfText: -Role/-Language only matter in a tagged document (New-VellumPdfPageDocument -Tagged).'
-        }
-
-        # Alignment shifts the start by the text's width. The engine measures without
-        # character/word spacing and scaling, so when those are set the width is computed
-        # here and the text is placed left-aligned at the adjusted x.
-        $hasSpacing = $bound.ContainsKey('CharSpacing') -or $bound.ContainsKey('WordSpacing') -or $bound.ContainsKey('HorizontalScale')
-        $startX = $X
-        $showAlignment = [VellumPdf.Canvas.TextAlignment]::$Align
-        if ($hasSpacing -and $Align -ne 'Left') {
-            $base = if ($resolved.Handle) { $resolved.Handle.MeasureString($Text, $FontSize) } else { $resolved.Resource.MeasureString($Text, $FontSize) }
-            $spaces = ($Text.ToCharArray() | Where-Object { $_ -eq ' ' } | Measure-Object).Count
-            $width = ($base + $CharSpacing * $Text.Length + $WordSpacing * $spaces) * $(if ($bound.ContainsKey('HorizontalScale')) { $HorizontalScale / 100 } else { 1 })
-            $startX = if ($Align -eq 'Center') { $X - $width / 2 } else { $X - $width }
-            $showAlignment = [VellumPdf.Canvas.TextAlignment]::Left
-        }
-
-        [void]$canvas.SaveState()
         try {
-            if ($bound.ContainsKey('Color')) {
-                $c = ConvertTo-VellumColor $Color
-                [void]$canvas.SetFillColorRgb($c[0], $c[1], $c[2])
+            Assert-VellumPdfDocumentOpen -Document $Document -CommandName 'Add-VellumPdfText'
+            Assert-VellumPdfCoordinate $X 'X' 'Add-VellumPdfText'; Assert-VellumPdfCoordinate $Y 'Y' 'Add-VellumPdfText'
+            if ($Text -match '[\r\n]') { throw 'Add-VellumPdfText: -Text must be a single line; use New-VellumPdfDocument for wrapped text.' }
+
+            $resolved = Get-VellumPdfPageFont -Document $Document -FontHandle $FontHandle -Font $Font -CommandName 'Add-VellumPdfText'
+            if (-not $resolved.Handle -and $Document.Conformance -eq [VellumPdf.Document.PdfConformance]::None) {
+                Write-VellumPdfEncodingWarning -Text $Text -CommandName 'Add-VellumPdfText'
             }
-            Invoke-VellumPdfTagged -Document $Document -Canvas $canvas -PdfPage $pdfPage -Kind Structure -StructType $Role -Language $Language -Draw {
-                [void]$canvas.BeginText()
-                if ($bound.ContainsKey('CharSpacing')) { [void]$canvas.SetCharSpacing($CharSpacing) }
-                if ($bound.ContainsKey('WordSpacing')) { [void]$canvas.SetWordSpacing($WordSpacing) }
-                if ($bound.ContainsKey('Rise')) { [void]$canvas.SetTextRise($Rise) }
-                if ($bound.ContainsKey('HorizontalScale')) { [void]$canvas.SetHorizScaling($HorizontalScale) }
-                if ($resolved.Handle) {
-                    $Document.RegisterEmbeddedFontUsage($pdfPage, $resolved.Handle)
-                    [void]$canvas.SetFontByName($resolved.Handle.ResourceName, $FontSize)
-                    [void][PSVellumPDF.Interop.CanvasHelpers]::ShowEmbeddedText($canvas, $resolved.Handle, $Text, $FontSize, $startX, $Y, $showAlignment)
-                }
-                else {
-                    [void]$canvas.SetFont($resolved.Resource, $FontSize)
-                    [void]$canvas.ShowTextAligned($Text, $startX, $Y, $showAlignment)
-                }
-                [void]$canvas.EndText()
+            $canvas = Get-VellumPdfPageCanvas -Document $Document -Page $Page -CommandName 'Add-VellumPdfText'
+            $pdfPage = $Document.Pages[$Page - 1]
+            $bound = $PSBoundParameters
+            if (-not $Document.Tagged -and ($bound.ContainsKey('Role') -or $bound.ContainsKey('Language'))) {
+                Write-Verbose 'Add-VellumPdfText: -Role/-Language only matter in a tagged document (New-VellumPdfPageDocument -Tagged).'
             }
+
+            # Alignment shifts the start by the text's width. The engine measures without
+            # character/word spacing and scaling, so when those are set the width is computed
+            # here and the text is placed left-aligned at the adjusted x.
+            $hasSpacing = $bound.ContainsKey('CharSpacing') -or $bound.ContainsKey('WordSpacing') -or $bound.ContainsKey('HorizontalScale')
+            $startX = $X
+            $showAlignment = [VellumPdf.Canvas.TextAlignment]::$Align
+            if ($hasSpacing -and $Align -ne 'Left') {
+                $base = if ($resolved.Handle) { $resolved.Handle.MeasureString($Text, $FontSize) } else { $resolved.Resource.MeasureString($Text, $FontSize) }
+                $spaces = ($Text.ToCharArray() | Where-Object { $_ -eq ' ' } | Measure-Object).Count
+                $width = ($base + $CharSpacing * $Text.Length + $WordSpacing * $spaces) * $(if ($bound.ContainsKey('HorizontalScale')) { $HorizontalScale / 100 } else { 1 })
+                $startX = if ($Align -eq 'Center') { $X - $width / 2 } else { $X - $width }
+                $showAlignment = [VellumPdf.Canvas.TextAlignment]::Left
+            }
+
+            [void]$canvas.SaveState()
+            try {
+                if ($bound.ContainsKey('Color')) {
+                    $c = ConvertTo-VellumColor $Color
+                    [void]$canvas.SetFillColorRgb($c[0], $c[1], $c[2])
+                }
+                Invoke-VellumPdfTagged -Document $Document -Canvas $canvas -PdfPage $pdfPage -Kind Structure -StructType $Role -Language $Language -Draw {
+                    [void]$canvas.BeginText()
+                    if ($bound.ContainsKey('CharSpacing')) { [void]$canvas.SetCharSpacing($CharSpacing) }
+                    if ($bound.ContainsKey('WordSpacing')) { [void]$canvas.SetWordSpacing($WordSpacing) }
+                    if ($bound.ContainsKey('Rise')) { [void]$canvas.SetTextRise($Rise) }
+                    if ($bound.ContainsKey('HorizontalScale')) { [void]$canvas.SetHorizScaling($HorizontalScale) }
+                    if ($resolved.Handle) {
+                        $Document.RegisterEmbeddedFontUsage($pdfPage, $resolved.Handle)
+                        [void]$canvas.SetFontByName($resolved.Handle.ResourceName, $FontSize)
+                        [void][PSVellumPDF.Interop.CanvasHelpers]::ShowEmbeddedText($canvas, $resolved.Handle, $Text, $FontSize, $startX, $Y, $showAlignment)
+                    }
+                    else {
+                        [void]$canvas.SetFont($resolved.Resource, $FontSize)
+                        [void]$canvas.ShowTextAligned($Text, $startX, $Y, $showAlignment)
+                    }
+                    [void]$canvas.EndText()
+                }
+            }
+            finally { [void]$canvas.RestoreState() }
+            $Document
         }
-        finally { [void]$canvas.RestoreState() }
-        $Document
+        catch {
+            $PSCmdlet.ThrowTerminatingError($_)
+        }
     }
 }

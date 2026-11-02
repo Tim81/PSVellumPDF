@@ -15,7 +15,7 @@ function Export-VellumPdfImage {
         Files are named <pdf name>-p<page>-i<n>.<ext>. An existing file is not
         overwritten unless -Force is given.
     .PARAMETER Path
-        The PDF file(s). Accepts wildcards and pipeline input by property name.
+        The PDF file(s). Accepts wildcards. Piped strings bind here; piped file objects bind to -LiteralPath.
     .PARAMETER LiteralPath
         The PDF file(s), taken literally.
     .PARAMETER Bytes
@@ -50,8 +50,7 @@ function Export-VellumPdfImage {
     [CmdletBinding(SupportsShouldProcess, DefaultParameterSetName = 'Path')]
     [OutputType([System.IO.FileInfo])]
     param(
-        [Parameter(Mandatory, Position = 0, ValueFromPipeline, ValueFromPipelineByPropertyName, ParameterSetName = 'Path')]
-        [Alias('FullName')]
+        [Parameter(Mandatory, Position = 0, ValueFromPipeline, ParameterSetName = 'Path')]
         [string[]]$Path,
 
         [Parameter(Mandatory, ValueFromPipelineByPropertyName, ParameterSetName = 'LiteralPath')]
@@ -59,6 +58,7 @@ function Export-VellumPdfImage {
         [string[]]$LiteralPath,
 
         [Parameter(Mandatory, ParameterSetName = 'Bytes')]
+        [AllowEmptyCollection()]
         [byte[]]$Bytes,
 
         [Parameter(Mandatory)]
@@ -90,63 +90,73 @@ function Export-VellumPdfImage {
     )
 
     begin {
-        $limits = @{}
-        foreach ($n in 'MaxDecodedStreamBytes', 'MaxDiagnostics', 'MaxFormXObjectDepth', 'ReconstructionBudgetMultiplier') {
-            if ($PSBoundParameters.ContainsKey($n)) { $limits[$n] = $PSBoundParameters[$n] }
+        try {
+            $limits = @{}
+            foreach ($n in 'MaxDecodedStreamBytes', 'MaxDiagnostics', 'MaxFormXObjectDepth', 'ReconstructionBudgetMultiplier') {
+                if ($PSBoundParameters.ContainsKey($n)) { $limits[$n] = $PSBoundParameters[$n] }
+            }
+            $plain = if ($Password) { [System.Net.NetworkCredential]::new('', $Password).Password }
+            $destination = $ExecutionContext.SessionState.Path.GetUnresolvedProviderPathFromPSPath($DestinationPath)
         }
-        $plain = if ($Password) { [System.Net.NetworkCredential]::new('', $Password).Password }
-        $destination = $ExecutionContext.SessionState.Path.GetUnresolvedProviderPathFromPSPath($DestinationPath)
+        catch {
+            $PSCmdlet.ThrowTerminatingError($_)
+        }
     }
 
     process {
-        foreach ($source in Get-VellumPdfInput -Path $Path -LiteralPath $LiteralPath -Bytes $Bytes -CommandName 'Export-VellumPdfImage') {
-            $prefix = if ($BaseName) { $BaseName }
-                elseif ($source.Name -eq '<bytes>') { 'pdf' }
-                else { [System.IO.Path]::GetFileNameWithoutExtension($source.Name) }
+        try {
+            foreach ($source in Get-VellumPdfInput -Path $Path -LiteralPath $LiteralPath -Bytes $Bytes -CommandName 'Export-VellumPdfImage') {
+                $prefix = if ($BaseName) { $BaseName }
+                    elseif ($source.Name -eq '<bytes>') { 'pdf' }
+                    else { [System.IO.Path]::GetFileNameWithoutExtension($source.Name) }
 
-            $reader = Open-VellumPdfReader -Limit $limits -Bytes $source.Data -Password $plain -CommandName 'Export-VellumPdfImage' -Source $source.Name
-            try {
-                $options = [VellumPdf.Reader.PdfImageExtractionOptions]::new()
-                if ($ExcludeInline) {
-                    $options.IncludeInlineImages = $false
-                    $options.IncludeAnnotationAppearances = $false
+                $reader = Open-VellumPdfReader -Limit $limits -Bytes $source.Data -Password $plain -CommandName 'Export-VellumPdfImage' -Source $source.Name
+                try {
+                    $options = [VellumPdf.Reader.PdfImageExtractionOptions]::new()
+                    if ($ExcludeInline) {
+                        $options.IncludeInlineImages = $false
+                        $options.IncludeAnnotationAppearances = $false
+                    }
+                    $result = $reader.ExtractImages($options)
+                    foreach ($d in $result.Diagnostics) { Write-Warning "Export-VellumPdfImage: $($d.Message)" }
+
+                    $counter = @{ }
+                    foreach ($image in $result.Images) {
+                        $pageNumber = $image.PageIndex + 1
+                        if ($Page -and $pageNumber -notin $Page) { continue }
+                        $counter[$pageNumber] = 1 + [int]$counter[$pageNumber]
+
+                        [byte[]]$png = $null
+                        $data = $null
+                        $ext = $image.FileExtension
+                        if ($image.TryEncodePngWithAlpha([ref]$png) -or $image.TryEncodePng([ref]$png)) {
+                            $data = $png
+                            $ext = 'png'
+                        }
+                        else {
+                            $data = $image.Data.ToArray()
+                        }
+                        $name = '{0}-p{1}-i{2}.{3}' -f $prefix, $pageNumber, $counter[$pageNumber], $ext.TrimStart('.')
+                        $target = Join-Path $destination $name
+                        if ((Test-Path -LiteralPath $target) -and -not $Force) {
+                            # WriteError (not Write-Error -ErrorAction Continue) so the caller's -ErrorAction applies.
+                            $PSCmdlet.WriteError([System.Management.Automation.ErrorRecord]::new(
+                                    [System.IO.IOException]::new("Export-VellumPdfImage: '$target' exists; use -Force to overwrite."),
+                                    'ImageFileExists', [System.Management.Automation.ErrorCategory]::ResourceExists, $target))
+                            continue
+                        }
+                        if ($PSCmdlet.ShouldProcess($target, 'Write image')) {
+                            [void][System.IO.Directory]::CreateDirectory($destination)
+                            [System.IO.File]::WriteAllBytes($target, $data)
+                            Get-Item -LiteralPath $target
+                        }
+                    }
                 }
-                $result = $reader.ExtractImages($options)
-                foreach ($d in $result.Diagnostics) { Write-Warning "Export-VellumPdfImage: $($d.Message)" }
-
-                $counter = @{ }
-                foreach ($image in $result.Images) {
-                    $pageNumber = $image.PageIndex + 1
-                    if ($Page -and $pageNumber -notin $Page) { continue }
-                    $counter[$pageNumber] = 1 + [int]$counter[$pageNumber]
-
-                    [byte[]]$png = $null
-                    $data = $null
-                    $ext = $image.FileExtension
-                    if ($image.TryEncodePngWithAlpha([ref]$png) -or $image.TryEncodePng([ref]$png)) {
-                        $data = $png
-                        $ext = 'png'
-                    }
-                    else {
-                        $data = $image.Data.ToArray()
-                    }
-                    $name = '{0}-p{1}-i{2}.{3}' -f $prefix, $pageNumber, $counter[$pageNumber], $ext.TrimStart('.')
-                    $target = Join-Path $destination $name
-                    if ((Test-Path -LiteralPath $target) -and -not $Force) {
-                        # WriteError (not Write-Error -ErrorAction Continue) so the caller's -ErrorAction applies.
-                        $PSCmdlet.WriteError([System.Management.Automation.ErrorRecord]::new(
-                                [System.IO.IOException]::new("Export-VellumPdfImage: '$target' exists; use -Force to overwrite."),
-                                'ImageFileExists', [System.Management.Automation.ErrorCategory]::ResourceExists, $target))
-                        continue
-                    }
-                    if ($PSCmdlet.ShouldProcess($target, 'Write image')) {
-                        [void][System.IO.Directory]::CreateDirectory($destination)
-                        [System.IO.File]::WriteAllBytes($target, $data)
-                        Get-Item -LiteralPath $target
-                    }
-                }
+                finally { $reader.Dispose() }
             }
-            finally { $reader.Dispose() }
+        }
+        catch {
+            $PSCmdlet.ThrowTerminatingError($_)
         }
     }
 }

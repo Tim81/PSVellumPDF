@@ -139,133 +139,141 @@ function Add-VellumPdfShape {
     )
 
     process {
-        Assert-VellumPdfDocumentOpen -Document $Document -CommandName 'Add-VellumPdfShape'
-        $bound = $PSBoundParameters
-        foreach ($v in $X, $Y, $Width, $Height, $X2, $Y2, $Radius, $StartAngle, $EndAngle) {
-            if (-not [double]::IsFinite($v)) { throw 'Add-VellumPdfShape: coordinates and sizes must be finite numbers.' }
-        }
-        if ($Shape -eq 'Line') {
-            if (-not $bound.ContainsKey('X2') -or -not $bound.ContainsKey('Y2')) {
-                throw 'Add-VellumPdfShape: a Line needs -X2 and -Y2.'
-            }
-            if ($bound.ContainsKey('FillColor') -or $bound.ContainsKey('FillCmyk') -or $bound.ContainsKey('Opacity')) {
-                throw 'Add-VellumPdfShape: a Line has no fill; use -StrokeColor/-StrokeCmyk/-StrokeOpacity.'
-            }
-        }
-        elseif ($Shape -eq 'Arc') {
-            foreach ($req in 'Radius', 'StartAngle', 'EndAngle') {
-                if (-not $bound.ContainsKey($req)) { throw "Add-VellumPdfShape: an Arc needs -$req." }
-            }
-            foreach ($no in 'Width', 'Height', 'X2', 'Y2') {
-                if ($bound.ContainsKey($no)) { throw "Add-VellumPdfShape: -$no does not apply to an Arc; its size is -Radius." }
-            }
-        }
-        else {
-            if ($Width -le 0 -or $Height -le 0 -or -not $bound.ContainsKey('Width') -or -not $bound.ContainsKey('Height')) {
-                throw "Add-VellumPdfShape: a $Shape needs a positive -Width and -Height."
-            }
-            if ($bound.ContainsKey('X2') -or $bound.ContainsKey('Y2')) { throw "Add-VellumPdfShape: -X2/-Y2 apply to a Line only." }
-        }
-        if ($Shape -ne 'Arc') {
-            foreach ($no in 'Radius', 'StartAngle', 'EndAngle') {
-                if ($bound.ContainsKey($no)) { throw "Add-VellumPdfShape: -$no applies to an Arc only." }
-            }
-        }
-        $hasIcc = $bound.ContainsKey('FillIcc') -or $bound.ContainsKey('StrokeIcc')
-        if ($hasIcc -ne $bound.ContainsKey('IccProfilePath')) {
-            throw 'Add-VellumPdfShape: -IccProfilePath and -FillIcc/-StrokeIcc go together; give both.'
-        }
-        if ($Shape -eq 'Line' -and $bound.ContainsKey('FillIcc')) { throw 'Add-VellumPdfShape: a Line has no fill; use -StrokeIcc.' }
-        if (($bound.ContainsKey('FillIcc') -and ($bound.ContainsKey('FillColor') -or $bound.ContainsKey('FillCmyk'))) -or
-            ($bound.ContainsKey('StrokeIcc') -and ($bound.ContainsKey('StrokeColor') -or $bound.ContainsKey('StrokeCmyk')))) {
-            throw 'Add-VellumPdfShape: give a colour as RGB/hex/name, CMYK, or ICC components, not several.'
-        }
-        if (($bound.ContainsKey('FillColor') -and $bound.ContainsKey('FillCmyk')) -or
-            ($bound.ContainsKey('StrokeColor') -and $bound.ContainsKey('StrokeCmyk'))) {
-            throw 'Add-VellumPdfShape: give a colour as RGB/hex/name or as CMYK, not both.'
-        }
-
-        if (($bound.ContainsKey('FillCmyk') -or $bound.ContainsKey('StrokeCmyk')) -and
-            $Document.Conformance -ne [VellumPdf.Document.PdfConformance]::None -and
-            -not $Document.PSObject.Properties['PSVellumCmykIntent']) {
-            Write-Warning ('Add-VellumPdfShape: PDF/A allows CMYK colour only with a CMYK output intent. Call ' +
-                'Set-VellumPdfOutputIntent -Cmyk on this document, or use RGB colours.')
-        }
-        $canvas = Get-VellumPdfPageCanvas -Document $Document -Page $Page -CommandName 'Add-VellumPdfShape'
-        $iccName = $null
-        if ($hasIcc) {
-            $icc = Register-VellumPdfIccSpace -Document $Document -Page $Page -IccProfilePath $IccProfilePath -CommandName 'Add-VellumPdfShape'
-            $iccCount = $icc.Count
-            $iccName = $icc.Name
-            foreach ($pair in @(@('FillIcc', $FillIcc), @('StrokeIcc', $StrokeIcc))) {
-                if ($bound.ContainsKey($pair[0]) -and @($pair[1]).Count -ne $iccCount) {
-                    throw "Add-VellumPdfShape: -$($pair[0]) needs $iccCount value(s) for this profile; got $(@($pair[1]).Count)."
-                }
-            }
-        }
-        $hasFill = $bound.ContainsKey('FillColor') -or $bound.ContainsKey('FillCmyk') -or $bound.ContainsKey('FillIcc')
-        # Any stroke option asks for an outline (black unless a colour is given), even beside a fill.
-        $strokeRequested = $bound.ContainsKey('LineCap') -or $bound.ContainsKey('LineJoin') -or $bound.ContainsKey('MiterLimit') -or $bound.ContainsKey('StrokeColor') -or $bound.ContainsKey('StrokeCmyk') -or $bound.ContainsKey('StrokeIcc') -or $bound.ContainsKey('StrokeWidth') -or
-            $bound.ContainsKey('Dash') -or $bound.ContainsKey('StrokeOpacity')
-        $hasStroke = $strokeRequested -or $Shape -eq 'Line' -or -not $hasFill
-
-        [void]$canvas.SaveState()
         try {
-            # Tagged documents: decorative graphics are artifacts; -AltText makes the shape a Figure.
-            $tagKind = if ($AltText) { 'Structure' } else { 'Artifact' }
-            Invoke-VellumPdfTagged -Document $Document -Canvas $canvas -PdfPage $Document.Pages[$Page - 1] -Kind $tagKind -StructType Figure -AltText $AltText -Draw {
-            if ($bound.ContainsKey('FillColor')) { $c = ConvertTo-VellumColor $FillColor; [void]$canvas.SetFillColorRgb($c[0], $c[1], $c[2]) }
-            if ($bound.ContainsKey('FillCmyk')) { [void]$canvas.SetFillColorCmyk($FillCmyk[0], $FillCmyk[1], $FillCmyk[2], $FillCmyk[3]) }
-            if ($bound.ContainsKey('StrokeColor')) { $c = ConvertTo-VellumColor $StrokeColor; [void]$canvas.SetStrokeColorRgb($c[0], $c[1], $c[2]) }
-            if ($bound.ContainsKey('StrokeCmyk')) { [void]$canvas.SetStrokeColorCmyk($StrokeCmyk[0], $StrokeCmyk[1], $StrokeCmyk[2], $StrokeCmyk[3]) }
-            if ($bound.ContainsKey('FillIcc')) {
-                [void]$canvas.SetFillColorSpace($iccName)
-                [void][PSVellumPDF.Interop.CanvasHelpers]::SetFillColor($canvas, $FillIcc)
+            Assert-VellumPdfDocumentOpen -Document $Document -CommandName 'Add-VellumPdfShape'
+            $bound = $PSBoundParameters
+            foreach ($pair in @('X', $X), @('Y', $Y), @('Width', $Width), @('Height', $Height), @('X2', $X2), @('Y2', $Y2), @('Radius', $Radius)) {
+                Assert-VellumPdfCoordinate $pair[1] $pair[0] 'Add-VellumPdfShape'
             }
-            if ($bound.ContainsKey('StrokeIcc')) {
-                [void]$canvas.SetStrokeColorSpace($iccName)
-                [void][PSVellumPDF.Interop.CanvasHelpers]::SetStrokeColor($canvas, $StrokeIcc)
+            foreach ($angle in $StartAngle, $EndAngle) {
+                if (-not [double]::IsFinite($angle)) { throw 'Add-VellumPdfShape: angles must be finite numbers.' }
             }
-            if ($bound.ContainsKey('Opacity')) { [void]$canvas.SetFillAlpha($Opacity) }
-            if ($bound.ContainsKey('StrokeOpacity')) { [void]$canvas.SetStrokeAlpha($StrokeOpacity) }
-            if ($hasStroke) {
-                [void]$canvas.SetLineWidth($StrokeWidth)
-                if ($bound.ContainsKey('LineCap')) { [void]$canvas.SetLineCap(@('Butt', 'Round', 'Square').IndexOf($LineCap)) }
-                if ($bound.ContainsKey('LineJoin')) { [void]$canvas.SetLineJoin(@('Miter', 'Round', 'Bevel').IndexOf($LineJoin)) }
-                if ($bound.ContainsKey('MiterLimit')) { [void]$canvas.SetMiterLimit($MiterLimit) }
-                if ($Dash) { [void][PSVellumPDF.Interop.CanvasHelpers]::SetLineDash($canvas, $Dash, 0) }
+            if ($Shape -eq 'Line') {
+                if (-not $bound.ContainsKey('X2') -or -not $bound.ContainsKey('Y2')) {
+                    throw 'Add-VellumPdfShape: a Line needs -X2 and -Y2.'
+                }
+                if ($bound.ContainsKey('FillColor') -or $bound.ContainsKey('FillCmyk') -or $bound.ContainsKey('Opacity')) {
+                    throw 'Add-VellumPdfShape: a Line has no fill; use -StrokeColor/-StrokeCmyk/-StrokeOpacity.'
+                }
+            }
+            elseif ($Shape -eq 'Arc') {
+                foreach ($req in 'Radius', 'StartAngle', 'EndAngle') {
+                    if (-not $bound.ContainsKey($req)) { throw "Add-VellumPdfShape: an Arc needs -$req." }
+                }
+                foreach ($no in 'Width', 'Height', 'X2', 'Y2') {
+                    if ($bound.ContainsKey($no)) { throw "Add-VellumPdfShape: -$no does not apply to an Arc; its size is -Radius." }
+                }
+            }
+            else {
+                if ($Width -le 0 -or $Height -le 0 -or -not $bound.ContainsKey('Width') -or -not $bound.ContainsKey('Height')) {
+                    throw "Add-VellumPdfShape: a $Shape needs a positive -Width and -Height."
+                }
+                if ($bound.ContainsKey('X2') -or $bound.ContainsKey('Y2')) { throw "Add-VellumPdfShape: -X2/-Y2 apply to a Line only." }
+            }
+            if ($Shape -ne 'Arc') {
+                foreach ($no in 'Radius', 'StartAngle', 'EndAngle') {
+                    if ($bound.ContainsKey($no)) { throw "Add-VellumPdfShape: -$no applies to an Arc only." }
+                }
+            }
+            $hasIcc = $bound.ContainsKey('FillIcc') -or $bound.ContainsKey('StrokeIcc')
+            if ($hasIcc -ne $bound.ContainsKey('IccProfilePath')) {
+                throw 'Add-VellumPdfShape: -IccProfilePath and -FillIcc/-StrokeIcc go together; give both.'
+            }
+            if ($Shape -eq 'Line' -and $bound.ContainsKey('FillIcc')) { throw 'Add-VellumPdfShape: a Line has no fill; use -StrokeIcc.' }
+            if (($bound.ContainsKey('FillIcc') -and ($bound.ContainsKey('FillColor') -or $bound.ContainsKey('FillCmyk'))) -or
+                ($bound.ContainsKey('StrokeIcc') -and ($bound.ContainsKey('StrokeColor') -or $bound.ContainsKey('StrokeCmyk')))) {
+                throw 'Add-VellumPdfShape: give a colour as RGB/hex/name, CMYK, or ICC components, not several.'
+            }
+            if (($bound.ContainsKey('FillColor') -and $bound.ContainsKey('FillCmyk')) -or
+                ($bound.ContainsKey('StrokeColor') -and $bound.ContainsKey('StrokeCmyk'))) {
+                throw 'Add-VellumPdfShape: give a colour as RGB/hex/name or as CMYK, not both.'
             }
 
-            switch ($Shape) {
-                'Rectangle' { [void]$canvas.Rectangle($X, $Y, $Width, $Height) }
-                'Line' { [void]$canvas.MoveTo($X, $Y).LineTo($X2, $Y2) }
-                'Arc' {
-                    $toRadians = [math]::PI / 180
-                    $from = $StartAngle * $toRadians
-                    # AppendArc extends the current path, so start it at the arc's first point.
-                    [void]$canvas.MoveTo($X + $Radius * [math]::Cos($from), $Y + $Radius * [math]::Sin($from))
-                    [void]$canvas.AppendArc($X, $Y, $Radius, $from, $EndAngle * $toRadians)
-                }
-                'Ellipse' {
-                    # Four cubic Beziers; k is the standard circle-approximation constant.
-                    $k = 0.5522847498
-                    $rx = $Width / 2; $ry = $Height / 2
-                    $cx = $X + $rx; $cy = $Y + $ry
-                    [void]$canvas.MoveTo($cx + $rx, $cy)
-                    [void]$canvas.CurveTo($cx + $rx, $cy + $k * $ry, $cx + $k * $rx, $cy + $ry, $cx, $cy + $ry)
-                    [void]$canvas.CurveTo($cx - $k * $rx, $cy + $ry, $cx - $rx, $cy + $k * $ry, $cx - $rx, $cy)
-                    [void]$canvas.CurveTo($cx - $rx, $cy - $k * $ry, $cx - $k * $rx, $cy - $ry, $cx, $cy - $ry)
-                    [void]$canvas.CurveTo($cx + $k * $rx, $cy - $ry, $cx + $rx, $cy - $k * $ry, $cx + $rx, $cy)
-                    [void]$canvas.ClosePath()
+            if (($bound.ContainsKey('FillCmyk') -or $bound.ContainsKey('StrokeCmyk')) -and
+                $Document.Conformance -ne [VellumPdf.Document.PdfConformance]::None -and
+                -not $Document.PSObject.Properties['PSVellumCmykIntent']) {
+                Write-Warning ('Add-VellumPdfShape: PDF/A allows CMYK colour only with a CMYK output intent. Call ' +
+                    'Set-VellumPdfOutputIntent -Cmyk on this document, or use RGB colours.')
+            }
+            $canvas = Get-VellumPdfPageCanvas -Document $Document -Page $Page -CommandName 'Add-VellumPdfShape'
+            $iccName = $null
+            if ($hasIcc) {
+                $icc = Register-VellumPdfIccSpace -Document $Document -Page $Page -IccProfilePath $IccProfilePath -CommandName 'Add-VellumPdfShape'
+                $iccCount = $icc.Count
+                $iccName = $icc.Name
+                foreach ($pair in @(@('FillIcc', $FillIcc), @('StrokeIcc', $StrokeIcc))) {
+                    if ($bound.ContainsKey($pair[0]) -and @($pair[1]).Count -ne $iccCount) {
+                        throw "Add-VellumPdfShape: -$($pair[0]) needs $iccCount value(s) for this profile; got $(@($pair[1]).Count)."
+                    }
                 }
             }
-            if ($Shape -eq 'Line') { [void]$canvas.Stroke() }
-            elseif ($hasFill -and $strokeRequested) { [void]$canvas.FillAndStroke() }
-            elseif ($hasFill) { [void]$canvas.Fill() }
-            else { [void]$canvas.Stroke() }
+            $hasFill = $bound.ContainsKey('FillColor') -or $bound.ContainsKey('FillCmyk') -or $bound.ContainsKey('FillIcc')
+            # Any stroke option asks for an outline (black unless a colour is given), even beside a fill.
+            $strokeRequested = $bound.ContainsKey('LineCap') -or $bound.ContainsKey('LineJoin') -or $bound.ContainsKey('MiterLimit') -or $bound.ContainsKey('StrokeColor') -or $bound.ContainsKey('StrokeCmyk') -or $bound.ContainsKey('StrokeIcc') -or $bound.ContainsKey('StrokeWidth') -or
+                $bound.ContainsKey('Dash') -or $bound.ContainsKey('StrokeOpacity')
+            $hasStroke = $strokeRequested -or $Shape -eq 'Line' -or -not $hasFill
+
+            [void]$canvas.SaveState()
+            try {
+                # Tagged documents: decorative graphics are artifacts; -AltText makes the shape a Figure.
+                $tagKind = if ($AltText) { 'Structure' } else { 'Artifact' }
+                Invoke-VellumPdfTagged -Document $Document -Canvas $canvas -PdfPage $Document.Pages[$Page - 1] -Kind $tagKind -StructType Figure -AltText $AltText -Draw {
+                if ($bound.ContainsKey('FillColor')) { $c = ConvertTo-VellumColor $FillColor; [void]$canvas.SetFillColorRgb($c[0], $c[1], $c[2]) }
+                if ($bound.ContainsKey('FillCmyk')) { [void]$canvas.SetFillColorCmyk($FillCmyk[0], $FillCmyk[1], $FillCmyk[2], $FillCmyk[3]) }
+                if ($bound.ContainsKey('StrokeColor')) { $c = ConvertTo-VellumColor $StrokeColor; [void]$canvas.SetStrokeColorRgb($c[0], $c[1], $c[2]) }
+                if ($bound.ContainsKey('StrokeCmyk')) { [void]$canvas.SetStrokeColorCmyk($StrokeCmyk[0], $StrokeCmyk[1], $StrokeCmyk[2], $StrokeCmyk[3]) }
+                if ($bound.ContainsKey('FillIcc')) {
+                    [void]$canvas.SetFillColorSpace($iccName)
+                    [void][PSVellumPDF.Interop.CanvasHelpers]::SetFillColor($canvas, $FillIcc)
+                }
+                if ($bound.ContainsKey('StrokeIcc')) {
+                    [void]$canvas.SetStrokeColorSpace($iccName)
+                    [void][PSVellumPDF.Interop.CanvasHelpers]::SetStrokeColor($canvas, $StrokeIcc)
+                }
+                if ($bound.ContainsKey('Opacity')) { [void]$canvas.SetFillAlpha($Opacity) }
+                if ($bound.ContainsKey('StrokeOpacity')) { [void]$canvas.SetStrokeAlpha($StrokeOpacity) }
+                if ($hasStroke) {
+                    [void]$canvas.SetLineWidth($StrokeWidth)
+                    if ($bound.ContainsKey('LineCap')) { [void]$canvas.SetLineCap(@{ Butt = 0; Round = 1; Square = 2 }[$LineCap]) }
+                    if ($bound.ContainsKey('LineJoin')) { [void]$canvas.SetLineJoin(@{ Miter = 0; Round = 1; Bevel = 2 }[$LineJoin]) }
+                    if ($bound.ContainsKey('MiterLimit')) { [void]$canvas.SetMiterLimit($MiterLimit) }
+                    if ($Dash) { [void][PSVellumPDF.Interop.CanvasHelpers]::SetLineDash($canvas, $Dash, 0) }
+                }
+
+                switch ($Shape) {
+                    'Rectangle' { [void]$canvas.Rectangle($X, $Y, $Width, $Height) }
+                    'Line' { [void]$canvas.MoveTo($X, $Y).LineTo($X2, $Y2) }
+                    'Arc' {
+                        $toRadians = [math]::PI / 180
+                        $from = $StartAngle * $toRadians
+                        # AppendArc extends the current path, so start it at the arc's first point.
+                        [void]$canvas.MoveTo($X + $Radius * [math]::Cos($from), $Y + $Radius * [math]::Sin($from))
+                        [void]$canvas.AppendArc($X, $Y, $Radius, $from, $EndAngle * $toRadians)
+                    }
+                    'Ellipse' {
+                        # Four cubic Beziers; k is the standard circle-approximation constant.
+                        $k = 0.5522847498
+                        $rx = $Width / 2; $ry = $Height / 2
+                        $cx = $X + $rx; $cy = $Y + $ry
+                        [void]$canvas.MoveTo($cx + $rx, $cy)
+                        [void]$canvas.CurveTo($cx + $rx, $cy + $k * $ry, $cx + $k * $rx, $cy + $ry, $cx, $cy + $ry)
+                        [void]$canvas.CurveTo($cx - $k * $rx, $cy + $ry, $cx - $rx, $cy + $k * $ry, $cx - $rx, $cy)
+                        [void]$canvas.CurveTo($cx - $rx, $cy - $k * $ry, $cx - $k * $rx, $cy - $ry, $cx, $cy - $ry)
+                        [void]$canvas.CurveTo($cx + $k * $rx, $cy - $ry, $cx + $rx, $cy - $k * $ry, $cx + $rx, $cy)
+                        [void]$canvas.ClosePath()
+                    }
+                }
+                if ($Shape -eq 'Line') { [void]$canvas.Stroke() }
+                elseif ($hasFill -and $strokeRequested) { [void]$canvas.FillAndStroke() }
+                elseif ($hasFill) { [void]$canvas.Fill() }
+                else { [void]$canvas.Stroke() }
+                }
             }
+            finally { [void]$canvas.RestoreState() }
+            $Document
         }
-        finally { [void]$canvas.RestoreState() }
-        $Document
+        catch {
+            $PSCmdlet.ThrowTerminatingError($_)
+        }
     }
 }

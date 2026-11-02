@@ -121,124 +121,139 @@ function Add-VellumPdfPieChart {
     )
 
     begin {
-        $collected = [System.Collections.Generic.List[object]]::new()
-        $palette = Get-VellumPdfPalette
-        # Inside the script block below $PSBoundParameters would be the block's own (empty) dictionary.
-        $boundParameters = $PSBoundParameters
+        try {
+            $collected = [System.Collections.Generic.List[object]]::new()
+            $palette = Get-VellumPdfPalette
+            # Inside the script block below $PSBoundParameters would be the block's own (empty) dictionary.
+            $boundParameters = $PSBoundParameters
 
-        # Builds and adds the chart (and legend) for a list of raw slice specs.
-        $buildChart = {
-            param([object[]]$Specs)
+            # Builds and adds the chart (and legend) for a list of raw slice specs.
+            $buildChart = {
+                param([object[]]$Specs)
 
-            Assert-VellumPdfDocumentOpen -Document $Document -CommandName 'Add-VellumPdfPieChart'
-            if ($FontHandle) {
-                Assert-VellumPdfFontHandle -FontHandle $FontHandle -Document $Document -CommandName 'Add-VellumPdfPieChart'
-            }
-            if ($Decorative -and $AltText) {
-                throw 'Add-VellumPdfPieChart: -AltText and -Decorative cannot be combined; a decorative chart has no alternate text.'
-            }
-            if (-not $Specs -or $Specs.Count -eq 0) {
-                throw 'Add-VellumPdfPieChart: at least one slice is required.'
-            }
-
-            # Normalise every spec to (Value, Color triple, Label), validating up
-            # front: the engine only throws when the document is saved.
-            $items = [System.Collections.Generic.List[object]]::new()
-            $sum = 0.0
-            $i = 0
-            foreach ($spec in $Specs) {
-                if ($spec -is [VellumPdf.Layout.Elements.PieSlice]) {
-                    $value = $spec.Value
-                    $rgb = @($spec.Color.R, $spec.Color.G, $spec.Color.B)
-                    $label = $spec.Label
+                Assert-VellumPdfDocumentOpen -Document $Document -CommandName 'Add-VellumPdfPieChart'
+                if ($FontHandle) {
+                    Assert-VellumPdfFontHandle -FontHandle $FontHandle -Document $Document -CommandName 'Add-VellumPdfPieChart'
                 }
-                elseif ($spec -is [System.Collections.IDictionary] -or $spec -is [System.Management.Automation.PSCustomObject]) {
-                    $get = { param($k) if ($spec -is [System.Collections.IDictionary]) { $spec[$k] } else { $spec.$k } }
-                    $raw = & $get 'Value'
-                    $value = if ($null -ne $raw) { $raw -as [double] }
-                    if ($null -eq $value) { throw "Add-VellumPdfPieChart: slice $($i + 1) has no numeric Value (got '$raw')." }
-                    $colorSpec = & $get 'Color'
-                    $rgb = if ($null -ne $colorSpec) { ConvertTo-VellumColor $colorSpec } else { ConvertTo-VellumColor $palette[$i % $palette.Count] }
-                    $label = & $get 'Label'
+                if ($Decorative -and $AltText) {
+                    throw 'Add-VellumPdfPieChart: -AltText and -Decorative cannot be combined; a decorative chart has no alternate text.'
                 }
-                else {
-                    throw "Add-VellumPdfPieChart: slice $($i + 1) must be a hashtable (Value/Color/Label) or a PieSlice; got $($spec.GetType().Name)."
+                if (-not $Specs -or $Specs.Count -eq 0) {
+                    throw 'Add-VellumPdfPieChart: at least one slice is required.'
                 }
-                if (-not [double]::IsFinite($value) -or $value -lt 0) {
-                    throw "Add-VellumPdfPieChart: slice $($i + 1) Value must be a finite number >= 0; got $value."
+
+                # Normalise every spec to (Value, Color triple, Label), validating up
+                # front: the engine only throws when the document is saved.
+                $items = [System.Collections.Generic.List[object]]::new()
+                $sum = 0.0
+                $i = 0
+                foreach ($spec in $Specs) {
+                    if ($spec -is [VellumPdf.Layout.Elements.PieSlice]) {
+                        $value = $spec.Value
+                        $rgb = @($spec.Color.R, $spec.Color.G, $spec.Color.B)
+                        $label = $spec.Label
+                    }
+                    elseif ($spec -is [System.Collections.IDictionary] -or $spec -is [System.Management.Automation.PSCustomObject]) {
+                        $get = { param($k) Get-VellumPdfPropertyValue -InputObject $spec -Name $k }
+                        $raw = & $get 'Value'
+                        $value = if ($null -ne $raw) { $raw -as [double] }
+                        if ($null -eq $value) { throw "Add-VellumPdfPieChart: slice $($i + 1) has no numeric Value (got '$raw')." }
+                        $colorSpec = & $get 'Color'
+                        $rgb = if ($null -ne $colorSpec) { ConvertTo-VellumColor $colorSpec } else { ConvertTo-VellumColor $palette[$i % $palette.Count] }
+                        $label = & $get 'Label'
+                    }
+                    else {
+                        throw "Add-VellumPdfPieChart: slice $($i + 1) must be a hashtable (Value/Color/Label) or a PieSlice; got $($spec.GetType().Name)."
+                    }
+                    if (-not [double]::IsFinite($value) -or $value -lt 0) {
+                        throw "Add-VellumPdfPieChart: slice $($i + 1) Value must be a finite number >= 0; got $value."
+                    }
+                    $sum += $value
+                    $items.Add([pscustomobject]@{ Value = [double]$value; Rgb = $rgb; Label = if ($null -ne $label) { [string]$label } })
+                    $i++
                 }
-                $sum += $value
-                $items.Add([pscustomobject]@{ Value = [double]$value; Rgb = $rgb; Label = if ($null -ne $label) { [string]$label } })
-                $i++
-            }
-            if ($sum -le 0) { throw 'Add-VellumPdfPieChart: the slice values must add up to more than zero.' }
+                if ($sum -le 0) { throw 'Add-VellumPdfPieChart: the slice values must add up to more than zero.' }
 
-            $contentWidth = $Document.PageSize.Width - $Document.Margins.Left - $Document.Margins.Right
-            if ($Diameter -gt $contentWidth) {
-                Write-Warning ("Add-VellumPdfPieChart: -Diameter $Diameter is wider than the $([math]::Round($contentWidth, 1))pt " +
-                    'content area; the engine will draw a smaller chart.')
-            }
+                $contentWidth = $Document.PageSize.Width - $Document.Margins.Left - $Document.Margins.Right
+                if ($Diameter -gt $contentWidth) {
+                    Write-Warning ("Add-VellumPdfPieChart: -Diameter $Diameter is wider than the $([math]::Round($contentWidth, 1))pt " +
+                        'content area; the engine will draw a smaller chart.')
+                }
 
-            $slices = [System.Collections.Generic.List[VellumPdf.Layout.Elements.PieSlice]]::new()
-            foreach ($item in $items) {
-                $color = [VellumPdf.Layout.Core.ColorRgb]::new($item.Rgb[0], $item.Rgb[1], $item.Rgb[2])
-                $slices.Add([VellumPdf.Layout.Elements.PieSlice]::new($item.Value, $color, $item.Label))
-            }
-
-            $chart = [VellumPdf.Layout.Elements.PieChart]::new()
-            $chart.Slices = $slices
-            $chart.Diameter = $Diameter
-            $chart.StrokeWidth = $StrokeWidth
-            if ($boundParameters.ContainsKey('StrokeColor')) {
-                $sc = ConvertTo-VellumColor $StrokeColor
-                $chart.StrokeColor = [VellumPdf.Layout.Core.ColorRgb]::new($sc[0], $sc[1], $sc[2])
-            }
-            $chart.Alignment = [VellumPdf.Layout.Core.HorizontalAlignment]::$Alignment
-            # The engine measures the start angle in radians from +X (counter-clockwise).
-            $chart.StartAngle = $StartAngle * [math]::PI / 180
-            $chart.Clockwise = -not $CounterClockwise
-            if ($AltText) { $chart.AltText = $AltText }
-            if ($Decorative) { $chart.Decorative = $true }
-
-            Set-VellumPdfElementMargin -Element $chart -Top $MarginTop -Bottom $MarginBottom `
-                -BoundParameters $boundParameters -Document $Document
-            [void]$Document.Add($chart)
-
-            if ($Legend) {
-                $rows = [System.Collections.Generic.List[object]]::new()
-                $n = 0
+                $slices = [System.Collections.Generic.List[VellumPdf.Layout.Elements.PieSlice]]::new()
                 foreach ($item in $items) {
-                    $hex = '#{0:X2}{1:X2}{2:X2}' -f [int][math]::Round($item.Rgb[0] * 255), [int][math]::Round($item.Rgb[1] * 255), [int][math]::Round($item.Rgb[2] * 255)
-                    $name = if ($item.Label) { $item.Label } else { "Slice $($n + 1)" }
-                    $share = '{0:P1}' -f ($item.Value / $sum)
-                    $rows.Add(@(@{ Text = ' '; Background = $hex }, $name, @{ Text = $share; Alignment = 'Right' }))
-                    $n++
+                    $color = [VellumPdf.Layout.Core.ColorRgb]::new($item.Rgb[0], $item.Rgb[1], $item.Rgb[2])
+                    $slices.Add([VellumPdf.Layout.Elements.PieSlice]::new($item.Value, $color, $item.Label))
                 }
-                $tableArgs = @{ Document = $Document; Row = $rows.ToArray(); ColumnWidth = @(18, 0, 60); BorderWidth = 0 }
-                if ($FontHandle) { $tableArgs['FontHandle'] = $FontHandle }
-                [void](Add-VellumPdfTable @tableArgs)
+
+                $chart = [VellumPdf.Layout.Elements.PieChart]::new()
+                $chart.Slices = $slices
+                $chart.Diameter = $Diameter
+                $chart.StrokeWidth = $StrokeWidth
+                if ($boundParameters.ContainsKey('StrokeColor')) {
+                    $sc = ConvertTo-VellumColor $StrokeColor
+                    $chart.StrokeColor = [VellumPdf.Layout.Core.ColorRgb]::new($sc[0], $sc[1], $sc[2])
+                }
+                $chart.Alignment = [VellumPdf.Layout.Core.HorizontalAlignment]::$Alignment
+                # The engine measures the start angle in radians from +X (counter-clockwise).
+                $chart.StartAngle = $StartAngle * [math]::PI / 180
+                $chart.Clockwise = -not $CounterClockwise
+                if ($AltText) { $chart.AltText = $AltText }
+                if ($Decorative) { $chart.Decorative = $true }
+
+                Set-VellumPdfElementMargin -Element $chart -Top $MarginTop -Bottom $MarginBottom `
+                    -BoundParameters $boundParameters -Document $Document
+                [void]$Document.Add($chart)
+
+                if ($Legend) {
+                    $rows = [System.Collections.Generic.List[object]]::new()
+                    $n = 0
+                    foreach ($item in $items) {
+                        $hex = '#{0:X2}{1:X2}{2:X2}' -f [int][math]::Round($item.Rgb[0] * 255), [int][math]::Round($item.Rgb[1] * 255), [int][math]::Round($item.Rgb[2] * 255)
+                        $name = if ($item.Label) { $item.Label } else { "Slice $($n + 1)" }
+                        $share = '{0:P1}' -f ($item.Value / $sum)
+                        $rows.Add(@(@{ Text = ' '; Background = $hex }, $name, @{ Text = $share; Alignment = 'Right' }))
+                        $n++
+                    }
+                    $tableArgs = @{ Document = $Document; Row = $rows.ToArray(); ColumnWidth = @(18, 0, 60); BorderWidth = 0 }
+                    if ($FontHandle) { $tableArgs['FontHandle'] = $FontHandle }
+                    [void](Add-VellumPdfTable @tableArgs)
+                }
             }
+        }
+        catch {
+            $PSCmdlet.ThrowTerminatingError($_)
         }
     }
 
     process {
-        if ($PSCmdlet.ParameterSetName -eq 'Data') {
-            $collected.Add($InputObject)
+        try {
+            if ($PSCmdlet.ParameterSetName -eq 'Data') {
+                foreach ($item in $InputObject) { $collected.Add($item) }
+            }
+            else {
+                & $buildChart $Slice
+                $Document
+            }
         }
-        else {
-            & $buildChart $Slice
-            $Document
+        catch {
+            $PSCmdlet.ThrowTerminatingError($_)
         }
     }
 
     end {
-        if ($PSCmdlet.ParameterSetName -eq 'Data') {
-            $specs = foreach ($obj in $collected) {
-                $label = if ($LabelProperty) { $obj.$LabelProperty }
-                @{ Value = $obj.$ValueProperty; Label = $label }
+        try {
+            if ($PSCmdlet.ParameterSetName -eq 'Data') {
+                $specs = foreach ($obj in $collected) {
+                    $label = if ($LabelProperty) { Get-VellumPdfPropertyValue -InputObject $obj -Name $LabelProperty }
+                    @{ Value = (Get-VellumPdfPropertyValue -InputObject $obj -Name $ValueProperty); Label = $label }
+                }
+                & $buildChart @($specs)
+                $Document
             }
-            & $buildChart @($specs)
-            $Document
+        }
+        catch {
+            $PSCmdlet.ThrowTerminatingError($_)
         }
     }
 }

@@ -25,9 +25,8 @@ function ConvertTo-VellumPdfPathOps {
             $pair = @($p)
             if ($pair.Count -ne 2) { throw "${CommandName}: each -Point must be an x,y pair." }
             foreach ($v in $pair) {
-                if ($v -isnot [ValueType] -or -not [double]::IsFinite([double]$v)) {
-                    throw "${CommandName}: -Point coordinates must be finite numbers."
-                }
+                if ($v -isnot [ValueType]) { throw "${CommandName}: -Point coordinates must be numbers." }
+                Assert-VellumPdfCoordinate $v 'Point' $CommandName
             }
             $ops.Add([pscustomobject]@{ Op = $(if ($first) { 'M' } else { 'L' }); Args = [double[]]@($pair[0], $pair[1]) })
             $first = $false
@@ -59,13 +58,14 @@ function ConvertTo-VellumPdfPathOps {
             throw "${CommandName}: path data must start with a command (M), found '$t'."
         }
         $n = $arity[$cmd]
+        if ($null -eq $n) { throw "${CommandName}: unsupported path command '$cmd'. Use absolute M, L, C and Z only." }
         if ($i + $n -gt $tokens.Count) { throw "${CommandName}: '$cmd' needs $n numbers." }
         $nums = [double[]]::new($n)
         for ($k = 0; $k -lt $n; $k++) {
             $tv = $tokens[$i + $k].Value
             if ($tv -notmatch "^$number$") { throw "${CommandName}: expected a number for '$cmd' but found '$tv'." }
             $nums[$k] = [double]::Parse($tv, [cultureinfo]::InvariantCulture)
-            if (-not [double]::IsFinite($nums[$k])) { throw "${CommandName}: path coordinates must be finite numbers." }
+            Assert-VellumPdfCoordinate $nums[$k] 'Data' $CommandName
         }
         $i += $n
         if ($cmd -ne 'M' -and -not $sawMove) { throw "${CommandName}: path data must start with M." }

@@ -66,32 +66,37 @@ function Add-VellumPdfLink {
     )
 
     process {
-        Assert-VellumPdfDocumentOpen -Document $Document -CommandName 'Add-VellumPdfLink'
-        $hasUri = $PSBoundParameters.ContainsKey('Uri')
-        $hasTarget = $PSBoundParameters.ContainsKey('TargetPage')
-        if ($hasUri -eq $hasTarget) { throw 'Add-VellumPdfLink: give exactly one of -Uri or -TargetPage.' }
-        if (-not [double]::IsFinite($X) -or -not [double]::IsFinite($Y)) { throw 'Add-VellumPdfLink: -X and -Y must be finite.' }
-        if ($hasUri -and ($PSBoundParameters.ContainsKey('DestLeft') -or $PSBoundParameters.ContainsKey('DestTop'))) {
-            throw 'Add-VellumPdfLink: -DestLeft/-DestTop apply to -TargetPage only.'
-        }
-        $pdfPage = Get-VellumPdfPage -Document $Document -Page $Page -CommandName 'Add-VellumPdfLink'
-        Write-VellumPdfUntaggedWarning -Document $Document -CommandName 'Add-VellumPdfLink' -What 'a link annotation'
+        try {
+            Assert-VellumPdfDocumentOpen -Document $Document -CommandName 'Add-VellumPdfLink'
+            $hasUri = $PSBoundParameters.ContainsKey('Uri')
+            $hasTarget = $PSBoundParameters.ContainsKey('TargetPage')
+            if ($hasUri -eq $hasTarget) { throw 'Add-VellumPdfLink: give exactly one of -Uri or -TargetPage.' }
+            Assert-VellumPdfCoordinate $X 'X' 'Add-VellumPdfLink'; Assert-VellumPdfCoordinate $Y 'Y' 'Add-VellumPdfLink'; Assert-VellumPdfCoordinate $Width 'Width' 'Add-VellumPdfLink'; Assert-VellumPdfCoordinate $Height 'Height' 'Add-VellumPdfLink'
+            if ($hasUri -and ($PSBoundParameters.ContainsKey('DestLeft') -or $PSBoundParameters.ContainsKey('DestTop'))) {
+                throw 'Add-VellumPdfLink: -DestLeft/-DestTop apply to -TargetPage only.'
+            }
+            $pdfPage = Get-VellumPdfPage -Document $Document -Page $Page -CommandName 'Add-VellumPdfLink'
+            Write-VellumPdfUntaggedWarning -Document $Document -CommandName 'Add-VellumPdfLink' -What 'a link annotation'
 
-        $link = [VellumPdf.Annotations.PdfLinkAnnotation]::new()
-        $link.Rect = [VellumPdf.Document.PdfRectangle]::new($X, $Y, $X + $Width, $Y + $Height)
-        $link.Flags = $Flags
-        if ($hasUri) {
-            $link.Uri = Test-VellumPdfLinkUri -Uri $Uri -Name '-Uri'
+            $link = [VellumPdf.Annotations.PdfLinkAnnotation]::new()
+            $link.Rect = [VellumPdf.Document.PdfRectangle]::new($X, $Y, $X + $Width, $Y + $Height)
+            $link.Flags = $Flags
+            if ($hasUri) {
+                $link.Uri = Test-VellumPdfLinkUri -Uri $Uri -Name '-Uri'
+            }
+            else {
+                $target = Get-VellumPdfPage -Document $Document -Page $TargetPage -CommandName 'Add-VellumPdfLink'
+                Assert-VellumPdfCoordinate $DestLeft 'DestLeft' 'Add-VellumPdfLink'
+                if ($PSBoundParameters.ContainsKey('DestTop')) { Assert-VellumPdfCoordinate $DestTop 'DestTop' 'Add-VellumPdfLink' }
+                $link.DestPage = $target
+                $link.DestLeft = $DestLeft
+                $link.DestTop = if ($PSBoundParameters.ContainsKey('DestTop')) { $DestTop } else { $target.MediaBox.UrY }
+            }
+            $Document.RegisterLinkAnnotation($pdfPage, $link)
+            $Document
         }
-        else {
-            $target = Get-VellumPdfPage -Document $Document -Page $TargetPage -CommandName 'Add-VellumPdfLink'
-            if (-not [double]::IsFinite($DestLeft)) { throw 'Add-VellumPdfLink: -DestLeft must be finite.' }
-            if ($PSBoundParameters.ContainsKey('DestTop') -and -not [double]::IsFinite($DestTop)) { throw 'Add-VellumPdfLink: -DestTop must be finite.' }
-            $link.DestPage = $target
-            $link.DestLeft = $DestLeft
-            $link.DestTop = if ($PSBoundParameters.ContainsKey('DestTop')) { $DestTop } else { $target.MediaBox.UrY }
+        catch {
+            $PSCmdlet.ThrowTerminatingError($_)
         }
-        $Document.RegisterLinkAnnotation($pdfPage, $link)
-        $Document
     }
 }

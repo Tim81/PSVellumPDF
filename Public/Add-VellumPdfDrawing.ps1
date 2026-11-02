@@ -77,31 +77,36 @@ function Add-VellumPdfDrawing {
     )
 
     process {
-        Assert-VellumPdfDocumentOpen -Document $Document -CommandName 'Add-VellumPdfDrawing'
-        if ($Decorative -and $AltText) {
-            throw 'Add-VellumPdfDrawing: -AltText and -Decorative cannot be combined.'
-        }
-        $staged = $Document.PSObject.Properties['PSVellumSignature']
-        if ($staged -and $staged.Value.ExternalSigner) {
-            throw ('Add-VellumPdfDrawing: this document is staged for signing with an -ExternalSigner, which signs ' +
-                'asynchronously and cannot run drawing script blocks. Sign with the certificate or an -ExternalPrivateKey instead.')
-        }
+        try {
+            Assert-VellumPdfDocumentOpen -Document $Document -CommandName 'Add-VellumPdfDrawing'
+            if ($Decorative -and $AltText) {
+                throw 'Add-VellumPdfDrawing: -AltText and -Decorative cannot be combined.'
+            }
+            $staged = $Document.PSObject.Properties['PSVellumSignature']
+            if ($staged -and $staged.Value.ExternalSigner) {
+                throw ('Add-VellumPdfDrawing: this document is staged for signing with an -ExternalSigner, which signs ' +
+                    'asynchronously and cannot run drawing script blocks. Sign with the certificate or an -ExternalPrivateKey instead.')
+            }
 
-        # Space deferred by the previous element's -MarginBottom goes above this block.
-        $top = if ($PSBoundParameters.ContainsKey('MarginTop')) { $MarginTop } else { 0.0 }
-        $pending = $Document.PSObject.Properties['PSVellumPendingSpace']
-        if ($pending -and $pending.Value) {
-            $top += [double]$pending.Value
-            $pending.Value = 0.0
-        }
+            # Space deferred by the previous element's -MarginBottom goes above this block.
+            $top = if ($PSBoundParameters.ContainsKey('MarginTop')) { $MarginTop } else { 0.0 }
+            $pending = $Document.PSObject.Properties['PSVellumPendingSpace']
+            if ($pending -and $pending.Value) {
+                $top += [double]$pending.Value
+                $pending.Value = 0.0
+            }
 
-        $renderer = [PSVellumPDF.Interop.ScriptBlockRenderer]::new($Height, $ScriptBlock, $AltText, [bool]$Decorative, $top, $MarginBottom)
-        [void]$Document.Add($renderer)
-        # Remember that the document holds script-block content: a signature
-        # produced asynchronously (external signer) cannot run it.
-        if (-not $Document.PSObject.Properties['PSVellumHasDrawing']) {
-            $Document.PSObject.Properties.Add([psnoteproperty]::new('PSVellumHasDrawing', $true))
+            $renderer = [PSVellumPDF.Interop.ScriptBlockRenderer]::new($Height, $ScriptBlock, $AltText, [bool]$Decorative, $top, $MarginBottom)
+            [void]$Document.Add($renderer)
+            # Remember that the document holds script-block content: a signature
+            # produced asynchronously (external signer) cannot run it.
+            if (-not $Document.PSObject.Properties['PSVellumHasDrawing']) {
+                $Document.PSObject.Properties.Add([psnoteproperty]::new('PSVellumHasDrawing', $true))
+            }
+            $Document
         }
-        $Document
+        catch {
+            $PSCmdlet.ThrowTerminatingError($_)
+        }
     }
 }

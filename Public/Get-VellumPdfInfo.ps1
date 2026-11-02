@@ -17,7 +17,7 @@ function Get-VellumPdfInfo {
         output intents and named destinations. The reader does not verify
         a signature, so this does not tell you whether one is valid.
     .PARAMETER Path
-        The PDF file(s). Accepts wildcards and pipeline input by property name.
+        The PDF file(s). Accepts wildcards. Piped strings bind here; piped FileInfo objects (Get-ChildItem) bind to -LiteralPath through their PSPath, so names containing [ ] work.
     .PARAMETER LiteralPath
         The PDF file(s), taken literally.
     .PARAMETER Bytes
@@ -48,8 +48,7 @@ function Get-VellumPdfInfo {
     [CmdletBinding(DefaultParameterSetName = 'Path')]
     [OutputType('PSVellumPDF.PdfInfo')]
     param(
-        [Parameter(Mandatory, Position = 0, ValueFromPipeline, ValueFromPipelineByPropertyName, ParameterSetName = 'Path')]
-        [Alias('FullName')]
+        [Parameter(Mandatory, Position = 0, ValueFromPipeline, ParameterSetName = 'Path')]
         [string[]]$Path,
 
         [Parameter(Mandatory, ValueFromPipelineByPropertyName, ParameterSetName = 'LiteralPath')]
@@ -57,6 +56,7 @@ function Get-VellumPdfInfo {
         [string[]]$LiteralPath,
 
         [Parameter(Mandatory, ParameterSetName = 'Bytes')]
+        [AllowEmptyCollection()]
         [byte[]]$Bytes,
 
         [securestring]$Password,
@@ -78,105 +78,115 @@ function Get-VellumPdfInfo {
     )
 
     begin {
-        $limits = @{}
-        foreach ($n in 'MaxDecodedStreamBytes', 'MaxDiagnostics', 'MaxFormXObjectDepth', 'ReconstructionBudgetMultiplier') {
-            if ($PSBoundParameters.ContainsKey($n)) { $limits[$n] = $PSBoundParameters[$n] }
+        try {
+            $limits = @{}
+            foreach ($n in 'MaxDecodedStreamBytes', 'MaxDiagnostics', 'MaxFormXObjectDepth', 'ReconstructionBudgetMultiplier') {
+                if ($PSBoundParameters.ContainsKey($n)) { $limits[$n] = $PSBoundParameters[$n] }
+            }
+            $plain = if ($Password) { [System.Net.NetworkCredential]::new('', $Password).Password }
         }
-        $plain = if ($Password) { [System.Net.NetworkCredential]::new('', $Password).Password }
+        catch {
+            $PSCmdlet.ThrowTerminatingError($_)
+        }
     }
 
     process {
-        foreach ($source in Get-VellumPdfInput -Path $Path -LiteralPath $LiteralPath -Bytes $Bytes -CommandName 'Get-VellumPdfInfo') {
-            $reader = Open-VellumPdfReader -Limit $limits -Bytes $source.Data -Password $plain -AllowReconstruction:$AllowReconstruction `
-                -CommandName 'Get-VellumPdfInfo' -Source $source.Name
-            try {
-                $pages = @(foreach ($p in $reader.Pages) {
-                        [pscustomobject]@{
-                            PSTypeName = 'PSVellumPDF.PdfPageInfo'
-                            Page       = $p.Index + 1
-                            Width      = $p.MediaBox.Width
-                            Height     = $p.MediaBox.Height
-                            Rotate     = $p.Rotate
-                            MediaBox   = @($p.MediaBox.LlX, $p.MediaBox.LlY, $p.MediaBox.UrX, $p.MediaBox.UrY)
-                            CropBox    = @($p.CropBox.LlX, $p.CropBox.LlY, $p.CropBox.UrX, $p.CropBox.UrY)
-                        }
-                    })
+        try {
+            foreach ($source in Get-VellumPdfInput -Path $Path -LiteralPath $LiteralPath -Bytes $Bytes -CommandName 'Get-VellumPdfInfo') {
+                $reader = Open-VellumPdfReader -Limit $limits -Bytes $source.Data -Password $plain -AllowReconstruction:$AllowReconstruction `
+                    -CommandName 'Get-VellumPdfInfo' -Source $source.Name
+                try {
+                    $pages = @(foreach ($p in $reader.Pages) {
+                            [pscustomobject]@{
+                                PSTypeName = 'PSVellumPDF.PdfPageInfo'
+                                Page       = $p.Index + 1
+                                Width      = $p.MediaBox.Width
+                                Height     = $p.MediaBox.Height
+                                Rotate     = $p.Rotate
+                                MediaBox   = @($p.MediaBox.LlX, $p.MediaBox.LlY, $p.MediaBox.UrX, $p.MediaBox.UrY)
+                                CropBox    = @($p.CropBox.LlX, $p.CropBox.LlY, $p.CropBox.UrX, $p.CropBox.UrY)
+                            }
+                        })
 
-                $encryption = if ($reader.Encryption) {
-                    $e = $reader.Encryption
+                    $encryption = if ($reader.Encryption) {
+                        $e = $reader.Encryption
+                        [pscustomobject]@{
+                            PSTypeName      = 'PSVellumPDF.PdfEncryptionInfo'
+                            Version         = $e.V
+                            Revision        = $e.R
+                            KeyLengthBits   = $e.KeyLengthBits
+                            StreamCipher    = [string]$e.StreamCipher
+                            StringCipher    = [string]$e.StringCipher
+                            Permissions     = [string]$e.Permissions
+                            IsOwnerAccess   = $e.IsOwnerAccess
+                            EncryptMetadata = $e.EncryptMetadata
+                        }
+                    }
+
+                    $signatures = @(foreach ($sig in $reader.Signatures) {
+                            $range = $sig.ByteRange.ToArray()
+                            [pscustomobject]@{
+                                PSTypeName     = 'PSVellumPDF.PdfSignatureInfo'
+                                SubFilter      = if ($sig.SubFilter) { [string]$sig.SubFilter.Value } else { $null }
+                                SigningTime    = $sig.SigningTime
+                                ByteRange      = $range
+                                ContentsLength = $sig.Contents.Length
+                            }
+                        })
+
+                    $diagnostics = @(foreach ($d in $reader.Diagnostics) {
+                            [pscustomobject]@{
+                                PSTypeName = 'PSVellumPDF.PdfReaderDiagnostic'
+                                Severity   = [string]$d.Severity
+                                Code       = [string]$d.Code
+                                Message    = $d.Message
+                                Page       = if ($null -ne $d.PageIndex) { $d.PageIndex + 1 }
+                                ObjectNumber = $d.ObjectNumber
+                                Generation   = $d.Generation
+                            }
+                        })
+
+                    # The catalog's entries cannot be enumerated through the public API, so report
+                    # the presence of the ones that matter for accessibility and navigation.
+                    $has = { param($key) $null -ne $reader.Catalog.Get([VellumPdf.Core.PdfName]::new($key)) }
+                    $features = [pscustomobject]@{
+                        PSTypeName       = 'PSVellumPDF.PdfCatalogInfo'
+                        HasLanguage      = & $has 'Lang'
+                        IsTagged         = & $has 'StructTreeRoot'
+                        HasMetadata      = & $has 'Metadata'
+                        HasOutline       = & $has 'Outlines'
+                        HasForm          = & $has 'AcroForm'
+                        HasOutputIntents = & $has 'OutputIntents'
+                        HasNamedDests    = & $has 'Names'
+                    }
+
+                    $claimed = @()
+                    try {
+                        $claimed = @([VellumPdf.Conformance.PdfPreflight]::DetectClaimedProfiles($source.Data, $plain) |
+                                ForEach-Object { switch ($_) { 'PdfA2B' { 'PdfA2b' } 'PdfA2U' { 'PdfA2u' } 'PdfA2A' { 'PdfA2a' } default { [string]$_ } } })
+                    }
+                    catch { Write-Verbose "Could not detect claimed profiles: $($_.Exception.Message)" }
+
                     [pscustomobject]@{
-                        PSTypeName      = 'PSVellumPDF.PdfEncryptionInfo'
-                        Version         = $e.V
-                        Revision        = $e.R
-                        KeyLengthBits   = $e.KeyLengthBits
-                        StreamCipher    = [string]$e.StreamCipher
-                        StringCipher    = [string]$e.StringCipher
-                        Permissions     = [string]$e.Permissions
-                        IsOwnerAccess   = $e.IsOwnerAccess
-                        EncryptMetadata = $e.EncryptMetadata
+                        PSTypeName       = 'PSVellumPDF.PdfInfo'
+                        Path             = $source.Name
+                        SizeBytes        = $source.Data.Length
+                        PageCount        = $reader.PageCount
+                        Pages            = $pages
+                        IsEncrypted      = [bool]$reader.Encryption
+                        Encryption       = $encryption
+                        Signatures       = $signatures
+                        ClaimedProfiles  = $claimed
+                        WasReconstructed = $reader.WasReconstructed
+                        Diagnostics      = $diagnostics
+                        Catalog          = $features
                     }
                 }
-
-                $signatures = @(foreach ($sig in $reader.Signatures) {
-                        $range = $sig.ByteRange.ToArray()
-                        [pscustomobject]@{
-                            PSTypeName     = 'PSVellumPDF.PdfSignatureInfo'
-                            SubFilter      = if ($sig.SubFilter) { [string]$sig.SubFilter.Value } else { $null }
-                            SigningTime    = $sig.SigningTime
-                            ByteRange      = $range
-                            ContentsLength = $sig.Contents.Length
-                        }
-                    })
-
-                $diagnostics = @(foreach ($d in $reader.Diagnostics) {
-                        [pscustomobject]@{
-                            PSTypeName = 'PSVellumPDF.PdfReaderDiagnostic'
-                            Severity   = [string]$d.Severity
-                            Code       = [string]$d.Code
-                            Message    = $d.Message
-                            Page       = if ($null -ne $d.PageIndex) { $d.PageIndex + 1 }
-                            ObjectNumber = $d.ObjectNumber
-                            Generation   = $d.Generation
-                        }
-                    })
-
-                # The catalog's entries cannot be enumerated through the public API, so report
-                # the presence of the ones that matter for accessibility and navigation.
-                $has = { param($key) $null -ne $reader.Catalog.Get([VellumPdf.Core.PdfName]::new($key)) }
-                $features = [pscustomobject]@{
-                    PSTypeName       = 'PSVellumPDF.PdfCatalogInfo'
-                    HasLanguage      = & $has 'Lang'
-                    IsTagged         = & $has 'StructTreeRoot'
-                    HasMetadata      = & $has 'Metadata'
-                    HasOutline       = & $has 'Outlines'
-                    HasForm          = & $has 'AcroForm'
-                    HasOutputIntents = & $has 'OutputIntents'
-                    HasNamedDests    = & $has 'Names'
-                }
-
-                $claimed = @()
-                try {
-                    $claimed = @([VellumPdf.Conformance.PdfPreflight]::DetectClaimedProfiles($source.Data, $plain) |
-                            ForEach-Object { switch ($_) { 'PdfA2B' { 'PdfA2b' } 'PdfA2U' { 'PdfA2u' } 'PdfA2A' { 'PdfA2a' } default { [string]$_ } } })
-                }
-                catch { Write-Verbose "Could not detect claimed profiles: $($_.Exception.Message)" }
-
-                [pscustomobject]@{
-                    PSTypeName       = 'PSVellumPDF.PdfInfo'
-                    Path             = $source.Name
-                    SizeBytes        = $source.Data.Length
-                    PageCount        = $reader.PageCount
-                    Pages            = $pages
-                    IsEncrypted      = [bool]$reader.Encryption
-                    Encryption       = $encryption
-                    Signatures       = $signatures
-                    ClaimedProfiles  = $claimed
-                    WasReconstructed = $reader.WasReconstructed
-                    Diagnostics      = $diagnostics
-                    Catalog          = $features
-                }
+                finally { $reader.Dispose() }
             }
-            finally { $reader.Dispose() }
+        }
+        catch {
+            $PSCmdlet.ThrowTerminatingError($_)
         }
     }
 }

@@ -154,34 +154,39 @@ function Add-VellumPdfPageBarcode {
     )
 
     process {
-        Assert-VellumPdfDocumentOpen -Document $Document -CommandName 'Add-VellumPdfPageBarcode'
-        if (-not [double]::IsFinite($X) -or -not [double]::IsFinite($Y)) { throw 'Add-VellumPdfPageBarcode: -X and -Y must be finite.' }
-        # Validates -Page up front (the canvas lookup below would do so too, but after building the symbol).
-        [void](Get-VellumPdfPage -Document $Document -Page $Page -CommandName 'Add-VellumPdfPageBarcode')
-        $isPdfA = $Document.Conformance -in @([VellumPdf.Document.PdfConformance]::PdfA2b, [VellumPdf.Document.PdfConformance]::PdfA2u,
-            [VellumPdf.Document.PdfConformance]::PdfA2a)
-
         try {
-            $barcode = New-VellumPdfBarcodeSet -Parameters $PSBoundParameters -IsPdfA $isPdfA -ParameterSetName $PSCmdlet.ParameterSetName |
-                Select-Object -First 1
+            Assert-VellumPdfDocumentOpen -Document $Document -CommandName 'Add-VellumPdfPageBarcode'
+            Assert-VellumPdfCoordinate $X 'X' 'Add-VellumPdfPageBarcode'; Assert-VellumPdfCoordinate $Y 'Y' 'Add-VellumPdfPageBarcode'
+            # Validates -Page up front (the canvas lookup below would do so too, but after building the symbol).
+            [void](Get-VellumPdfPage -Document $Document -Page $Page -CommandName 'Add-VellumPdfPageBarcode')
+            $isPdfA = $Document.Conformance -in @([VellumPdf.Document.PdfConformance]::PdfA2b, [VellumPdf.Document.PdfConformance]::PdfA2u,
+                [VellumPdf.Document.PdfConformance]::PdfA2a)
+
+            try {
+                $barcode = New-VellumPdfBarcodeSet -Parameters $PSBoundParameters -IsPdfA $isPdfA -ParameterSetName $PSCmdlet.ParameterSetName |
+                    Select-Object -First 1
+            }
+            catch {
+                throw ($_.Exception.Message -replace '^Add-VellumPdfBarcode:', 'Add-VellumPdfPageBarcode:')
+            }
+
+            $canvas = Get-VellumPdfPageCanvas -Document $Document -Page $Page -CommandName 'Add-VellumPdfPageBarcode'
+            $fontResource = if ($barcode -is [VellumPdf.Barcodes.Barcode1D] -and $barcode.ShowText) { $Document.UseFont($barcode.TextFont) }
+            if ($Decorative -and $AltText) { throw 'Add-VellumPdfPageBarcode: -AltText and -Decorative cannot be combined.' }
+            $kind = if ($Decorative) { 'Artifact' } else { 'Structure' }
+            # Tagged documents: a data-bearing symbol is a Figure; default alternate text names the symbology.
+            $alt = if ($AltText) { $AltText } elseif ($Content) { "$Type barcode: $Content" } else { "$Type barcode" }
+            [void]$canvas.SaveState()
+            try {
+                Invoke-VellumPdfTagged -Document $Document -Canvas $canvas -PdfPage $Document.Pages[$Page - 1] -Kind $kind -StructType Figure -AltText $alt -Draw {
+                    [void][VellumPdf.Barcodes.BarcodeCanvasExtensions]::DrawBarcode($canvas, $barcode, $X, $Y, $fontResource)
+                }
+            }
+            finally { [void]$canvas.RestoreState() }
+            $Document
         }
         catch {
-            throw ($_.Exception.Message -replace '^Add-VellumPdfBarcode:', 'Add-VellumPdfPageBarcode:')
+            $PSCmdlet.ThrowTerminatingError($_)
         }
-
-        $canvas = Get-VellumPdfPageCanvas -Document $Document -Page $Page -CommandName 'Add-VellumPdfPageBarcode'
-        $fontResource = if ($barcode -is [VellumPdf.Barcodes.Barcode1D] -and $barcode.ShowText) { $Document.UseFont($barcode.TextFont) }
-        if ($Decorative -and $AltText) { throw 'Add-VellumPdfPageBarcode: -AltText and -Decorative cannot be combined.' }
-        $kind = if ($Decorative) { 'Artifact' } else { 'Structure' }
-        # Tagged documents: a data-bearing symbol is a Figure; default alternate text names the symbology.
-        $alt = if ($AltText) { $AltText } elseif ($Content) { "$Type barcode: $Content" } else { "$Type barcode" }
-        [void]$canvas.SaveState()
-        try {
-            Invoke-VellumPdfTagged -Document $Document -Canvas $canvas -PdfPage $Document.Pages[$Page - 1] -Kind $kind -StructType Figure -AltText $alt -Draw {
-                [void][VellumPdf.Barcodes.BarcodeCanvasExtensions]::DrawBarcode($canvas, $barcode, $X, $Y, $fontResource)
-            }
-        }
-        finally { [void]$canvas.RestoreState() }
-        $Document
     }
 }

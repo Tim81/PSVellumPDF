@@ -83,8 +83,13 @@ function Set-VellumPdfHeader {
     )
 
     process {
-        Set-VellumPdfBand -Document $Document -Kind Header -Template $Template -Font $Font -FontSize $FontSize `
-            -FontHandle $FontHandle -Color $Color -Height $Height -Alignment $Alignment `
-            -BoundParameters $PSBoundParameters
+        try {
+            Set-VellumPdfBand -Document $Document -Kind Header -Template $Template -Font $Font -FontSize $FontSize `
+                -FontHandle $FontHandle -Color $Color -Height $Height -Alignment $Alignment `
+                -BoundParameters $PSBoundParameters
+        }
+        catch {
+            $PSCmdlet.ThrowTerminatingError($_)
+        }
     }
 }

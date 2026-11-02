@@ -265,54 +265,59 @@ function Add-VellumPdfBarcode {
     )
 
     process {
-        Assert-VellumPdfDocumentOpen -Document $Document -CommandName 'Add-VellumPdfBarcode'
-        $bound = $PSBoundParameters
-        $isPdfA = $Document.Conformance -in @(
-            [VellumPdf.Document.PdfConformance]::PdfA2b,
-            [VellumPdf.Document.PdfConformance]::PdfA2u,
-            [VellumPdf.Document.PdfConformance]::PdfA2a)
+        try {
+            Assert-VellumPdfDocumentOpen -Document $Document -CommandName 'Add-VellumPdfBarcode'
+            $bound = $PSBoundParameters
+            $isPdfA = $Document.Conformance -in @(
+                [VellumPdf.Document.PdfConformance]::PdfA2b,
+                [VellumPdf.Document.PdfConformance]::PdfA2u,
+                [VellumPdf.Document.PdfConformance]::PdfA2a)
 
-        # Option validation and symbol construction are shared with Add-VellumPdfPageBarcode.
-        $barcodes = @(New-VellumPdfBarcodeSet -Parameters $PSBoundParameters -IsPdfA $isPdfA -ParameterSetName $PSCmdlet.ParameterSetName)
+            # Option validation and symbol construction are shared with Add-VellumPdfPageBarcode.
+            $barcodes = @(New-VellumPdfBarcodeSet -Parameters $PSBoundParameters -IsPdfA $isPdfA -ParameterSetName $PSCmdlet.ParameterSetName)
 
-        if ($FontHandle) {
-            Assert-VellumPdfFontHandle -FontHandle $FontHandle -Document $Document -CommandName 'Add-VellumPdfBarcode'
-        }
-        if ($FontHandle -and -not $Caption) {
-            throw 'Add-VellumPdfBarcode: -FontHandle is only used for -Caption; add -Caption or drop -FontHandle.'
-        }
-
-        $contentWidth = $Document.PageSize.Width - $Document.Margins.Left - $Document.Margins.Right
-        foreach ($barcode in $barcodes) {
-            # Top/bottom go through the shared helper (which also adds any space the
-            # previous element's -MarginBottom deferred); left/right are set directly.
-            Set-VellumPdfElementMargin -Element $barcode -Top $MarginTop -Bottom $MarginBottom `
-                -BoundParameters $PSBoundParameters -Document $Document
-            if ($bound.ContainsKey('MarginLeft') -or $bound.ContainsKey('MarginRight')) {
-                $edges = $barcode.Margins
-                $barcode.Margins = [VellumPdf.Layout.Core.EdgeInsets]::new($edges.Top,
-                    $(if ($bound.ContainsKey('MarginRight')) { $MarginRight } else { $edges.Right }),
-                    $edges.Bottom,
-                    $(if ($bound.ContainsKey('MarginLeft')) { $MarginLeft } else { $edges.Left }))
+            if ($FontHandle) {
+                Assert-VellumPdfFontHandle -FontHandle $FontHandle -Document $Document -CommandName 'Add-VellumPdfBarcode'
+            }
+            if ($FontHandle -and -not $Caption) {
+                throw 'Add-VellumPdfBarcode: -FontHandle is only used for -Caption; add -Caption or drop -FontHandle.'
             }
 
-            $size = $barcode.Measure()
-            if ($size.Width -gt $contentWidth) {
-                throw ("Add-VellumPdfBarcode: the symbol is $([math]::Round($size.Width, 1))pt wide but the page content area " +
-                    "is only $([math]::Round($contentWidth, 1))pt. Reduce -ModuleSize/-TargetWidth or the margins.")
+            $contentWidth = $Document.PageSize.Width - $Document.Margins.Left - $Document.Margins.Right
+            foreach ($barcode in $barcodes) {
+                # Top/bottom go through the shared helper (which also adds any space the
+                # previous element's -MarginBottom deferred); left/right are set directly.
+                Set-VellumPdfElementMargin -Element $barcode -Top $MarginTop -Bottom $MarginBottom `
+                    -BoundParameters $PSBoundParameters -Document $Document
+                if ($bound.ContainsKey('MarginLeft') -or $bound.ContainsKey('MarginRight')) {
+                    $edges = $barcode.Margins
+                    $barcode.Margins = [VellumPdf.Layout.Core.EdgeInsets]::new($edges.Top,
+                        $(if ($bound.ContainsKey('MarginRight')) { $MarginRight } else { $edges.Right }),
+                        $edges.Bottom,
+                        $(if ($bound.ContainsKey('MarginLeft')) { $MarginLeft } else { $edges.Left }))
+                }
+
+                $size = $barcode.Measure()
+                if ($size.Width -gt $contentWidth) {
+                    throw ("Add-VellumPdfBarcode: the symbol is $([math]::Round($size.Width, 1))pt wide but the page content area " +
+                        "is only $([math]::Round($contentWidth, 1))pt. Reduce -ModuleSize/-TargetWidth or the margins.")
+                }
             }
-        }
 
-        # --- add to the document ----------------------------------------------------
-        foreach ($barcode in $barcodes) {
-            [void][VellumPdf.Barcodes.DocumentBarcodeExtensions]::Add($Document, $barcode)
-        }
+            # --- add to the document ----------------------------------------------------
+            foreach ($barcode in $barcodes) {
+                [void][VellumPdf.Barcodes.DocumentBarcodeExtensions]::Add($Document, $barcode)
+            }
 
-        if ($Caption) {
-            $captionArgs = @{ Document = $Document; Text = $Caption; Alignment = $Alignment }
-            if ($FontHandle) { $captionArgs['FontHandle'] = $FontHandle }
-            [void](Add-VellumPdfParagraph @captionArgs)
+            if ($Caption) {
+                $captionArgs = @{ Document = $Document; Text = $Caption; Alignment = $Alignment }
+                if ($FontHandle) { $captionArgs['FontHandle'] = $FontHandle }
+                [void](Add-VellumPdfParagraph @captionArgs)
+            }
+            $Document
         }
-        $Document
+        catch {
+            $PSCmdlet.ThrowTerminatingError($_)
+        }
     }
 }

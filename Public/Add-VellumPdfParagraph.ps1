@@ -128,74 +128,79 @@ function Add-VellumPdfParagraph {
     )
 
     process {
-        Assert-VellumPdfDocumentOpen -Document $Document -CommandName 'Add-VellumPdfParagraph'
-        if ($FontHandle) {
-            Assert-VellumPdfFontHandle -FontHandle $FontHandle -Document $Document -CommandName 'Add-VellumPdfParagraph'
-        }
+        try {
+            Assert-VellumPdfDocumentOpen -Document $Document -CommandName 'Add-VellumPdfParagraph'
+            if ($FontHandle) {
+                Assert-VellumPdfFontHandle -FontHandle $FontHandle -Document $Document -CommandName 'Add-VellumPdfParagraph'
+            }
 
-        if ($PSCmdlet.ParameterSetName -eq 'Runs') {
-            if ($Run | Where-Object { $_.Style.LinkUri }) {
+            if ($PSCmdlet.ParameterSetName -eq 'Runs') {
+                if ($Run | Where-Object { $_.Style.LinkUri }) {
+                    Write-VellumPdfLinkConformanceWarning -Document $Document -CommandName 'Add-VellumPdfParagraph'
+                }
+                $paragraph = [VellumPdf.Layout.Elements.Paragraph]::new(
+                    [System.Collections.Generic.List[VellumPdf.Layout.Elements.TextRun]]$Run)
+                $paragraph.Alignment = [VellumPdf.Layout.Core.HorizontalAlignment]::$Alignment
+                if ($Language) { $paragraph.Language = $Language }
+                Set-VellumPdfElementMargin -Element $paragraph -Top $MarginTop -Bottom $MarginBottom `
+                    -BoundParameters $PSBoundParameters -Document $Document -DeferBottom
+                [void]$Document.Add($paragraph)
+                return $Document
+            }
+
+            # --- Text parameter set ---
+            if ($PSBoundParameters.ContainsKey('LinkUri') -and $LinkUri) {
                 Write-VellumPdfLinkConformanceWarning -Document $Document -CommandName 'Add-VellumPdfParagraph'
             }
-            $paragraph = [VellumPdf.Layout.Elements.Paragraph]::new(
-                [System.Collections.Generic.List[VellumPdf.Layout.Elements.TextRun]]$Run)
+            if (-not $FontHandle) {
+                Write-VellumPdfEncodingWarning -Text $Text -CommandName 'Add-VellumPdfParagraph'
+            }
+            $wantsColor   = $PSBoundParameters.ContainsKey('Color')
+            if ($wantsColor) { $Color = ConvertTo-VellumColor $Color }
+            $wantsLink    = $PSBoundParameters.ContainsKey('LinkUri') -and ($LinkUri -ne '')
+            $wantsLeading = $PSBoundParameters.ContainsKey('Leading')
+            $wantsFont    = [bool]$Font -or $PSBoundParameters.ContainsKey('FontSize') -or $FontHandle
+            $wantsStyle   = $wantsFont -or $wantsColor -or $wantsLink -or $wantsLeading
+
+            if (-not $wantsStyle -and $Alignment -eq 'Left' -and -not $Language `
+                    -and -not $PSBoundParameters.ContainsKey('MarginTop') `
+                    -and -not $PSBoundParameters.ContainsKey('MarginBottom') `
+                    -and -not $Document.PSObject.Properties['PSVellumPendingSpace']?.Value) {
+                # No overrides at all: use the document's default font.
+                [void]$Document.Add($Text, $null)
+                return $Document
+            }
+
+            # An explicit Paragraph needs a complete style: VellumPdf renders any
+            # style without a font in the library-global Helvetica, NOT the document
+            # default. Fill gaps from the stashed document defaults instead.
+            $default = Resolve-VellumPdfDefault -Document $Document
+            $effSize = if ($PSBoundParameters.ContainsKey('FontSize')) { $FontSize } else { $default.FontSize }
+            if ($FontHandle) {
+                $sp = @{ FontHandle = $FontHandle; FontSize = $effSize }
+                if ($wantsColor)   { $sp['Color']   = $Color }
+                if ($wantsLink)    { $sp['LinkUri'] = $LinkUri }
+                if ($wantsLeading) { $sp['Leading'] = $Leading }
+                $style = New-VellumTextStyle @sp
+            } else {
+                $effFont = if ($Font) { $Font } else { $default.Font }
+                $sp = @{ Font = $effFont; FontSize = $effSize }
+                if ($wantsColor)   { $sp['Color']   = $Color }
+                if ($wantsLink)    { $sp['LinkUri'] = $LinkUri }
+                if ($wantsLeading) { $sp['Leading'] = $Leading }
+                $style = New-VellumTextStyle @sp
+            }
+
+            $paragraph = [VellumPdf.Layout.Elements.Paragraph]::new($Text, $style)
             $paragraph.Alignment = [VellumPdf.Layout.Core.HorizontalAlignment]::$Alignment
             if ($Language) { $paragraph.Language = $Language }
             Set-VellumPdfElementMargin -Element $paragraph -Top $MarginTop -Bottom $MarginBottom `
                 -BoundParameters $PSBoundParameters -Document $Document -DeferBottom
             [void]$Document.Add($paragraph)
-            return $Document
+            $Document
         }
-
-        # --- Text parameter set ---
-        if ($PSBoundParameters.ContainsKey('LinkUri') -and $LinkUri) {
-            Write-VellumPdfLinkConformanceWarning -Document $Document -CommandName 'Add-VellumPdfParagraph'
+        catch {
+            $PSCmdlet.ThrowTerminatingError($_)
         }
-        if (-not $FontHandle) {
-            Write-VellumPdfEncodingWarning -Text $Text -CommandName 'Add-VellumPdfParagraph'
-        }
-        $wantsColor   = $PSBoundParameters.ContainsKey('Color')
-        if ($wantsColor) { $Color = ConvertTo-VellumColor $Color }
-        $wantsLink    = $PSBoundParameters.ContainsKey('LinkUri') -and ($LinkUri -ne '')
-        $wantsLeading = $PSBoundParameters.ContainsKey('Leading')
-        $wantsFont    = [bool]$Font -or $PSBoundParameters.ContainsKey('FontSize') -or $FontHandle
-        $wantsStyle   = $wantsFont -or $wantsColor -or $wantsLink -or $wantsLeading
-
-        if (-not $wantsStyle -and $Alignment -eq 'Left' -and -not $Language `
-                -and -not $PSBoundParameters.ContainsKey('MarginTop') `
-                -and -not $PSBoundParameters.ContainsKey('MarginBottom') `
-                -and -not $Document.PSObject.Properties['PSVellumPendingSpace']?.Value) {
-            # No overrides at all: use the document's default font.
-            [void]$Document.Add($Text, $null)
-            return $Document
-        }
-
-        # An explicit Paragraph needs a complete style: VellumPdf renders any
-        # style without a font in the library-global Helvetica, NOT the document
-        # default. Fill gaps from the stashed document defaults instead.
-        $default = Resolve-VellumPdfDefault -Document $Document
-        $effSize = if ($PSBoundParameters.ContainsKey('FontSize')) { $FontSize } else { $default.FontSize }
-        if ($FontHandle) {
-            $sp = @{ FontHandle = $FontHandle; FontSize = $effSize }
-            if ($wantsColor)   { $sp['Color']   = $Color }
-            if ($wantsLink)    { $sp['LinkUri'] = $LinkUri }
-            if ($wantsLeading) { $sp['Leading'] = $Leading }
-            $style = New-VellumTextStyle @sp
-        } else {
-            $effFont = if ($Font) { $Font } else { $default.Font }
-            $sp = @{ Font = $effFont; FontSize = $effSize }
-            if ($wantsColor)   { $sp['Color']   = $Color }
-            if ($wantsLink)    { $sp['LinkUri'] = $LinkUri }
-            if ($wantsLeading) { $sp['Leading'] = $Leading }
-            $style = New-VellumTextStyle @sp
-        }
-
-        $paragraph = [VellumPdf.Layout.Elements.Paragraph]::new($Text, $style)
-        $paragraph.Alignment = [VellumPdf.Layout.Core.HorizontalAlignment]::$Alignment
-        if ($Language) { $paragraph.Language = $Language }
-        Set-VellumPdfElementMargin -Element $paragraph -Top $MarginTop -Bottom $MarginBottom `
-            -BoundParameters $PSBoundParameters -Document $Document -DeferBottom
-        [void]$Document.Add($paragraph)
-        $Document
     }
 }

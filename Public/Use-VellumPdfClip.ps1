@@ -74,49 +74,54 @@ function Use-VellumPdfClip {
     )
 
     process {
-        Assert-VellumPdfDocumentOpen -Document $Document -CommandName 'Use-VellumPdfClip'
-        switch ($PSCmdlet.ParameterSetName) {
-            'Data' { $ops = ConvertTo-VellumPdfPathOps -Data $Data -CommandName 'Use-VellumPdfClip' }
-            'Point' { $ops = ConvertTo-VellumPdfPathOps -Point $Point -Close -CommandName 'Use-VellumPdfClip' }
-            default {
-                foreach ($v in $X, $Y, $Width, $Height) {
-                    if (-not [double]::IsFinite($v)) { throw 'Use-VellumPdfClip: coordinates and sizes must be finite numbers.' }
-                }
-                if ($Ellipse) {
-                    $k = 0.5522847498
-                    $rx = $Width / 2; $ry = $Height / 2
-                    $cx = $X + $rx; $cy = $Y + $ry
-                    $kx = $k * $rx; $ky = $k * $ry
-                    $ops = @(
-                        [pscustomobject]@{ Op = 'M'; Args = [double[]]@(($cx + $rx), $cy) }
-                        [pscustomobject]@{ Op = 'C'; Args = [double[]]@(($cx + $rx), ($cy + $ky), ($cx + $kx), ($cy + $ry), $cx, ($cy + $ry)) }
-                        [pscustomobject]@{ Op = 'C'; Args = [double[]]@(($cx - $kx), ($cy + $ry), ($cx - $rx), ($cy + $ky), ($cx - $rx), $cy) }
-                        [pscustomobject]@{ Op = 'C'; Args = [double[]]@(($cx - $rx), ($cy - $ky), ($cx - $kx), ($cy - $ry), $cx, ($cy - $ry)) }
-                        [pscustomobject]@{ Op = 'C'; Args = [double[]]@(($cx + $kx), ($cy - $ry), ($cx + $rx), ($cy - $ky), ($cx + $rx), $cy) }
-                        [pscustomobject]@{ Op = 'Z'; Args = [double[]]@() }
-                    )
-                }
-                else {
-                    $ops = @(
-                        [pscustomobject]@{ Op = 'M'; Args = [double[]]@($X, $Y) }
-                        [pscustomobject]@{ Op = 'L'; Args = [double[]]@(($X + $Width), $Y) }
-                        [pscustomobject]@{ Op = 'L'; Args = [double[]]@(($X + $Width), ($Y + $Height)) }
-                        [pscustomobject]@{ Op = 'L'; Args = [double[]]@($X, ($Y + $Height)) }
-                        [pscustomobject]@{ Op = 'Z'; Args = [double[]]@() }
-                    )
+        try {
+            Assert-VellumPdfDocumentOpen -Document $Document -CommandName 'Use-VellumPdfClip'
+            switch ($PSCmdlet.ParameterSetName) {
+                'Data' { $ops = ConvertTo-VellumPdfPathOps -Data $Data -CommandName 'Use-VellumPdfClip' }
+                'Point' { $ops = ConvertTo-VellumPdfPathOps -Point $Point -Close -CommandName 'Use-VellumPdfClip' }
+                default {
+                    foreach ($pair in @('X', $X), @('Y', $Y), @('Width', $Width), @('Height', $Height)) {
+                        Assert-VellumPdfCoordinate $pair[1] $pair[0] 'Use-VellumPdfClip'
+                    }
+                    if ($Ellipse) {
+                        $k = 0.5522847498
+                        $rx = $Width / 2; $ry = $Height / 2
+                        $cx = $X + $rx; $cy = $Y + $ry
+                        $kx = $k * $rx; $ky = $k * $ry
+                        $ops = @(
+                            [pscustomobject]@{ Op = 'M'; Args = [double[]]@(($cx + $rx), $cy) }
+                            [pscustomobject]@{ Op = 'C'; Args = [double[]]@(($cx + $rx), ($cy + $ky), ($cx + $kx), ($cy + $ry), $cx, ($cy + $ry)) }
+                            [pscustomobject]@{ Op = 'C'; Args = [double[]]@(($cx - $kx), ($cy + $ry), ($cx - $rx), ($cy + $ky), ($cx - $rx), $cy) }
+                            [pscustomobject]@{ Op = 'C'; Args = [double[]]@(($cx - $rx), ($cy - $ky), ($cx - $kx), ($cy - $ry), $cx, ($cy - $ry)) }
+                            [pscustomobject]@{ Op = 'C'; Args = [double[]]@(($cx + $kx), ($cy - $ry), ($cx + $rx), ($cy - $ky), ($cx + $rx), $cy) }
+                            [pscustomobject]@{ Op = 'Z'; Args = [double[]]@() }
+                        )
+                    }
+                    else {
+                        $ops = @(
+                            [pscustomobject]@{ Op = 'M'; Args = [double[]]@($X, $Y) }
+                            [pscustomobject]@{ Op = 'L'; Args = [double[]]@(($X + $Width), $Y) }
+                            [pscustomobject]@{ Op = 'L'; Args = [double[]]@(($X + $Width), ($Y + $Height)) }
+                            [pscustomobject]@{ Op = 'L'; Args = [double[]]@($X, ($Y + $Height)) }
+                            [pscustomobject]@{ Op = 'Z'; Args = [double[]]@() }
+                        )
+                    }
                 }
             }
+            $canvas = Get-VellumPdfPageCanvas -Document $Document -Page $Page -CommandName 'Use-VellumPdfClip'
+            [void]$canvas.SaveState()
+            try {
+                Write-VellumPdfPathOps -Canvas $canvas -Ops $ops
+                if ($FillRule -eq 'EvenOdd') { [void]$canvas.ClipEvenOdd() } else { [void]$canvas.Clip() }
+                [void]$canvas.EndPath()
+                # Run in the caller's scope with the document as $_; the block's own output is dropped.
+                $null = $Document | ForEach-Object -Process $ScriptBlock
+            }
+            finally { [void]$canvas.RestoreState() }
+            $Document
         }
-        $canvas = Get-VellumPdfPageCanvas -Document $Document -Page $Page -CommandName 'Use-VellumPdfClip'
-        [void]$canvas.SaveState()
-        try {
-            Write-VellumPdfPathOps -Canvas $canvas -Ops $ops
-            if ($FillRule -eq 'EvenOdd') { [void]$canvas.ClipEvenOdd() } else { [void]$canvas.Clip() }
-            [void]$canvas.EndPath()
-            # Run in the caller's scope with the document as $_; the block's own output is dropped.
-            $null = $Document | ForEach-Object -Process $ScriptBlock
+        catch {
+            $PSCmdlet.ThrowTerminatingError($_)
         }
-        finally { [void]$canvas.RestoreState() }
-        $Document
     }
 }

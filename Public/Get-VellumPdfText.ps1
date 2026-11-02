@@ -12,7 +12,7 @@ function Get-VellumPdfText {
         runs that the PDF positions apart; there is no OCR for scanned pages.
         Diagnostics about text it could not decode are written as warnings.
     .PARAMETER Path
-        The PDF file(s). Accepts wildcards and pipeline input by property name.
+        The PDF file(s). Accepts wildcards. Piped strings bind here; piped FileInfo objects (Get-ChildItem) bind to -LiteralPath through their PSPath, so names containing [ ] work.
     .PARAMETER LiteralPath
         The PDF file(s), taken literally.
     .PARAMETER Bytes
@@ -46,8 +46,7 @@ function Get-VellumPdfText {
     [OutputType([string])]
     [OutputType('PSVellumPDF.PdfPageText')]
     param(
-        [Parameter(Mandatory, Position = 0, ValueFromPipeline, ValueFromPipelineByPropertyName, ParameterSetName = 'Path')]
-        [Alias('FullName')]
+        [Parameter(Mandatory, Position = 0, ValueFromPipeline, ParameterSetName = 'Path')]
         [string[]]$Path,
 
         [Parameter(Mandatory, ValueFromPipelineByPropertyName, ParameterSetName = 'LiteralPath')]
@@ -55,6 +54,7 @@ function Get-VellumPdfText {
         [string[]]$LiteralPath,
 
         [Parameter(Mandatory, ParameterSetName = 'Bytes')]
+        [AllowEmptyCollection()]
         [byte[]]$Bytes,
 
         [ValidateRange(1, 1000000)]
@@ -81,38 +81,48 @@ function Get-VellumPdfText {
     )
 
     begin {
-        $limits = @{}
-        foreach ($n in 'MaxDecodedStreamBytes', 'MaxDiagnostics', 'MaxFormXObjectDepth', 'ReconstructionBudgetMultiplier') {
-            if ($PSBoundParameters.ContainsKey($n)) { $limits[$n] = $PSBoundParameters[$n] }
+        try {
+            $limits = @{}
+            foreach ($n in 'MaxDecodedStreamBytes', 'MaxDiagnostics', 'MaxFormXObjectDepth', 'ReconstructionBudgetMultiplier') {
+                if ($PSBoundParameters.ContainsKey($n)) { $limits[$n] = $PSBoundParameters[$n] }
+            }
+            $plain = if ($Password) { [System.Net.NetworkCredential]::new('', $Password).Password }
         }
-        $plain = if ($Password) { [System.Net.NetworkCredential]::new('', $Password).Password }
+        catch {
+            $PSCmdlet.ThrowTerminatingError($_)
+        }
     }
 
     process {
-        foreach ($source in Get-VellumPdfInput -Path $Path -LiteralPath $LiteralPath -Bytes $Bytes -CommandName 'Get-VellumPdfText') {
-            $reader = Open-VellumPdfReader -Limit $limits -Bytes $source.Data -Password $plain -AllowReconstruction:$AllowReconstruction `
-                -CommandName 'Get-VellumPdfText' -Source $source.Name
-            try {
-                $numbers = if ($Page) { $Page } elseif ($reader.PageCount -gt 0) { 1..$reader.PageCount } else { @() }   # 1..0 would count down to page 0
-                foreach ($n in $numbers) {
-                    if ($n -gt $reader.PageCount) {
-                        throw "Get-VellumPdfText: '$($source.Name)' has $($reader.PageCount) page(s); page $n does not exist."
+        try {
+            foreach ($source in Get-VellumPdfInput -Path $Path -LiteralPath $LiteralPath -Bytes $Bytes -CommandName 'Get-VellumPdfText') {
+                $reader = Open-VellumPdfReader -Limit $limits -Bytes $source.Data -Password $plain -AllowReconstruction:$AllowReconstruction `
+                    -CommandName 'Get-VellumPdfText' -Source $source.Name
+                try {
+                    $numbers = if ($Page) { $Page } elseif ($reader.PageCount -gt 0) { 1..$reader.PageCount } else { @() }   # 1..0 would count down to page 0
+                    foreach ($n in $numbers) {
+                        if ($n -gt $reader.PageCount) {
+                            throw "Get-VellumPdfText: '$($source.Name)' has $($reader.PageCount) page(s); page $n does not exist."
+                        }
+                    }
+                    $texts = foreach ($n in $numbers) {
+                        $result = $reader.GetPage($n - 1).ExtractText()
+                        foreach ($d in $result.Diagnostics) {
+                            Write-Warning "Get-VellumPdfText: page ${n}: $($d.Message)"
+                        }
+                        [pscustomobject]@{ PSTypeName = 'PSVellumPDF.PdfPageText'; Page = $n; Text = $result.Text }
+                    }
+                    if ($PerPage) { $texts }
+                    else {
+                        $separator = [VellumPdf.Reader.PdfTextExtractionOptions]::new().PageSeparator
+                        ($texts | ForEach-Object Text) -join $separator
                     }
                 }
-                $texts = foreach ($n in $numbers) {
-                    $result = $reader.GetPage($n - 1).ExtractText()
-                    foreach ($d in $result.Diagnostics) {
-                        Write-Warning "Get-VellumPdfText: page ${n}: $($d.Message)"
-                    }
-                    [pscustomobject]@{ PSTypeName = 'PSVellumPDF.PdfPageText'; Page = $n; Text = $result.Text }
-                }
-                if ($PerPage) { $texts }
-                else {
-                    $separator = [VellumPdf.Reader.PdfTextExtractionOptions]::new().PageSeparator
-                    ($texts | ForEach-Object Text) -join $separator
-                }
+                finally { $reader.Dispose() }
             }
-            finally { $reader.Dispose() }
+        }
+        catch {
+            $PSCmdlet.ThrowTerminatingError($_)
         }
     }
 }

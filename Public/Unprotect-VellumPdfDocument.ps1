@@ -43,8 +43,7 @@ function Unprotect-VellumPdfDocument {
     [CmdletBinding(SupportsShouldProcess, DefaultParameterSetName = 'Path')]
     [OutputType([System.IO.FileInfo])]
     param(
-        [Parameter(Mandatory, Position = 0, ValueFromPipelineByPropertyName, ParameterSetName = 'Path')]
-        [Alias('FullName')]
+        [Parameter(Mandatory, Position = 0, ValueFromPipeline, ParameterSetName = 'Path')]
         [string]$Path,
 
         [Parameter(Mandatory, ValueFromPipelineByPropertyName, ParameterSetName = 'LiteralPath')]
@@ -75,47 +74,52 @@ function Unprotect-VellumPdfDocument {
     )
 
     process {
-        $limits = @{}
-        foreach ($n in 'MaxDecodedStreamBytes', 'MaxDiagnostics', 'MaxFormXObjectDepth', 'ReconstructionBudgetMultiplier') {
-            if ($PSBoundParameters.ContainsKey($n)) { $limits[$n] = $PSBoundParameters[$n] }
-        }
-        $sources = @(Get-VellumPdfInput -Path $Path -LiteralPath $LiteralPath -CommandName 'Unprotect-VellumPdfDocument')
-        if ($sources.Count -ne 1) {
-            throw "Unprotect-VellumPdfDocument: the path matches $($sources.Count) files; decrypt one file at a time (each needs its own -DestinationPath)."
-        }
-        $source = $sources[0]
-        $target = $ExecutionContext.SessionState.Path.GetUnresolvedProviderPathFromPSPath($DestinationPath)
-        if ([string]::Equals($target, $source.Name, [System.StringComparison]::OrdinalIgnoreCase)) {
-            throw 'Unprotect-VellumPdfDocument: -DestinationPath must be a different file than the source.'
-        }
-        if ((Test-Path -LiteralPath $target) -and -not $Force) {
-            throw "Unprotect-VellumPdfDocument: '$target' exists; use -Force to overwrite."
-        }
-        $plain = if ($Password) { [System.Net.NetworkCredential]::new('', $Password).Password }
-        $reader = Open-VellumPdfReader -Limit $limits -Bytes $source.Data -Password $plain -CommandName 'Unprotect-VellumPdfDocument' -Source $source.Name
         try {
-            if (-not $reader.Encryption) {
-                throw "Unprotect-VellumPdfDocument: '$($source.Name)' is not encrypted; nothing to remove."
+            $limits = @{}
+            foreach ($n in 'MaxDecodedStreamBytes', 'MaxDiagnostics', 'MaxFormXObjectDepth', 'ReconstructionBudgetMultiplier') {
+                if ($PSBoundParameters.ContainsKey($n)) { $limits[$n] = $PSBoundParameters[$n] }
             }
-            if ($PSCmdlet.ShouldProcess($target, "Write decrypted copy of '$($source.Name)'")) {
-                $options = [VellumPdf.Reader.PdfSaveDecryptedOptions]::new()
-                if ($AllowInvalidatingSignatures) { $options.AllowInvalidatingSignatures = $true }
-                $temp = "$target.$([guid]::NewGuid().ToString('N')).tmp"
-                try {
-                    $stream = [System.IO.File]::Create($temp)
-                    try { $reader.SaveDecrypted($stream, $options) }
-                    catch {
-                        throw "Unprotect-VellumPdfDocument: could not decrypt '$($source.Name)': $($_.Exception.Message)"
+            $sources = @(Get-VellumPdfInput -Path $Path -LiteralPath $LiteralPath -CommandName 'Unprotect-VellumPdfDocument')
+            if ($sources.Count -ne 1) {
+                throw "Unprotect-VellumPdfDocument: the path matches $($sources.Count) files; decrypt one file at a time (each needs its own -DestinationPath)."
+            }
+            $source = $sources[0]
+            $target = $ExecutionContext.SessionState.Path.GetUnresolvedProviderPathFromPSPath($DestinationPath)
+            if ([string]::Equals($target, $source.Name, [System.StringComparison]::OrdinalIgnoreCase)) {
+                throw 'Unprotect-VellumPdfDocument: -DestinationPath must be a different file than the source.'
+            }
+            if ((Test-Path -LiteralPath $target) -and -not $Force) {
+                throw "Unprotect-VellumPdfDocument: '$target' exists; use -Force to overwrite."
+            }
+            $plain = if ($Password) { [System.Net.NetworkCredential]::new('', $Password).Password }
+            $reader = Open-VellumPdfReader -Limit $limits -Bytes $source.Data -Password $plain -CommandName 'Unprotect-VellumPdfDocument' -Source $source.Name
+            try {
+                if (-not $reader.Encryption) {
+                    throw "Unprotect-VellumPdfDocument: '$($source.Name)' is not encrypted; nothing to remove."
+                }
+                if ($PSCmdlet.ShouldProcess($target, "Write decrypted copy of '$($source.Name)'")) {
+                    $options = [VellumPdf.Reader.PdfSaveDecryptedOptions]::new()
+                    if ($AllowInvalidatingSignatures) { $options.AllowInvalidatingSignatures = $true }
+                    $temp = "$target.$([guid]::NewGuid().ToString('N')).tmp"
+                    try {
+                        $stream = [System.IO.File]::Create($temp)
+                        try { $reader.SaveDecrypted($stream, $options) }
+                        catch {
+                            throw "Unprotect-VellumPdfDocument: could not decrypt '$($source.Name)': $($_.Exception.Message)"
+                        }
+                        finally { $stream.Dispose() }
+                        [System.IO.File]::Move($temp, $target, $true)
                     }
-                    finally { $stream.Dispose() }
-                    [System.IO.File]::Move($temp, $target, $true)
+                    finally {
+                        if (Test-Path -LiteralPath $temp) { Remove-Item -LiteralPath $temp -Force -ErrorAction SilentlyContinue }
+                    }
+                    Get-Item -LiteralPath $target
                 }
-                finally {
-                    if (Test-Path -LiteralPath $temp) { Remove-Item -LiteralPath $temp -Force -ErrorAction SilentlyContinue }
-                }
-                Get-Item -LiteralPath $target
             }
+            finally { $reader.Dispose() }
         }
-        finally { $reader.Dispose() }
+        catch {
+            $PSCmdlet.ThrowTerminatingError($_)
+        }
     }
 }

@@ -18,8 +18,9 @@ function Test-VellumPdfConformance {
         formal compliance statement is required. Known gap: it does not examine
         fonts that are used only by form fields or other annotation appearances.
     .PARAMETER Path
-        The PDF file(s). Accepts wildcards, and pipeline input by property name, so
-        the file returned by Save-VellumPdfDocument can be piped straight in.
+        The PDF file(s). Accepts wildcards. Piped strings bind here; the file returned
+        by Save-VellumPdfDocument (a FileInfo) binds to -LiteralPath, so it can be piped
+        straight in and names containing [ ] work.
     .PARAMETER LiteralPath
         The PDF file(s), taken literally (no wildcards).
     .PARAMETER Bytes
@@ -45,8 +46,7 @@ function Test-VellumPdfConformance {
     [OutputType('PSVellumPDF.PreflightResult')]
     [OutputType([bool], ParameterSetName = 'Quiet')]
     param(
-        [Parameter(Mandatory, Position = 0, ValueFromPipeline, ValueFromPipelineByPropertyName, ParameterSetName = 'Path')]
-        [Alias('FullName')]
+        [Parameter(Mandatory, Position = 0, ValueFromPipeline, ParameterSetName = 'Path')]
         [string[]]$Path,
 
         [Parameter(Mandatory, ValueFromPipelineByPropertyName, ParameterSetName = 'LiteralPath')]
@@ -54,6 +54,7 @@ function Test-VellumPdfConformance {
         [string[]]$LiteralPath,
 
         [Parameter(Mandatory, ParameterSetName = 'Bytes')]
+        [AllowEmptyCollection()]
         [byte[]]$Bytes,
 
         [ValidateSet('PdfA2b', 'PdfA2u', 'PdfA2a', 'PdfUA1')]
@@ -65,51 +66,66 @@ function Test-VellumPdfConformance {
     )
 
     begin {
-        $plain = if ($Password) { [System.Net.NetworkCredential]::new('', $Password).Password }
-        $allOk = $true
+        try {
+            $plain = if ($Password) { [System.Net.NetworkCredential]::new('', $Password).Password }
+            $allOk = $true
+        }
+        catch {
+            $PSCmdlet.ThrowTerminatingError($_)
+        }
     }
 
     process {
-        $sources = @(Get-VellumPdfInput -Path $Path -LiteralPath $LiteralPath -Bytes $Bytes -CommandName 'Test-VellumPdfConformance')
+        try {
+            $sources = @(Get-VellumPdfInput -Path $Path -LiteralPath $LiteralPath -Bytes $Bytes -CommandName 'Test-VellumPdfConformance')
 
-        foreach ($source in $sources) {
-            $name = $source.Name
-            $data = [byte[]]$source.Data
+            foreach ($source in $sources) {
+                $name = $source.Name
+                $data = [byte[]]$source.Data
 
-            $profiles = $Profile
-            if (-not $profiles) {
-                try {
-                    $claimed = [VellumPdf.Conformance.PdfPreflight]::DetectClaimedProfiles($data, $plain)
-                }
-                catch [VellumPdf.Reader.PdfPasswordException] {
-                    throw "Test-VellumPdfConformance: '$name' is encrypted and needs a password. Pass -Password."
-                }
-                catch [System.IO.InvalidDataException] {
-                    throw "Test-VellumPdfConformance: '$name' is not a well-formed PDF: $($_.Exception.Message)"
-                }
-                $profiles = @(foreach ($c in $claimed) {
-                        switch ($c) {
-                            ([VellumPdf.Conformance.PdfConformance]::PdfA2B) { 'PdfA2b' }
-                            ([VellumPdf.Conformance.PdfConformance]::PdfA2U) { 'PdfA2u' }
-                            ([VellumPdf.Conformance.PdfConformance]::PdfA2A) { 'PdfA2a' }
-                            ([VellumPdf.Conformance.PdfConformance]::PdfUA1) { 'PdfUA1' }
-                        }
-                    })
+                $profiles = $Profile
                 if (-not $profiles) {
-                    throw ("Test-VellumPdfConformance: '$name' does not claim PDF/A-2 or PDF/UA-1 conformance. " +
-                        'Pass -Profile to validate it against a profile anyway.')
+                    try {
+                        $claimed = [VellumPdf.Conformance.PdfPreflight]::DetectClaimedProfiles($data, $plain)
+                    }
+                    catch [VellumPdf.Reader.PdfPasswordException] {
+                        throw "Test-VellumPdfConformance: '$name' is encrypted and needs a password. Pass -Password."
+                    }
+                    catch [System.IO.InvalidDataException] {
+                        throw "Test-VellumPdfConformance: '$name' is not a well-formed PDF: $($_.Exception.Message)"
+                    }
+                    $profiles = @(foreach ($c in $claimed) {
+                            switch ($c) {
+                                ([VellumPdf.Conformance.PdfConformance]::PdfA2B) { 'PdfA2b' }
+                                ([VellumPdf.Conformance.PdfConformance]::PdfA2U) { 'PdfA2u' }
+                                ([VellumPdf.Conformance.PdfConformance]::PdfA2A) { 'PdfA2a' }
+                                ([VellumPdf.Conformance.PdfConformance]::PdfUA1) { 'PdfUA1' }
+                            }
+                        })
+                    if (-not $profiles) {
+                        throw ("Test-VellumPdfConformance: '$name' does not claim PDF/A-2 or PDF/UA-1 conformance. " +
+                            'Pass -Profile to validate it against a profile anyway.')
+                    }
+                }
+
+                foreach ($p in $profiles) {
+                    $result = Invoke-VellumPdfPreflight -Bytes $data -Profile $p -Password $plain -Source $name
+                    if (-not $result.IsCompliant) { $allOk = $false }
+                    if (-not $Quiet) { $result }
                 }
             }
-
-            foreach ($p in $profiles) {
-                $result = Invoke-VellumPdfPreflight -Bytes $data -Profile $p -Password $plain -Source $name
-                if (-not $result.IsCompliant) { $allOk = $false }
-                if (-not $Quiet) { $result }
-            }
+        }
+        catch {
+            $PSCmdlet.ThrowTerminatingError($_)
         }
     }
 
     end {
-        if ($Quiet) { $allOk }
+        try {
+            if ($Quiet) { $allOk }
+        }
+        catch {
+            $PSCmdlet.ThrowTerminatingError($_)
+        }
     }
 }

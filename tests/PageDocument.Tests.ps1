@@ -623,8 +623,8 @@ Describe 'Options that must not be silently ignored' {
         try {
             $ro = @(@{ X = 1; Y = 1; Width = 5; Height = 5; ExportValue = 'a' })
             { $doc | Add-VellumPdfFormField Radio -Name g -X 5 -RadioOption $ro } | Should -Throw '*does not apply to -Type Radio*'
-            { $doc | Add-VellumPdfLink -X 1 -Y 1 -Width 5 -Height 5 -TargetPage 2 -DestTop ([double]::NaN) } | Should -Throw '*-DestTop must be finite*'
-            { $doc | Add-VellumPdfOutlineEntry 'x' -TargetPage 2 -DestTop ([double]::PositiveInfinity) } | Should -Throw '*-DestTop must be finite*'
+            { $doc | Add-VellumPdfLink -X 1 -Y 1 -Width 5 -Height 5 -TargetPage 2 -DestTop ([double]::NaN) } | Should -Throw '*-DestTop must be a finite number*'
+            { $doc | Add-VellumPdfOutlineEntry 'x' -TargetPage 2 -DestTop ([double]::PositiveInfinity) } | Should -Throw '*-DestTop must be a finite number*'
         }
         finally { $doc.Dispose() }
     }

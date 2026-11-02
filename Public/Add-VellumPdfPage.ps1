@@ -55,16 +55,21 @@ function Add-VellumPdfPage {
     )
 
     process {
-        Assert-VellumPdfDocumentOpen -Document $Document -CommandName 'Add-VellumPdfPage'
-        $size = switch ($PSCmdlet.ParameterSetName) {
-            'Named' { [VellumPdf.Document.PageSize]::$PageSize }
-            'Custom' { [VellumPdf.Document.PageSize]::Mm($PageWidthMm, $PageHeightMm) }
-            default { $Document.DefaultPageSize }
+        try {
+            Assert-VellumPdfDocumentOpen -Document $Document -CommandName 'Add-VellumPdfPage'
+            $size = switch ($PSCmdlet.ParameterSetName) {
+                'Named' { [VellumPdf.Document.PageSize]::$PageSize }
+                'Custom' { [VellumPdf.Document.PageSize]::Mm($PageWidthMm, $PageHeightMm) }
+                default { $Document.DefaultPageSize }
+            }
+            for ($i = 0; $i -lt $Count; $i++) {
+                $page = $Document.AddPage($size)
+                if ($Rotate -ne 0) { $page.Rotate = $Rotate }
+            }
+            if ($PassThru) { $page } else { $Document }
         }
-        for ($i = 0; $i -lt $Count; $i++) {
-            $page = $Document.AddPage($size)
-            if ($Rotate -ne 0) { $page.Rotate = $Rotate }
+        catch {
+            $PSCmdlet.ThrowTerminatingError($_)
         }
-        if ($PassThru) { $page } else { $Document }
     }
 }

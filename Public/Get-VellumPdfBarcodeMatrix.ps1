@@ -75,27 +75,32 @@ function Get-VellumPdfBarcodeMatrix {
 
     process {
         try {
-            $barcode = New-VellumPdfBarcodeSet -Parameters $PSBoundParameters -IsPdfA $false -ParameterSetName $PSCmdlet.ParameterSetName |
-                Select-Object -First 1
-            $matrix = $barcode.GetMatrix()
+            try {
+                $barcode = New-VellumPdfBarcodeSet -Parameters $PSBoundParameters -IsPdfA $false -ParameterSetName $PSCmdlet.ParameterSetName |
+                    Select-Object -First 1
+                $matrix = $barcode.GetMatrix()
+            }
+            catch {
+                throw ($_.Exception.Message -replace '^Add-VellumPdfBarcode:', 'Get-VellumPdfBarcodeMatrix:')
+            }
+            $lines = [System.Collections.Generic.List[string]]::new()
+            for ($y = 0; $y -lt $matrix.Height; $y++) {
+                $row = [System.Text.StringBuilder]::new($matrix.Width)
+                for ($x = 0; $x -lt $matrix.Width; $x++) { [void]$row.Append($(if ($matrix.IsDark($x, $y)) { '#' } else { '.' })) }
+                $lines.Add($row.ToString())
+            }
+            $result = [pscustomobject]@{
+                PSTypeName = 'PSVellumPDF.BarcodeMatrix'
+                Type       = $Type
+                Width      = $matrix.Width
+                Height     = $matrix.Height
+                Rows       = $lines.ToArray()
+            }
+            $result | Add-Member -MemberType ScriptMethod -Name IsDark -Value { param([int]$x, [int]$y) $this.Rows[$y][$x] -eq '#' }
+            $result
         }
         catch {
-            throw ($_.Exception.Message -replace '^Add-VellumPdfBarcode:', 'Get-VellumPdfBarcodeMatrix:')
+            $PSCmdlet.ThrowTerminatingError($_)
         }
-        $lines = [System.Collections.Generic.List[string]]::new()
-        for ($y = 0; $y -lt $matrix.Height; $y++) {
-            $row = [System.Text.StringBuilder]::new($matrix.Width)
-            for ($x = 0; $x -lt $matrix.Width; $x++) { [void]$row.Append($(if ($matrix.IsDark($x, $y)) { '#' } else { '.' })) }
-            $lines.Add($row.ToString())
-        }
-        $result = [pscustomobject]@{
-            PSTypeName = 'PSVellumPDF.BarcodeMatrix'
-            Type       = $Type
-            Width      = $matrix.Width
-            Height     = $matrix.Height
-            Rows       = $lines.ToArray()
-        }
-        $result | Add-Member -MemberType ScriptMethod -Name IsDark -Value { param([int]$x, [int]$y) $this.Rows[$y][$x] -eq '#' }
-        $result
     }
 }

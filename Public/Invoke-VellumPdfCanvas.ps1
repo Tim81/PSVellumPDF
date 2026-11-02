@@ -54,19 +54,24 @@ function Invoke-VellumPdfCanvas {
     )
 
     process {
-        Assert-VellumPdfDocumentOpen -Document $Document -CommandName 'Invoke-VellumPdfCanvas'
-        $canvas = Get-VellumPdfPageCanvas -Document $Document -Page $Page -CommandName 'Invoke-VellumPdfCanvas'
-        $pdfPage = $Document.Pages[$Page - 1]
-        [void]$canvas.SaveState()
         try {
-            if ($NoMarkedContent) { & $ScriptBlock $canvas $pdfPage $Document | Out-Null }
-            else {
-                Invoke-VellumPdfTagged -Document $Document -Canvas $canvas -PdfPage $pdfPage -Kind Artifact -Draw {
-                    & $ScriptBlock $canvas $pdfPage $Document | Out-Null
+            Assert-VellumPdfDocumentOpen -Document $Document -CommandName 'Invoke-VellumPdfCanvas'
+            $canvas = Get-VellumPdfPageCanvas -Document $Document -Page $Page -CommandName 'Invoke-VellumPdfCanvas'
+            $pdfPage = $Document.Pages[$Page - 1]
+            [void]$canvas.SaveState()
+            try {
+                if ($NoMarkedContent) { & $ScriptBlock $canvas $pdfPage $Document | Out-Null }
+                else {
+                    Invoke-VellumPdfTagged -Document $Document -Canvas $canvas -PdfPage $pdfPage -Kind Artifact -Draw {
+                        & $ScriptBlock $canvas $pdfPage $Document | Out-Null
+                    }
                 }
             }
+            finally { [void]$canvas.RestoreState() }
+            $Document
         }
-        finally { [void]$canvas.RestoreState() }
-        $Document
+        catch {
+            $PSCmdlet.ThrowTerminatingError($_)
+        }
     }
 }

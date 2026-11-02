@@ -63,38 +63,43 @@ function Add-VellumPdfGradient {
     )
 
     process {
-        Assert-VellumPdfDocumentOpen -Document $Document -CommandName 'Add-VellumPdfGradient'
-        if (-not [double]::IsFinite($X) -or -not [double]::IsFinite($Y)) { throw 'Add-VellumPdfGradient: -X and -Y must be finite.' }
-        if ($Type -eq 'Radial' -and $PSBoundParameters.ContainsKey('Direction')) {
-            throw 'Add-VellumPdfGradient: -Direction applies to an Axial gradient only.'
-        }
-        $a = ConvertTo-VellumColor $StartColor
-        $b = ConvertTo-VellumColor $EndColor
-        $c0 = [VellumPdf.Graphics.KernelColor]::new($a[0], $a[1], $a[2])
-        $c1 = [VellumPdf.Graphics.KernelColor]::new($b[0], $b[1], $b[2])
-        $canvas = Get-VellumPdfPageCanvas -Document $Document -Page $Page -CommandName 'Add-VellumPdfGradient'
-
-        [void]$canvas.SaveState()
         try {
-            $tagKind = if ($AltText) { 'Structure' } else { 'Artifact' }
-            Invoke-VellumPdfTagged -Document $Document -Canvas $canvas -PdfPage $Document.Pages[$Page - 1] -Kind $tagKind -StructType Figure -AltText $AltText -Draw {
-            [void]$canvas.Rectangle($X, $Y, $Width, $Height).Clip().EndPath()
-            if ($Type -eq 'Radial') {
-                $cx = $X + $Width / 2; $cy = $Y + $Height / 2
-                $radius = [math]::Sqrt($Width * $Width + $Height * $Height) / 2
-                [void]$canvas.PaintRadialGradient($cx, $cy, 0, $cx, $cy, $radius, $c0, $c1)
+            Assert-VellumPdfDocumentOpen -Document $Document -CommandName 'Add-VellumPdfGradient'
+            Assert-VellumPdfCoordinate $X 'X' 'Add-VellumPdfGradient'; Assert-VellumPdfCoordinate $Y 'Y' 'Add-VellumPdfGradient'; Assert-VellumPdfCoordinate $Width 'Width' 'Add-VellumPdfGradient'; Assert-VellumPdfCoordinate $Height 'Height' 'Add-VellumPdfGradient'
+            if ($Type -eq 'Radial' -and $PSBoundParameters.ContainsKey('Direction')) {
+                throw 'Add-VellumPdfGradient: -Direction applies to an Axial gradient only.'
             }
-            else {
-                switch ($Direction) {
-                    'LeftToRight' { $pts = @($X, ($Y + $Height / 2), ($X + $Width), ($Y + $Height / 2)) }
-                    'BottomToTop' { $pts = @(($X + $Width / 2), $Y, ($X + $Width / 2), ($Y + $Height)) }
-                    'Diagonal' { $pts = @($X, $Y, ($X + $Width), ($Y + $Height)) }
+            $a = ConvertTo-VellumColor $StartColor
+            $b = ConvertTo-VellumColor $EndColor
+            $c0 = [VellumPdf.Graphics.KernelColor]::new($a[0], $a[1], $a[2])
+            $c1 = [VellumPdf.Graphics.KernelColor]::new($b[0], $b[1], $b[2])
+            $canvas = Get-VellumPdfPageCanvas -Document $Document -Page $Page -CommandName 'Add-VellumPdfGradient'
+
+            [void]$canvas.SaveState()
+            try {
+                $tagKind = if ($AltText) { 'Structure' } else { 'Artifact' }
+                Invoke-VellumPdfTagged -Document $Document -Canvas $canvas -PdfPage $Document.Pages[$Page - 1] -Kind $tagKind -StructType Figure -AltText $AltText -Draw {
+                [void]$canvas.Rectangle($X, $Y, $Width, $Height).Clip().EndPath()
+                if ($Type -eq 'Radial') {
+                    $cx = $X + $Width / 2; $cy = $Y + $Height / 2
+                    $radius = [math]::Sqrt($Width * $Width + $Height * $Height) / 2
+                    [void]$canvas.PaintRadialGradient($cx, $cy, 0, $cx, $cy, $radius, $c0, $c1)
                 }
-                [void]$canvas.PaintAxialGradient($pts[0], $pts[1], $pts[2], $pts[3], $c0, $c1)
+                else {
+                    switch ($Direction) {
+                        'LeftToRight' { $pts = @($X, ($Y + $Height / 2), ($X + $Width), ($Y + $Height / 2)) }
+                        'BottomToTop' { $pts = @(($X + $Width / 2), $Y, ($X + $Width / 2), ($Y + $Height)) }
+                        'Diagonal' { $pts = @($X, $Y, ($X + $Width), ($Y + $Height)) }
+                    }
+                    [void]$canvas.PaintAxialGradient($pts[0], $pts[1], $pts[2], $pts[3], $c0, $c1)
+                }
+                }
             }
-            }
+            finally { [void]$canvas.RestoreState() }
+            $Document
         }
-        finally { [void]$canvas.RestoreState() }
-        $Document
+        catch {
+            $PSCmdlet.ThrowTerminatingError($_)
+        }
     }
 }

@@ -57,23 +57,28 @@ function Register-VellumPdfFont {
     )
 
     process {
-        Assert-VellumPdfDocumentOpen -Document $Document -CommandName 'Register-VellumPdfFont'
+        try {
+            Assert-VellumPdfDocumentOpen -Document $Document -CommandName 'Register-VellumPdfFont'
 
-        $handle = if ($PSCmdlet.ParameterSetName -eq 'Bytes') {
-            $Document.UseTrueTypeFont($FontBytes)
-        }
-        else {
-            $resolved = $ExecutionContext.SessionState.Path.GetUnresolvedProviderPathFromPSPath($Path)
-            if (-not [System.IO.File]::Exists($resolved)) {
-                throw "Register-VellumPdfFont: font file not found: '$resolved'. Verify the path and try again."
+            $handle = if ($PSCmdlet.ParameterSetName -eq 'Bytes') {
+                $Document.UseTrueTypeFont($FontBytes)
             }
-            if ($Document -is [VellumPdf.Layout.Document]) { $Document.LoadTrueTypeFont($resolved) }
-            else { $Document.UseTrueTypeFont([System.IO.File]::ReadAllBytes($resolved)) }
-        }
+            else {
+                $resolved = $ExecutionContext.SessionState.Path.GetUnresolvedProviderPathFromPSPath($Path)
+                if (-not [System.IO.File]::Exists($resolved)) {
+                    throw "Register-VellumPdfFont: font file not found: '$resolved'. Verify the path and try again."
+                }
+                if ($Document -is [VellumPdf.Layout.Document]) { $Document.LoadTrueTypeFont($resolved) }
+                else { $Document.UseTrueTypeFont([System.IO.File]::ReadAllBytes($resolved)) }
+            }
 
-        # Tag the handle with its owning document so the content cmdlets can
-        # reject cross-document use (which silently breaks font rendering).
-        $handle.PSObject.Properties.Add([psnoteproperty]::new('PSVellumOwner', $Document))
-        $handle
+            # Tag the handle with its owning document so the content cmdlets can
+            # reject cross-document use (which silently breaks font rendering).
+            $handle.PSObject.Properties.Add([psnoteproperty]::new('PSVellumOwner', $Document))
+            $handle
+        }
+        catch {
+            $PSCmdlet.ThrowTerminatingError($_)
+        }
     }
 }

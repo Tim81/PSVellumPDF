@@ -76,33 +76,38 @@ function New-VellumPdfTextRun {
         [double]$Leading
     )
 
-    if (-not $FontHandle) {
-        Write-VellumPdfEncodingWarning -Text $Text -CommandName 'New-VellumPdfTextRun'
+    try {
+        if (-not $FontHandle) {
+            Write-VellumPdfEncodingWarning -Text $Text -CommandName 'New-VellumPdfTextRun'
+        }
+
+        # Build a style forwarding only the parameters that were explicitly bound.
+        # Always produce at least a bare TextStyle (never $null) because the
+        # VellumPdf renderer requires a non-null style on every TextRun in a
+        # runs-based paragraph.
+        $styleParams = @{}
+        if ($PSBoundParameters.ContainsKey('Font'))       { $styleParams['Font']       = $Font }
+        if ($PSBoundParameters.ContainsKey('FontSize'))   { $styleParams['FontSize']   = $FontSize }
+        if ($PSBoundParameters.ContainsKey('FontHandle')) { $styleParams['FontHandle'] = $FontHandle }
+        if ($PSBoundParameters.ContainsKey('Color'))      { $styleParams['Color']      = ConvertTo-VellumColor $Color }
+        if ($PSBoundParameters.ContainsKey('LinkUri'))    { $styleParams['LinkUri']    = $LinkUri }
+        if ($PSBoundParameters.ContainsKey('Leading'))    { $styleParams['Leading']    = $Leading }
+
+        $style = if ($styleParams.Count -gt 0) {
+            New-VellumTextStyle @styleParams
+        } else {
+            $null
+        }
+
+        # Guarantee a non-null style: an empty TextStyle lets the renderer fall
+        # back to the document's default font without any NullReferenceException.
+        if ($null -eq $style) {
+            $style = [VellumPdf.Layout.Core.TextStyle]::new()
+        }
+
+        [VellumPdf.Layout.Elements.TextRun]::new($Text, $style)
     }
-
-    # Build a style forwarding only the parameters that were explicitly bound.
-    # Always produce at least a bare TextStyle (never $null) because the
-    # VellumPdf renderer requires a non-null style on every TextRun in a
-    # runs-based paragraph.
-    $styleParams = @{}
-    if ($PSBoundParameters.ContainsKey('Font'))       { $styleParams['Font']       = $Font }
-    if ($PSBoundParameters.ContainsKey('FontSize'))   { $styleParams['FontSize']   = $FontSize }
-    if ($PSBoundParameters.ContainsKey('FontHandle')) { $styleParams['FontHandle'] = $FontHandle }
-    if ($PSBoundParameters.ContainsKey('Color'))      { $styleParams['Color']      = ConvertTo-VellumColor $Color }
-    if ($PSBoundParameters.ContainsKey('LinkUri'))    { $styleParams['LinkUri']    = $LinkUri }
-    if ($PSBoundParameters.ContainsKey('Leading'))    { $styleParams['Leading']    = $Leading }
-
-    $style = if ($styleParams.Count -gt 0) {
-        New-VellumTextStyle @styleParams
-    } else {
-        $null
+    catch {
+        $PSCmdlet.ThrowTerminatingError($_)
     }
-
-    # Guarantee a non-null style: an empty TextStyle lets the renderer fall
-    # back to the document's default font without any NullReferenceException.
-    if ($null -eq $style) {
-        $style = [VellumPdf.Layout.Core.TextStyle]::new()
-    }
-
-    [VellumPdf.Layout.Elements.TextRun]::new($Text, $style)
 }

@@ -112,29 +112,34 @@ function Set-VellumPdfPageBand {
     )
 
     process {
-        Assert-VellumPdfDocumentOpen -Document $Document -CommandName 'Set-VellumPdfPageBand'
-        $prop = $Document.PSObject.Properties['PSVellumPageBands']
-        if (-not $prop) {
-            $Document.PSObject.Properties.Add([psnoteproperty]::new('PSVellumPageBands', [ordered]@{}))
+        try {
+            Assert-VellumPdfDocumentOpen -Document $Document -CommandName 'Set-VellumPdfPageBand'
             $prop = $Document.PSObject.Properties['PSVellumPageBands']
+            if (-not $prop) {
+                $Document.PSObject.Properties.Add([psnoteproperty]::new('PSVellumPageBands', [ordered]@{}))
+                $prop = $Document.PSObject.Properties['PSVellumPageBands']
+            }
+            $key = "$Position|$Align"
+            if ($PSCmdlet.ParameterSetName -eq 'Remove') {
+                $prop.Value.Remove($key)
+                return $Document
+            }
+            if ($Template -match '[\r\n]') { throw 'Set-VellumPdfPageBand: -Template must be a single line.' }
+            $resolved = Get-VellumPdfPageFont -Document $Document -FontHandle $FontHandle -Font $Font -CommandName 'Set-VellumPdfPageBand'
+            if (-not $resolved.Handle -and $Document.Conformance -eq [VellumPdf.Document.PdfConformance]::None) {
+                Write-VellumPdfEncodingWarning -Text ($Template -replace '\{pages?\}', '0') -CommandName 'Set-VellumPdfPageBand'
+            }
+            $rgb = $null
+            if ($PSBoundParameters.ContainsKey('Color')) { $rgb = ConvertTo-VellumColor $Color }
+            $prop.Value[$key] = [pscustomobject]@{
+                Position = $Position; Align = $Align; Template = $Template; FontSize = $FontSize
+                Resolved = $resolved; Rgb = $rgb; Inset = $Inset; Offset = $Offset
+                StartNumber = $StartNumber; SkipFirstPage = [bool]$SkipFirstPage
+            }
+            $Document
         }
-        $key = "$Position|$Align"
-        if ($PSCmdlet.ParameterSetName -eq 'Remove') {
-            $prop.Value.Remove($key)
-            return $Document
+        catch {
+            $PSCmdlet.ThrowTerminatingError($_)
         }
-        if ($Template -match '[\r\n]') { throw 'Set-VellumPdfPageBand: -Template must be a single line.' }
-        $resolved = Get-VellumPdfPageFont -Document $Document -FontHandle $FontHandle -Font $Font -CommandName 'Set-VellumPdfPageBand'
-        if (-not $resolved.Handle -and $Document.Conformance -eq [VellumPdf.Document.PdfConformance]::None) {
-            Write-VellumPdfEncodingWarning -Text ($Template -replace '\{pages?\}', '0') -CommandName 'Set-VellumPdfPageBand'
-        }
-        $rgb = $null
-        if ($PSBoundParameters.ContainsKey('Color')) { $rgb = ConvertTo-VellumColor $Color }
-        $prop.Value[$key] = [pscustomobject]@{
-            Position = $Position; Align = $Align; Template = $Template; FontSize = $FontSize
-            Resolved = $resolved; Rgb = $rgb; Inset = $Inset; Offset = $Offset
-            StartNumber = $StartNumber; SkipFirstPage = [bool]$SkipFirstPage
-        }
-        $Document
     }
 }

@@ -35,15 +35,20 @@ function Add-VellumPdfElement {
     )
 
     process {
-        Assert-VellumPdfDocumentOpen -Document $Document -CommandName 'Add-VellumPdfElement'
-        # A custom renderer has no margins of its own: put the space a previous element's
-        # -MarginBottom deferred in front of it as an invisible spacer.
-        $pending = $Document.PSObject.Properties['PSVellumPendingSpace']
-        if ($pending -and $pending.Value) {
-            [void]$Document.Add([PSVellumPDF.Interop.SpacerRenderer]::new([double]$pending.Value))
-            $pending.Value = 0.0
+        try {
+            Assert-VellumPdfDocumentOpen -Document $Document -CommandName 'Add-VellumPdfElement'
+            # A custom renderer has no margins of its own: put the space a previous element's
+            # -MarginBottom deferred in front of it as an invisible spacer.
+            $pending = $Document.PSObject.Properties['PSVellumPendingSpace']
+            if ($pending -and $pending.Value) {
+                [void]$Document.Add([PSVellumPDF.Interop.SpacerRenderer]::new([double]$pending.Value))
+                $pending.Value = 0.0
+            }
+            [void]$Document.Add($Renderer)
+            $Document
         }
-        [void]$Document.Add($Renderer)
-        $Document
+        catch {
+            $PSCmdlet.ThrowTerminatingError($_)
+        }
     }
 }

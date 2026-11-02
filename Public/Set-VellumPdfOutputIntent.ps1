@@ -81,39 +81,44 @@ function Set-VellumPdfOutputIntent {
     )
 
     process {
-        Assert-VellumPdfDocumentOpen -Document $Document -CommandName 'Set-VellumPdfOutputIntent'
+        try {
+            Assert-VellumPdfDocumentOpen -Document $Document -CommandName 'Set-VellumPdfOutputIntent'
 
-        # The library writes the output intent only for conformant documents
-        # and silently ignores it otherwise - fail fast instead.
-        if ($Document.Conformance -eq [VellumPdf.Document.PdfConformance]::None) {
-            throw ('Set-VellumPdfOutputIntent: the output intent is only written for PDF/A conformant ' +
-                'documents. Create the document with New-VellumPdfDocument -Conformance PdfA2b ' +
-                '(or another PDF/A level) first.')
-        }
+            # The library writes the output intent only for conformant documents
+            # and silently ignores it otherwise - fail fast instead.
+            if ($Document.Conformance -eq [VellumPdf.Document.PdfConformance]::None) {
+                throw ('Set-VellumPdfOutputIntent: the output intent is only written for PDF/A conformant ' +
+                    'documents. Create the document with New-VellumPdfDocument -Conformance PdfA2b ' +
+                    '(or another PDF/A level) first.')
+            }
 
-        if ($PSCmdlet.ParameterSetName -eq 'Cmyk') {
-            $identifier = if ($PSBoundParameters.ContainsKey('OutputConditionIdentifier')) {
-                $OutputConditionIdentifier
+            if ($PSCmdlet.ParameterSetName -eq 'Cmyk') {
+                $identifier = if ($PSBoundParameters.ContainsKey('OutputConditionIdentifier')) {
+                    $OutputConditionIdentifier
+                }
+                else {
+                    'Generic CMYK'
+                }
+                $Document.UseCmykOutputIntent($identifier)
             }
             else {
-                'Generic CMYK'
+                $resolved = $ExecutionContext.SessionState.Path.GetUnresolvedProviderPathFromPSPath($IccProfilePath)
+                if (-not [System.IO.File]::Exists($resolved)) {
+                    throw "Set-VellumPdfOutputIntent: ICC profile not found: '$resolved'."
+                }
+                $bytes = [System.IO.File]::ReadAllBytes($resolved)
+                $infoValue = if ($PSBoundParameters.ContainsKey('Info')) { $Info } else { $null }
+                $Document.SetPdfAOutputIntent($bytes, $ComponentCount, $OutputConditionIdentifier, $infoValue)
             }
-            $Document.UseCmykOutputIntent($identifier)
-        }
-        else {
-            $resolved = $ExecutionContext.SessionState.Path.GetUnresolvedProviderPathFromPSPath($IccProfilePath)
-            if (-not [System.IO.File]::Exists($resolved)) {
-                throw "Set-VellumPdfOutputIntent: ICC profile not found: '$resolved'."
+            # Remember a CMYK-capable intent: PDF/A allows DeviceCMYK drawing only with one
+            # (Add-VellumPdfShape -FillCmyk warns when it is missing).
+            if (($PSCmdlet.ParameterSetName -eq 'Cmyk' -or $ComponentCount -eq 4) -and -not $Document.PSObject.Properties['PSVellumCmykIntent']) {
+                $Document.PSObject.Properties.Add([psnoteproperty]::new('PSVellumCmykIntent', $true))
             }
-            $bytes = [System.IO.File]::ReadAllBytes($resolved)
-            $infoValue = if ($PSBoundParameters.ContainsKey('Info')) { $Info } else { $null }
-            $Document.SetPdfAOutputIntent($bytes, $ComponentCount, $OutputConditionIdentifier, $infoValue)
+            $Document
         }
-        # Remember a CMYK-capable intent: PDF/A allows DeviceCMYK drawing only with one
-        # (Add-VellumPdfShape -FillCmyk warns when it is missing).
-        if (($PSCmdlet.ParameterSetName -eq 'Cmyk' -or $ComponentCount -eq 4) -and -not $Document.PSObject.Properties['PSVellumCmykIntent']) {
-            $Document.PSObject.Properties.Add([psnoteproperty]::new('PSVellumCmykIntent', $true))
+        catch {
+            $PSCmdlet.ThrowTerminatingError($_)
         }
-        $Document
     }
 }

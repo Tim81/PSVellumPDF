@@ -199,160 +199,165 @@ function Set-VellumPdfSignature {
     )
 
     process {
-        Assert-VellumPdfDocumentOpen -Document $Document -CommandName 'Set-VellumPdfSignature'
+        try {
+            Assert-VellumPdfDocumentOpen -Document $Document -CommandName 'Set-VellumPdfSignature'
 
-        # The library rejects Encrypt() + Sign() at save time; fail fast here
-        # with the same constraint so the error points at the right cmdlet.
-        if ($Document.PSObject.Properties['PSVellumProtected']) {
-            throw ('Set-VellumPdfSignature: encryption and digital signatures cannot be combined. ' +
-                'Remove the Protect-VellumPdfDocument call to sign this document.')
-        }
-
-        if ($ExternalPrivateKey -and $ExternalSigner) {
-            throw 'Set-VellumPdfSignature: -ExternalPrivateKey and -ExternalSigner cannot be combined; choose one.'
-        }
-        if ($ExternalSigner -and $Document.PSObject.Properties['PSVellumHasDrawing']) {
-            throw ('Set-VellumPdfSignature: -ExternalSigner signs asynchronously on other threads, which cannot run the ' +
-                'script blocks of Add-VellumPdfDrawing elements already in this document. Use -ExternalPrivateKey, or a certificate with its key.')
-        }
-        if (-not $Certificate.HasPrivateKey -and -not $ExternalPrivateKey -and -not $ExternalSigner) {
-            throw ('Set-VellumPdfSignature: the certificate does not include a private key. ' +
-                'Signing requires the private key; load the certificate from a PFX ' +
-                '(Get-PfxCertificate) or a store entry that has the key, or pass ' +
-                '-ExternalPrivateKey / -ExternalSigner for a key held elsewhere.')
-        }
-
-        $settings = [VellumPdf.Signing.PdfSignatureSettings]::new()
-        $settings.Certificate = $Certificate
-        if ($PSBoundParameters.ContainsKey('Reason'))      { $settings.Reason      = $Reason }
-        if ($PSBoundParameters.ContainsKey('Location'))    { $settings.Location    = $Location }
-        if ($PSBoundParameters.ContainsKey('ContactInfo')) { $settings.ContactInfo = $ContactInfo }
-        if ($PSBoundParameters.ContainsKey('SignerName'))  { $settings.SignerName  = $SignerName }
-        if ($PSBoundParameters.ContainsKey('SigningTime')) { $settings.SigningTime = $SigningTime }
-        if ($ExternalPrivateKey) { $settings.ExternalPrivateKey = $ExternalPrivateKey }
-        if ($ExternalSigner)     { $settings.ExternalSigner = $ExternalSigner }
-        if ($PSBoundParameters.ContainsKey('SignaturePage')) { $settings.SignaturePage = $SignaturePage - 1 }
-        if ($PSBoundParameters.ContainsKey('SubFilter')) {
-            $settings.SubFilter = if ($SubFilter -eq 'Pkcs7') {
-                [VellumPdf.Signing.PdfSignatureSettings]::SubFilterAdbePkcs7Detached
-            } else {
-                [VellumPdf.Signing.PdfSignatureSettings]::SubFilterEtsiCAdESDetached
+            # The library rejects Encrypt() + Sign() at save time; fail fast here
+            # with the same constraint so the error points at the right cmdlet.
+            if ($Document.PSObject.Properties['PSVellumProtected']) {
+                throw ('Set-VellumPdfSignature: encryption and digital signatures cannot be combined. ' +
+                    'Remove the Protect-VellumPdfDocument call to sign this document.')
             }
-        }
 
-        # Validate the timestamp parameters BEFORE mutating any document state
-        # below, so a bad -TimestampUrl on a re-stage leaves the previously
-        # staged signature (and its HttpClient) intact.
-        if ($TimestampClient -and $PSBoundParameters.ContainsKey('TimestampUrl')) {
-            throw 'Set-VellumPdfSignature: -TimestampUrl and -TimestampClient cannot be combined; choose one.'
-        }
-        $hasTimestamp = $TimestampClient -or $PSBoundParameters.ContainsKey('TimestampUrl')
-        $levelName = if ($Level) { $Level } elseif ($hasTimestamp) { 'B-T' } else { 'B-B' }
-        if ($levelName -ne 'B-B' -and -not $hasTimestamp) {
-            throw "Set-VellumPdfSignature: -Level $levelName needs a signature timestamp; add -TimestampUrl (or -TimestampClient)."
-        }
-        if ($Level -eq 'B-B' -and $hasTimestamp) {
-            throw 'Set-VellumPdfSignature: -Level B-B carries no timestamp; drop -TimestampUrl/-TimestampClient or use -Level B-T.'
-        }
-        if ($RevocationClient -or $PSBoundParameters.ContainsKey('RevocationTimeout')) {
-            if ($levelName -notin 'B-LT', 'B-LTA') {
-                throw 'Set-VellumPdfSignature: -RevocationClient/-RevocationTimeout apply to -Level B-LT or B-LTA only.'
+            if ($ExternalPrivateKey -and $ExternalSigner) {
+                throw 'Set-VellumPdfSignature: -ExternalPrivateKey and -ExternalSigner cannot be combined; choose one.'
             }
-        }
-        if ($RevocationClient -and $PSBoundParameters.ContainsKey('RevocationTimeout')) {
-            throw 'Set-VellumPdfSignature: -RevocationTimeout configures the default client; it cannot be combined with -RevocationClient.'
-        }
-        $settings.Level = [VellumPdf.Signing.PadesLevel]::($levelName -replace '-', '_')
-        if ($PSBoundParameters.ContainsKey('EstimatedSignatureSize')) {
-            $settings.EstimatedSignatureSizeBytes = $EstimatedSignatureSize
-        }
-        elseif ($levelName -in 'B-LT', 'B-LTA') {
-            # Long-term levels embed the chain and revocation evidence in the signature.
-            $settings.EstimatedSignatureSizeBytes = 32768
-        }
-        if ($levelName -in 'B-LT', 'B-LTA' -and $RevocationClient) { $settings.RevocationClient = $RevocationClient }
-        if ($TimestampClient) { $settings.TimestampClient = $TimestampClient }
-
-        if ($PSBoundParameters.ContainsKey('TimestampUrl')) {
-            if (-not $TimestampUrl.IsAbsoluteUri -or $TimestampUrl.Scheme -notin @('http', 'https')) {
-                throw ("Set-VellumPdfSignature: -TimestampUrl must be an absolute http or https URL; " +
-                    "got '$TimestampUrl'.")
+            if ($ExternalSigner -and $Document.PSObject.Properties['PSVellumHasDrawing']) {
+                throw ('Set-VellumPdfSignature: -ExternalSigner signs asynchronously on other threads, which cannot run the ' +
+                    'script blocks of Add-VellumPdfDrawing elements already in this document. Use -ExternalPrivateKey, or a certificate with its key.')
             }
-        }
-        elseif ($PSBoundParameters.ContainsKey('TimestampTimeout') -or
-                $PSBoundParameters.ContainsKey('TimestampRequestCertificate')) {
-            throw ('Set-VellumPdfSignature: -TimestampTimeout and ' +
-                '-TimestampRequestCertificate require -TimestampUrl.')
-        }
-
-        # Dispose any HttpClient stashed by a previous timestamp staging on this
-        # document before replacing the staged signature, so re-staging does not
-        # orphan a live HttpClient.
-        $clientProp = $Document.PSObject.Properties['PSVellumTimestampHttpClient']
-        if ($clientProp -and $clientProp.Value) {
-            $clientProp.Value.Dispose()
-            $clientProp.Value = $null
-        }
-
-        # Same for the revocation client's HttpClient from a previous staging.
-        $revProp = $Document.PSObject.Properties['PSVellumRevocationHttpClient']
-        if ($revProp -and $revProp.Value) {
-            $revProp.Value.Dispose()
-            $revProp.Value = $null
-        }
-        if ($levelName -in 'B-LT', 'B-LTA' -and -not $RevocationClient) {
-            # The OCSP/CRL addresses come from the signing certificate chain. CRL hosts do
-            # legitimately redirect (unlike a timestamp authority), so redirects stay on but
-            # are capped, and the client is per signature rather than the engine's process-wide
-            # shared one; Save-VellumPdfDocument disposes it with the document. Built here, after
-            # all parameter validation, so a rejected call cannot leak it.
-            $handler = [System.Net.Http.SocketsHttpHandler]::new()
-            $handler.AllowAutoRedirect = $true
-            $handler.MaxAutomaticRedirections = 3
-            $revocationHttpClient = [System.Net.Http.HttpClient]::new($handler, $true)
-            $timeoutArg = if ($PSBoundParameters.ContainsKey('RevocationTimeout')) { $RevocationTimeout } else { $null }
-            $settings.RevocationClient = [VellumPdf.Signing.HttpRevocationClient]::new($revocationHttpClient, $timeoutArg)
-            if ($revProp) { $revProp.Value = $revocationHttpClient }
-            else { $Document.PSObject.Properties.Add([psnoteproperty]::new('PSVellumRevocationHttpClient', $revocationHttpClient)) }
-        }
-
-        if ($PSBoundParameters.ContainsKey('TimestampUrl')) {
-            # The HttpTimestampClient holds this HttpClient and is invoked later
-            # by Save-VellumPdfDocument, so it must outlive this cmdlet. It is
-            # stashed on the document and disposed when the document is (see
-            # Save-VellumPdfDocument), or replaced by the next staging above.
-            #
-            # -TimestampUrl is user-supplied, so harden the client: a TSA does
-            # not legitimately redirect, and following one would let a hostile
-            # URL bounce the save-time request at an internal host (SSRF). Disable
-            # auto-redirect and bound the request so a black-hole TSA cannot stall
-            # Save indefinitely.
-            $handler = [System.Net.Http.SocketsHttpHandler]::new()
-            $handler.AllowAutoRedirect = $false
-            $httpClient = [System.Net.Http.HttpClient]::new($handler, $true)
-            if ($PSBoundParameters.ContainsKey('TimestampTimeout')) {
-                $httpClient.Timeout = $TimestampTimeout
+            if (-not $Certificate.HasPrivateKey -and -not $ExternalPrivateKey -and -not $ExternalSigner) {
+                throw ('Set-VellumPdfSignature: the certificate does not include a private key. ' +
+                    'Signing requires the private key; load the certificate from a PFX ' +
+                    '(Get-PfxCertificate) or a store entry that has the key, or pass ' +
+                    '-ExternalPrivateKey / -ExternalSigner for a key held elsewhere.')
             }
-            $settings.TimestampClient = [VellumPdf.Signing.HttpTimestampClient]::new(
-                $TimestampUrl, $httpClient, $TimestampRequestCertificate, $TimestampTimeout)
-            if ($clientProp) {
-                $clientProp.Value = $httpClient
+
+            $settings = [VellumPdf.Signing.PdfSignatureSettings]::new()
+            $settings.Certificate = $Certificate
+            if ($PSBoundParameters.ContainsKey('Reason'))      { $settings.Reason      = $Reason }
+            if ($PSBoundParameters.ContainsKey('Location'))    { $settings.Location    = $Location }
+            if ($PSBoundParameters.ContainsKey('ContactInfo')) { $settings.ContactInfo = $ContactInfo }
+            if ($PSBoundParameters.ContainsKey('SignerName'))  { $settings.SignerName  = $SignerName }
+            if ($PSBoundParameters.ContainsKey('SigningTime')) { $settings.SigningTime = $SigningTime }
+            if ($ExternalPrivateKey) { $settings.ExternalPrivateKey = $ExternalPrivateKey }
+            if ($ExternalSigner)     { $settings.ExternalSigner = $ExternalSigner }
+            if ($PSBoundParameters.ContainsKey('SignaturePage')) { $settings.SignaturePage = $SignaturePage - 1 }
+            if ($PSBoundParameters.ContainsKey('SubFilter')) {
+                $settings.SubFilter = if ($SubFilter -eq 'Pkcs7') {
+                    [VellumPdf.Signing.PdfSignatureSettings]::SubFilterAdbePkcs7Detached
+                } else {
+                    [VellumPdf.Signing.PdfSignatureSettings]::SubFilterEtsiCAdESDetached
+                }
+            }
+
+            # Validate the timestamp parameters BEFORE mutating any document state
+            # below, so a bad -TimestampUrl on a re-stage leaves the previously
+            # staged signature (and its HttpClient) intact.
+            if ($TimestampClient -and $PSBoundParameters.ContainsKey('TimestampUrl')) {
+                throw 'Set-VellumPdfSignature: -TimestampUrl and -TimestampClient cannot be combined; choose one.'
+            }
+            $hasTimestamp = $TimestampClient -or $PSBoundParameters.ContainsKey('TimestampUrl')
+            $levelName = if ($Level) { $Level } elseif ($hasTimestamp) { 'B-T' } else { 'B-B' }
+            if ($levelName -ne 'B-B' -and -not $hasTimestamp) {
+                throw "Set-VellumPdfSignature: -Level $levelName needs a signature timestamp; add -TimestampUrl (or -TimestampClient)."
+            }
+            if ($Level -eq 'B-B' -and $hasTimestamp) {
+                throw 'Set-VellumPdfSignature: -Level B-B carries no timestamp; drop -TimestampUrl/-TimestampClient or use -Level B-T.'
+            }
+            if ($RevocationClient -or $PSBoundParameters.ContainsKey('RevocationTimeout')) {
+                if ($levelName -notin 'B-LT', 'B-LTA') {
+                    throw 'Set-VellumPdfSignature: -RevocationClient/-RevocationTimeout apply to -Level B-LT or B-LTA only.'
+                }
+            }
+            if ($RevocationClient -and $PSBoundParameters.ContainsKey('RevocationTimeout')) {
+                throw 'Set-VellumPdfSignature: -RevocationTimeout configures the default client; it cannot be combined with -RevocationClient.'
+            }
+            $settings.Level = [VellumPdf.Signing.PadesLevel]::($levelName -replace '-', '_')
+            if ($PSBoundParameters.ContainsKey('EstimatedSignatureSize')) {
+                $settings.EstimatedSignatureSizeBytes = $EstimatedSignatureSize
+            }
+            elseif ($levelName -in 'B-LT', 'B-LTA') {
+                # Long-term levels embed the chain and revocation evidence in the signature.
+                $settings.EstimatedSignatureSizeBytes = 32768
+            }
+            if ($levelName -in 'B-LT', 'B-LTA' -and $RevocationClient) { $settings.RevocationClient = $RevocationClient }
+            if ($TimestampClient) { $settings.TimestampClient = $TimestampClient }
+
+            if ($PSBoundParameters.ContainsKey('TimestampUrl')) {
+                if (-not $TimestampUrl.IsAbsoluteUri -or $TimestampUrl.Scheme -notin @('http', 'https')) {
+                    throw ("Set-VellumPdfSignature: -TimestampUrl must be an absolute http or https URL; " +
+                        "got '$TimestampUrl'.")
+                }
+            }
+            elseif ($PSBoundParameters.ContainsKey('TimestampTimeout') -or
+                    $PSBoundParameters.ContainsKey('TimestampRequestCertificate')) {
+                throw ('Set-VellumPdfSignature: -TimestampTimeout and ' +
+                    '-TimestampRequestCertificate require -TimestampUrl.')
+            }
+
+            # Dispose any HttpClient stashed by a previous timestamp staging on this
+            # document before replacing the staged signature, so re-staging does not
+            # orphan a live HttpClient.
+            $clientProp = $Document.PSObject.Properties['PSVellumTimestampHttpClient']
+            if ($clientProp -and $clientProp.Value) {
+                $clientProp.Value.Dispose()
+                $clientProp.Value = $null
+            }
+
+            # Same for the revocation client's HttpClient from a previous staging.
+            $revProp = $Document.PSObject.Properties['PSVellumRevocationHttpClient']
+            if ($revProp -and $revProp.Value) {
+                $revProp.Value.Dispose()
+                $revProp.Value = $null
+            }
+            if ($levelName -in 'B-LT', 'B-LTA' -and -not $RevocationClient) {
+                # The OCSP/CRL addresses come from the signing certificate chain. CRL hosts do
+                # legitimately redirect (unlike a timestamp authority), so redirects stay on but
+                # are capped, and the client is per signature rather than the engine's process-wide
+                # shared one; Save-VellumPdfDocument disposes it with the document. Built here, after
+                # all parameter validation, so a rejected call cannot leak it.
+                $handler = [System.Net.Http.SocketsHttpHandler]::new()
+                $handler.AllowAutoRedirect = $true
+                $handler.MaxAutomaticRedirections = 3
+                $revocationHttpClient = [System.Net.Http.HttpClient]::new($handler, $true)
+                $timeoutArg = if ($PSBoundParameters.ContainsKey('RevocationTimeout')) { $RevocationTimeout } else { $null }
+                $settings.RevocationClient = [VellumPdf.Signing.HttpRevocationClient]::new($revocationHttpClient, $timeoutArg)
+                if ($revProp) { $revProp.Value = $revocationHttpClient }
+                else { $Document.PSObject.Properties.Add([psnoteproperty]::new('PSVellumRevocationHttpClient', $revocationHttpClient)) }
+            }
+
+            if ($PSBoundParameters.ContainsKey('TimestampUrl')) {
+                # The HttpTimestampClient holds this HttpClient and is invoked later
+                # by Save-VellumPdfDocument, so it must outlive this cmdlet. It is
+                # stashed on the document and disposed when the document is (see
+                # Save-VellumPdfDocument), or replaced by the next staging above.
+                #
+                # -TimestampUrl is user-supplied, so harden the client: a TSA does
+                # not legitimately redirect, and following one would let a hostile
+                # URL bounce the save-time request at an internal host (SSRF). Disable
+                # auto-redirect and bound the request so a black-hole TSA cannot stall
+                # Save indefinitely.
+                $handler = [System.Net.Http.SocketsHttpHandler]::new()
+                $handler.AllowAutoRedirect = $false
+                $httpClient = [System.Net.Http.HttpClient]::new($handler, $true)
+                if ($PSBoundParameters.ContainsKey('TimestampTimeout')) {
+                    $httpClient.Timeout = $TimestampTimeout
+                }
+                $settings.TimestampClient = [VellumPdf.Signing.HttpTimestampClient]::new(
+                    $TimestampUrl, $httpClient, $TimestampRequestCertificate, $TimestampTimeout)
+                if ($clientProp) {
+                    $clientProp.Value = $httpClient
+                }
+                else {
+                    $Document.PSObject.Properties.Add(
+                        [psnoteproperty]::new('PSVellumTimestampHttpClient', $httpClient))
+                }
+            }
+
+            # Stage for Save-VellumPdfDocument; Set-* semantics allow replacing a
+            # previously staged signature.
+            $existing = $Document.PSObject.Properties['PSVellumSignature']
+            if ($existing) {
+                $existing.Value = $settings
             }
             else {
-                $Document.PSObject.Properties.Add(
-                    [psnoteproperty]::new('PSVellumTimestampHttpClient', $httpClient))
+                $Document.PSObject.Properties.Add([psnoteproperty]::new('PSVellumSignature', $settings))
             }
+            $Document
         }
-
-        # Stage for Save-VellumPdfDocument; Set-* semantics allow replacing a
-        # previously staged signature.
-        $existing = $Document.PSObject.Properties['PSVellumSignature']
-        if ($existing) {
-            $existing.Value = $settings
+        catch {
+            $PSCmdlet.ThrowTerminatingError($_)
         }
-        else {
-            $Document.PSObject.Properties.Add([psnoteproperty]::new('PSVellumSignature', $settings))
-        }
-        $Document
     }
 }

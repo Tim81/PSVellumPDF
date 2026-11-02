@@ -178,257 +178,262 @@ function Add-VellumPdfTable {
     )
 
     process {
-        Assert-VellumPdfDocumentOpen -Document $Document -CommandName 'Add-VellumPdfTable'
-        if ($FontHandle) {
-            Assert-VellumPdfFontHandle -FontHandle $FontHandle -Document $Document -CommandName 'Add-VellumPdfTable'
-        }
-        $tablePadding = if ($PSBoundParameters.ContainsKey('CellPadding')) {
-            ConvertTo-VellumInsets -Value $CellPadding -What 'Add-VellumPdfTable: -CellPadding'
-        }
-
-        # Two row shapes are accepted:
-        #   - records: PSCustomObject (e.g. from Import-Csv) or a hashtable per
-        #     row. Columns are the property/key names; values are read by name.
-        #   - cell arrays: an array per row, each element a scalar or a rich-cell
-        #     hashtable (@{ Text=...; ColSpan=...; Background=...; Alignment=... }).
-        # The first row decides the mode.
-        $isRecord = {
-            param($r)
-            ($r -is [System.Management.Automation.PSCustomObject]) -or ($r -is [System.Collections.IDictionary])
-        }
-        $recordMode = $Row.Count -gt 0 -and (& $isRecord $Row[0])
-
-        # All rows must be the same shape. Mixing records and cell-arrays would
-        # otherwise render silently-wrong output (an object stringified into one
-        # cell, or array cells read by property name as all-empty).
-        for ($i = 1; $i -lt $Row.Count; $i++) {
-            if ((& $isRecord $Row[$i]) -ne $recordMode) {
-                throw ('Add-VellumPdfTable: -Row mixes record rows (PSCustomObject/hashtable) and ' +
-                    "cell-array rows; row $i does not match the shape of the first row. Use one shape " +
-                    'for all rows.')
+        try {
+            Assert-VellumPdfDocumentOpen -Document $Document -CommandName 'Add-VellumPdfTable'
+            if ($FontHandle) {
+                Assert-VellumPdfFontHandle -FontHandle $FontHandle -Document $Document -CommandName 'Add-VellumPdfTable'
             }
-        }
+            $tablePadding = if ($PSBoundParameters.ContainsKey('CellPadding')) {
+                ConvertTo-VellumInsets -Value $CellPadding -What 'Add-VellumPdfTable: -CellPadding'
+            }
 
-        # Resolve a single cell value to a spec hashtable carrying at least Text.
-        $toSpec = {
-            param($value)
-            if ($value -is [System.Collections.IDictionary]) {
-                if (-not $value.Contains('Text')) {
-                    throw "Add-VellumPdfTable: a rich-cell hashtable must include a 'Text' key."
+            # Two row shapes are accepted:
+            #   - records: PSCustomObject (e.g. from Import-Csv) or a hashtable per
+            #     row. Columns are the property/key names; values are read by name.
+            #   - cell arrays: an array per row, each element a scalar or a rich-cell
+            #     hashtable (@{ Text=...; ColSpan=...; Background=...; Alignment=... }).
+            # The first row decides the mode.
+            $isRecord = {
+                param($r)
+                ($r -is [System.Management.Automation.PSCustomObject]) -or ($r -is [System.Collections.IDictionary])
+            }
+            $recordMode = $Row.Count -gt 0 -and (& $isRecord $Row[0])
+
+            # All rows must be the same shape. Mixing records and cell-arrays would
+            # otherwise render silently-wrong output (an object stringified into one
+            # cell, or array cells read by property name as all-empty).
+            for ($i = 1; $i -lt $Row.Count; $i++) {
+                if ((& $isRecord $Row[$i]) -ne $recordMode) {
+                    throw ('Add-VellumPdfTable: -Row mixes record rows (PSCustomObject/hashtable) and ' +
+                        "cell-array rows; row $i does not match the shape of the first row. Use one shape " +
+                        'for all rows.')
                 }
-                return $value
             }
-            return @{ Text = [string]$value }
-        }
 
-        # Build the rows as arrays of cell specs, and the effective header cells.
-        $headerLabels = $Header
-        $specRows = [System.Collections.Generic.List[object]]::new()
-        if ($recordMode) {
-            $columns = if ($Row[0] -is [System.Collections.IDictionary]) {
-                @($Row[0].Keys)
+            # Resolve a single cell value to a spec hashtable carrying at least Text.
+            $toSpec = {
+                param($value)
+                if ($value -is [System.Collections.IDictionary]) {
+                    if (-not $value.Contains('Text')) {
+                        throw "Add-VellumPdfTable: a rich-cell hashtable must include a 'Text' key."
+                    }
+                    return $value
+                }
+                return @{ Text = [string]$value }
+            }
+
+            # Build the rows as arrays of cell specs, and the effective header cells.
+            $headerLabels = $Header
+            $specRows = [System.Collections.Generic.List[object]]::new()
+            if ($recordMode) {
+                $columns = if ($Row[0] -is [System.Collections.IDictionary]) {
+                    @($Row[0].Keys)
+                }
+                else {
+                    @($Row[0].PSObject.Properties.Name)
+                }
+                if (-not $headerLabels) { $headerLabels = [string[]]$columns }
+                foreach ($rec in $Row) {
+                    $cells = foreach ($col in $columns) {
+                        $cellValue = Get-VellumPdfPropertyValue -InputObject $rec -Name $col
+                        & $toSpec $cellValue
+                    }
+                    $specRows.Add(@($cells))
+                }
             }
             else {
-                @($Row[0].PSObject.Properties.Name)
-            }
-            if (-not $headerLabels) { $headerLabels = [string[]]$columns }
-            foreach ($rec in $Row) {
-                $cells = foreach ($col in $columns) {
-                    $cellValue = if ($rec -is [System.Collections.IDictionary]) { $rec[$col] } else { $rec.$col }
-                    & $toSpec $cellValue
-                }
-                $specRows.Add(@($cells))
-            }
-        }
-        else {
-            foreach ($r in $Row) {
-                $cells = foreach ($v in @($r)) { & $toSpec $v }
-                $specRows.Add(@($cells))
-            }
-        }
-
-        # -Header is one row of entries, or several rows when its entries are themselves arrays.
-        $isHeaderRow = { param($e) $e -is [System.Collections.IEnumerable] -and $e -isnot [string] -and $e -isnot [System.Collections.IDictionary] }
-        $headerRowSpecs = [System.Collections.Generic.List[object]]::new()
-        if ($null -ne $headerLabels) {
-            $nested = @(@($headerLabels) | Where-Object { & $isHeaderRow $_ }).Count
-            if ($nested -gt 0 -and $nested -ne @($headerLabels).Count) {
-                throw 'Add-VellumPdfTable: -Header mixes plain entries and row arrays; give either one row of entries or several row arrays.'
-            }
-            if ($nested -gt 0) {
-                foreach ($hrow in $headerLabels) { $headerRowSpecs.Add(@(foreach ($h in @($hrow)) { & $toSpec $h })) }
-            }
-            else { $headerRowSpecs.Add(@(foreach ($h in @($headerLabels)) { & $toSpec $h })) }
-        }
-        $headerSpecs = if ($headerRowSpecs.Count) { @($headerRowSpecs | ForEach-Object { $_ }) } else { @() }   # every header cell, for text checks
-
-        # Encoding warning over every header and data cell's text, skipping cells
-        # that render in an embedded font (the table's, or the cell's own).
-        $cellText = @(
-            foreach ($spec in @($headerSpecs) + @($specRows | ForEach-Object { $_ })) {
-                if (-not $FontHandle -and -not $spec['FontHandle']) { [string]$spec['Text'] }
-            }
-        )
-        Write-VellumPdfEncodingWarning -Text $cellText -CommandName 'Add-VellumPdfTable'
-
-        $table = [VellumPdf.Layout.Elements.Table.TableElement]::new()
-
-        # Effective table font/size: the -Font/-FontSize overrides, else the
-        # document defaults. A TextStyle without a font renders in the
-        # library-global Helvetica, so these fill the gap for the default cell
-        # style AND for rich cells that set only Colour (see $buildCell).
-        $default = Resolve-VellumPdfDefault -Document $Document
-        $effFont = if ($Font) { $Font } else { $default.Font }
-        $effSize = if ($PSBoundParameters.ContainsKey('FontSize')) { $FontSize } else { $default.FontSize }
-        if ($FontHandle) {
-            $table.DefaultCellStyle = New-VellumTextStyle -FontHandle $FontHandle -FontSize $effSize
-        }
-        elseif ([bool]$Font -or $PSBoundParameters.ContainsKey('FontSize')) {
-            $table.DefaultCellStyle = New-VellumTextStyle -Font $effFont -FontSize $effSize
-        }
-
-        # The base-14 font names a rich cell's Font key may use (same set as the
-        # -Font parameter's ValidateSet, which does not reach per-cell hashtables).
-        $fontNames = @('Courier', 'CourierBold', 'CourierBoldOblique', 'CourierOblique',
-            'Helvetica', 'HelveticaBold', 'HelveticaBoldOblique', 'HelveticaOblique',
-            'Symbol', 'TimesBold', 'TimesBoldItalic', 'TimesItalic', 'TimesRoman', 'ZapfDingbats')
-
-        # Apply border width.
-        if ($PSBoundParameters.ContainsKey('BorderWidth')) {
-            $table.BorderWidth = $BorderWidth
-        }
-
-        # Resolve flexible colours once (RGB triple / hex / name -> ColorRgb).
-        $toRgb = {
-            param($value)
-            $c = ConvertTo-VellumColor $value
-            [VellumPdf.Layout.Core.ColorRgb]::new($c[0], $c[1], $c[2])
-        }
-        if ($PSBoundParameters.ContainsKey('BorderColor')) { $table.BorderColor = & $toRgb $BorderColor }
-        $headerBg = if ($PSBoundParameters.ContainsKey('HeaderBackground')) { & $toRgb $HeaderBackground }
-        $altBg    = if ($PSBoundParameters.ContainsKey('AlternateRowBackground')) { & $toRgb $AlternateRowBackground }
-
-        # Builds a styled Cell from a spec hashtable at a column index. Rich-cell
-        # values are validated here because the -Font/-FontSize/-Alignment
-        # parameter guards do not reach per-cell hashtables.
-        $buildCell = {
-            param($spec, $colIndex)
-            $cell = [VellumPdf.Layout.Elements.Table.Cell]::new([string]$spec['Text'])
-
-            $align = if ($spec['Alignment']) { [string]$spec['Alignment'] }
-                elseif ($ColumnAlignment -and $colIndex -lt $ColumnAlignment.Count) { $ColumnAlignment[$colIndex] }
-                else { $Alignment }
-            if ($align -notin @('Left', 'Center', 'Right', 'Justify')) {
-                throw "Add-VellumPdfTable: rich-cell Alignment '$align' is invalid; use Left, Center, Right, or Justify."
-            }
-            $cell.Alignment = [VellumPdf.Layout.Core.HorizontalAlignment]::$align
-
-            foreach ($spanKey in 'ColSpan', 'RowSpan') {
-                if ($null -ne $spec[$spanKey]) {
-                    $span = $spec[$spanKey] -as [int]
-                    if ($null -eq $span -or $span -lt 1) {
-                        throw "Add-VellumPdfTable: rich-cell $spanKey must be a positive integer; got '$($spec[$spanKey])'."
-                    }
-                    $cell.$spanKey = $span
+                foreach ($r in $Row) {
+                    $cells = foreach ($v in @($r)) { & $toSpec $v }
+                    $specRows.Add(@($cells))
                 }
             }
 
-            if ($spec['Background']) { $cell.Background = & $toRgb $spec['Background'] }
+            # -Header is one row of entries, or several rows when its entries are themselves arrays.
+            $isHeaderRow = { param($e) $e -is [System.Collections.IEnumerable] -and $e -isnot [string] -and $e -isnot [System.Collections.IDictionary] }
+            $headerRowSpecs = [System.Collections.Generic.List[object]]::new()
+            if ($null -ne $headerLabels) {
+                $nested = @(@($headerLabels) | Where-Object { & $isHeaderRow $_ }).Count
+                if ($nested -gt 0 -and $nested -ne @($headerLabels).Count) {
+                    throw 'Add-VellumPdfTable: -Header mixes plain entries and row arrays; give either one row of entries or several row arrays.'
+                }
+                if ($nested -gt 0) {
+                    foreach ($hrow in $headerLabels) { $headerRowSpecs.Add(@(foreach ($h in @($hrow)) { & $toSpec $h })) }
+                }
+                else { $headerRowSpecs.Add(@(foreach ($h in @($headerLabels)) { & $toSpec $h })) }
+            }
+            $headerSpecs = if ($headerRowSpecs.Count) { @($headerRowSpecs | ForEach-Object { $_ }) } else { @() }   # every header cell, for text checks
 
-            if ($spec['LinkUri']) {
-                throw ('Add-VellumPdfTable: a table cell cannot carry a LinkUri - VellumPdf ignores hyperlinks ' +
-                    'inside table cells. Put the link in a paragraph with -LinkUri instead.')
+            # Encoding warning over every header and data cell's text, skipping cells
+            # that render in an embedded font (the table's, or the cell's own).
+            $cellText = @(
+                foreach ($spec in @($headerSpecs) + @($specRows | ForEach-Object { $_ })) {
+                    if (-not $FontHandle -and -not $spec['FontHandle']) { [string]$spec['Text'] }
+                }
+            )
+            Write-VellumPdfEncodingWarning -Text $cellText -CommandName 'Add-VellumPdfTable'
+
+            $table = [VellumPdf.Layout.Elements.Table.TableElement]::new()
+
+            # Effective table font/size: the -Font/-FontSize overrides, else the
+            # document defaults. A TextStyle without a font renders in the
+            # library-global Helvetica, so these fill the gap for the default cell
+            # style AND for rich cells that set only Colour (see $buildCell).
+            $default = Resolve-VellumPdfDefault -Document $Document
+            $effFont = if ($Font) { $Font } else { $default.Font }
+            $effSize = if ($PSBoundParameters.ContainsKey('FontSize')) { $FontSize } else { $default.FontSize }
+            if ($FontHandle) {
+                $table.DefaultCellStyle = New-VellumTextStyle -FontHandle $FontHandle -FontSize $effSize
+            }
+            elseif ([bool]$Font -or $PSBoundParameters.ContainsKey('FontSize')) {
+                $table.DefaultCellStyle = New-VellumTextStyle -Font $effFont -FontSize $effSize
             }
 
-            $cellHandle = $spec['FontHandle']
-            if ($cellHandle) {
-                if ($cellHandle -isnot [VellumPdf.Fonts.EmbeddedFontHandle]) {
-                    throw 'Add-VellumPdfTable: rich-cell FontHandle must be an EmbeddedFontHandle from Register-VellumPdfFont.'
-                }
-                Assert-VellumPdfFontHandle -FontHandle $cellHandle -Document $Document -CommandName 'Add-VellumPdfTable'
-            }
-            $effHandle = if ($cellHandle) { $cellHandle } else { $FontHandle }
+            # The base-14 font names a rich cell's Font key may use (same set as the
+            # -Font parameter's ValidateSet, which does not reach per-cell hashtables).
+            $fontNames = @('Courier', 'CourierBold', 'CourierBoldOblique', 'CourierOblique',
+                'Helvetica', 'HelveticaBold', 'HelveticaBoldOblique', 'HelveticaOblique',
+                'Symbol', 'TimesBold', 'TimesBoldItalic', 'TimesItalic', 'TimesRoman', 'ZapfDingbats')
 
-            if ($null -ne $spec['Leading']) {
-                $lead = $spec['Leading'] -as [double]
-                if ($null -eq $lead -or $lead -lt 0 -or $lead -gt 1000) {
-                    throw "Add-VellumPdfTable: rich-cell Leading must be between 0 and 1000; got '$($spec['Leading'])'."
-                }
+            # Apply border width.
+            if ($PSBoundParameters.ContainsKey('BorderWidth')) {
+                $table.BorderWidth = $BorderWidth
             }
 
-            if ($spec['Font'] -or $null -ne $spec['FontSize'] -or $spec['Color'] -or $cellHandle -or $null -ne $spec['Leading']) {
-                if ($spec['Font'] -and [string]$spec['Font'] -notin $fontNames) {
-                    throw ("Add-VellumPdfTable: rich-cell Font '$($spec['Font'])' is not a base-14 font name. " +
-                        "Valid names: $($fontNames -join ', ').")
+            # Resolve flexible colours once (RGB triple / hex / name -> ColorRgb).
+            $toRgb = {
+                param($value)
+                $c = ConvertTo-VellumColor $value
+                [VellumPdf.Layout.Core.ColorRgb]::new($c[0], $c[1], $c[2])
+            }
+            if ($PSBoundParameters.ContainsKey('BorderColor')) { $table.BorderColor = & $toRgb $BorderColor }
+            $headerBg = if ($PSBoundParameters.ContainsKey('HeaderBackground')) { & $toRgb $HeaderBackground }
+            $altBg    = if ($PSBoundParameters.ContainsKey('AlternateRowBackground')) { & $toRgb $AlternateRowBackground }
+
+            # Builds a styled Cell from a spec hashtable at a column index. Rich-cell
+            # values are validated here because the -Font/-FontSize/-Alignment
+            # parameter guards do not reach per-cell hashtables.
+            $buildCell = {
+                param($spec, $colIndex)
+                $cell = [VellumPdf.Layout.Elements.Table.Cell]::new([string]$spec['Text'])
+
+                $align = if ($spec['Alignment']) { [string]$spec['Alignment'] }
+                    elseif ($ColumnAlignment -and $colIndex -lt $ColumnAlignment.Count) { $ColumnAlignment[$colIndex] }
+                    else { $Alignment }
+                if ($align -notin @('Left', 'Center', 'Right', 'Justify')) {
+                    throw "Add-VellumPdfTable: rich-cell Alignment '$align' is invalid; use Left, Center, Right, or Justify."
                 }
-                if ($null -ne $spec['FontSize']) {
-                    $size = $spec['FontSize'] -as [double]
-                    if ($null -eq $size -or $size -lt 1 -or $size -gt 1000) {
-                        throw "Add-VellumPdfTable: rich-cell FontSize must be between 1 and 1000; got '$($spec['FontSize'])'."
+                $cell.Alignment = [VellumPdf.Layout.Core.HorizontalAlignment]::$align
+
+                foreach ($spanKey in 'ColSpan', 'RowSpan') {
+                    if ($null -ne $spec[$spanKey]) {
+                        $span = $spec[$spanKey] -as [int]
+                        if ($null -eq $span -or $span -lt 1) {
+                            throw "Add-VellumPdfTable: rich-cell $spanKey must be a positive integer; got '$($spec[$spanKey])'."
+                        }
+                        $cell.$spanKey = $span
                     }
                 }
-                # Fill the font/size gap from the table's effective default so a
-                # Colour-only cell keeps the table font (base-14 or embedded)
-                # instead of falling back to the library-global Helvetica.
-                $cellStyle = @{
-                    FontSize = if ($null -ne $spec['FontSize']) { [double]$spec['FontSize'] } else { $effSize }
+
+                if ($spec['Background']) { $cell.Background = & $toRgb $spec['Background'] }
+
+                if ($spec['LinkUri']) {
+                    throw ('Add-VellumPdfTable: a table cell cannot carry a LinkUri - VellumPdf ignores hyperlinks ' +
+                        'inside table cells. Put the link in a paragraph with -LinkUri instead.')
                 }
-                if ($effHandle -and -not $spec['Font']) { $cellStyle['FontHandle'] = $effHandle }
-                else { $cellStyle['Font'] = if ($spec['Font']) { [string]$spec['Font'] } else { $effFont } }
-                if ($spec['Color']) { $cellStyle['Color'] = ConvertTo-VellumColor $spec['Color'] }
-                if ($null -ne $spec['Leading']) { $cellStyle['Leading'] = [double]$spec['Leading'] }
-                $cell.Style = New-VellumTextStyle @cellStyle
+
+                $cellHandle = $spec['FontHandle']
+                if ($cellHandle) {
+                    if ($cellHandle -isnot [VellumPdf.Fonts.EmbeddedFontHandle]) {
+                        throw 'Add-VellumPdfTable: rich-cell FontHandle must be an EmbeddedFontHandle from Register-VellumPdfFont.'
+                    }
+                    Assert-VellumPdfFontHandle -FontHandle $cellHandle -Document $Document -CommandName 'Add-VellumPdfTable'
+                }
+                $effHandle = if ($cellHandle) { $cellHandle } else { $FontHandle }
+
+                if ($null -ne $spec['Leading']) {
+                    $lead = $spec['Leading'] -as [double]
+                    if ($null -eq $lead -or $lead -lt 0 -or $lead -gt 1000) {
+                        throw "Add-VellumPdfTable: rich-cell Leading must be between 0 and 1000; got '$($spec['Leading'])'."
+                    }
+                }
+
+                if ($spec['Font'] -or $null -ne $spec['FontSize'] -or $spec['Color'] -or $cellHandle -or $null -ne $spec['Leading']) {
+                    if ($spec['Font'] -and [string]$spec['Font'] -notin $fontNames) {
+                        throw ("Add-VellumPdfTable: rich-cell Font '$($spec['Font'])' is not a base-14 font name. " +
+                            "Valid names: $($fontNames -join ', ').")
+                    }
+                    if ($null -ne $spec['FontSize']) {
+                        $size = $spec['FontSize'] -as [double]
+                        if ($null -eq $size -or $size -lt 1 -or $size -gt 1000) {
+                            throw "Add-VellumPdfTable: rich-cell FontSize must be between 1 and 1000; got '$($spec['FontSize'])'."
+                        }
+                    }
+                    # Fill the font/size gap from the table's effective default so a
+                    # Colour-only cell keeps the table font (base-14 or embedded)
+                    # instead of falling back to the library-global Helvetica.
+                    $cellStyle = @{
+                        FontSize = if ($null -ne $spec['FontSize']) { [double]$spec['FontSize'] } else { $effSize }
+                    }
+                    if ($effHandle -and -not $spec['Font']) { $cellStyle['FontHandle'] = $effHandle }
+                    else { $cellStyle['Font'] = if ($spec['Font']) { [string]$spec['Font'] } else { $effFont } }
+                    if ($spec['Color']) { $cellStyle['Color'] = ConvertTo-VellumColor $spec['Color'] }
+                    if ($null -ne $spec['Leading']) { $cellStyle['Leading'] = [double]$spec['Leading'] }
+                    $cell.Style = New-VellumTextStyle @cellStyle
+                }
+
+                if ($null -ne $spec['Padding']) {
+                    $cell.Padding = ConvertTo-VellumInsets -Value $spec['Padding'] -What 'Add-VellumPdfTable: rich-cell Padding'
+                }
+                elseif ($tablePadding) {
+                    $cell.Padding = $tablePadding
+                }
+                if ($spec['Language']) { $cell.Language = [string]$spec['Language'] }
+                $cell
             }
 
-            if ($null -ne $spec['Padding']) {
-                $cell.Padding = ConvertTo-VellumInsets -Value $spec['Padding'] -What 'Add-VellumPdfTable: rich-cell Padding'
+            # Apply column widths.
+            if ($ColumnWidth) {
+                $columnCount = if ($headerRowSpecs.Count) { $headerRowSpecs[0].Count } elseif ($specRows.Count) { $specRows[0].Count } else { 0 }
+                if ($ColumnWidth.Count -ne $columnCount) {
+                    Write-Warning ("Add-VellumPdfTable: -ColumnWidth has $($ColumnWidth.Count) value(s) " +
+                        "but the table has $columnCount column(s); extra widths are ignored and " +
+                        'missing ones fall back to the library default.')
+                }
+                [void]$table.SetColumnWidths($ColumnWidth)
             }
-            elseif ($tablePadding) {
-                $cell.Padding = $tablePadding
+
+            # Add optional header row.
+            foreach ($specsOfRow in $headerRowSpecs) {
+                $headerRow = $table.AddHeaderRow()
+                if ($headerBg) { $headerRow.Background = $headerBg }
+                $hi = 0
+                foreach ($headerSpec in $specsOfRow) {
+                    [void]$headerRow.AddCell((& $buildCell $headerSpec $hi))
+                    $hi++
+                }
             }
-            if ($spec['Language']) { $cell.Language = [string]$spec['Language'] }
-            $cell
+
+            # Add data rows, applying zebra striping to every second row.
+            $rowIndex = 0
+            foreach ($specRow in $specRows) {
+                $tableRow = $table.AddRow($false)
+                if ($altBg -and ($rowIndex % 2 -eq 1)) { $tableRow.Background = $altBg }
+                $colIndex = 0
+                foreach ($spec in $specRow) {
+                    [void]$tableRow.AddCell((& $buildCell $spec $colIndex))
+                    $colIndex++
+                }
+                $rowIndex++
+            }
+
+            Set-VellumPdfElementMargin -Element $table -Top $MarginTop -Bottom $MarginBottom `
+                -BoundParameters $PSBoundParameters -Document $Document -DeferBottom
+
+            [void]$Document.Add($table)
+            $Document
         }
-
-        # Apply column widths.
-        if ($ColumnWidth) {
-            $columnCount = if ($headerRowSpecs.Count) { $headerRowSpecs[0].Count } elseif ($specRows.Count) { $specRows[0].Count } else { 0 }
-            if ($ColumnWidth.Count -ne $columnCount) {
-                Write-Warning ("Add-VellumPdfTable: -ColumnWidth has $($ColumnWidth.Count) value(s) " +
-                    "but the table has $columnCount column(s); extra widths are ignored and " +
-                    'missing ones fall back to the library default.')
-            }
-            [void]$table.SetColumnWidths($ColumnWidth)
+        catch {
+            $PSCmdlet.ThrowTerminatingError($_)
         }
-
-        # Add optional header row.
-        foreach ($specsOfRow in $headerRowSpecs) {
-            $headerRow = $table.AddHeaderRow()
-            if ($headerBg) { $headerRow.Background = $headerBg }
-            $hi = 0
-            foreach ($headerSpec in $specsOfRow) {
-                [void]$headerRow.AddCell((& $buildCell $headerSpec $hi))
-                $hi++
-            }
-        }
-
-        # Add data rows, applying zebra striping to every second row.
-        $rowIndex = 0
-        foreach ($specRow in $specRows) {
-            $tableRow = $table.AddRow($false)
-            if ($altBg -and ($rowIndex % 2 -eq 1)) { $tableRow.Background = $altBg }
-            $colIndex = 0
-            foreach ($spec in $specRow) {
-                [void]$tableRow.AddCell((& $buildCell $spec $colIndex))
-                $colIndex++
-            }
-            $rowIndex++
-        }
-
-        Set-VellumPdfElementMargin -Element $table -Top $MarginTop -Bottom $MarginBottom `
-            -BoundParameters $PSBoundParameters -Document $Document -DeferBottom
-
-        [void]$Document.Add($table)
-        $Document
     }
 }

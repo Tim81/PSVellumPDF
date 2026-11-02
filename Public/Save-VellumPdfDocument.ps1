@@ -109,232 +109,237 @@ function Save-VellumPdfDocument {
     )
 
     process {
-        Assert-VellumPdfDocumentOpen -Document $Document -CommandName 'Save-VellumPdfDocument'
-        # A Layout document is single-use: layout runs inside Save, a second Save
-        # throws, and a failed Save can leave pages from the failed attempt so a
-        # retry may write a wrong file (VellumPdf #530). Say so plainly.
-        if ($Document.PSObject.Properties['PSVellumFailed']) {
-            throw ('Save-VellumPdfDocument: a previous save of this document failed, which can leave it in an ' +
-                'inconsistent state (a retry could write a different file). Build a new document with ' +
-                'New-VellumPdfDocument.')
-        }
-        if ($Document.PSObject.Properties['PSVellumSaved']) {
-            throw ('Save-VellumPdfDocument: this document was already saved (-KeepOpen). A VellumPdf layout ' +
-                'document can be written only once; build a new document with New-VellumPdfDocument.')
-        }
-
-        $validateProfile = $null
-        if ($Validate) {
-            $validateProfile = switch ($Document.Conformance) {
-                ([VellumPdf.Document.PdfConformance]::PdfA2b) { 'PdfA2b' }
-                ([VellumPdf.Document.PdfConformance]::PdfA2u) { 'PdfA2u' }
-                ([VellumPdf.Document.PdfConformance]::PdfA2a) { 'PdfA2a' }
-                ([VellumPdf.Document.PdfConformance]::PdfUA1) { 'PdfUA1' }
-                default { $null }
-            }
-            if (-not $validateProfile) {
-                throw ('Save-VellumPdfDocument: -Validate needs a document created with ' +
-                    'New-VellumPdfDocument -Conformance PdfA2b/PdfA2u/PdfA2a/PdfUA1.')
-            }
-            if ($Document.PSObject.Properties['PSVellumProtected']) {
-                throw 'Save-VellumPdfDocument: -Validate cannot read an encrypted PDF; validate before Protect-VellumPdfDocument or run Test-VellumPdfConformance -Password afterwards.'
-            }
-        }
-        $toMemory = $PSCmdlet.ParameterSetName -ne 'Path'
-        $resolved = if ($toMemory) {
-            if ($PSCmdlet.ParameterSetName -eq 'Stream') {
-                if (-not $Stream.CanWrite) {
-                    throw 'Save-VellumPdfDocument: -Stream must be a writable stream.'
-                }
-                '<stream>'
-            }
-            else { '<bytes>' }
-        }
-        else {
-            $ExecutionContext.SessionState.Path.GetUnresolvedProviderPathFromPSPath($Path)
-        }
-
-        # A signature staged by Set-VellumPdfSignature makes signing the write
-        # step: VellumPdf signs at serialization time, so Sign() replaces Save().
-        $signature = $Document.PSObject.Properties['PSVellumSignature']
-        $action = if ($signature) { 'Save signed PDF' } else { 'Save PDF' }
-
-        $attempted = $false
         try {
-            # Everything below is skipped under -WhatIf (ShouldProcess returns
-            # $false): nothing is written and the document is left open. The
-            # directory check lives here too so a -WhatIf dry run never throws
-            # or disposes the document.
-            if ($PSCmdlet.ShouldProcess($resolved, $action)) {
-                $attempted = $true
+            Assert-VellumPdfDocumentOpen -Document $Document -CommandName 'Save-VellumPdfDocument'
+            # A Layout document is single-use: layout runs inside Save, a second Save
+            # throws, and a failed Save can leave pages from the failed attempt so a
+            # retry may write a wrong file (VellumPdf #530). Say so plainly.
+            if ($Document.PSObject.Properties['PSVellumFailed']) {
+                throw ('Save-VellumPdfDocument: a previous save of this document failed, which can leave it in an ' +
+                    'inconsistent state (a retry could write a different file). Build a new document with ' +
+                    'New-VellumPdfDocument.')
+            }
+            if ($Document.PSObject.Properties['PSVellumSaved']) {
+                throw ('Save-VellumPdfDocument: this document was already saved (-KeepOpen). A VellumPdf layout ' +
+                    'document can be written only once; build a new document with New-VellumPdfDocument.')
+            }
 
-                # Renders (or signs) the document into an open stream, mapping engine
-                # failures to messages with context for this operation.
-                $render = {
-                    param([System.IO.Stream]$Target)
-                    try {
-                        # A page-based document accumulates its drawing in per-page canvases.
-                        if ($Document -is [VellumPdf.Document.PdfDocument]) {
-                            Complete-VellumPdfPageDocument -Document $Document
-                            if ($Document.Linearize -and $signature) {
-                                Write-Warning ('Save-VellumPdfDocument: signing ignores -Linearize; the signed file is not linearized.')
-                            }
-                        }
-                        if ($signature -and $signature.Value.ExternalSigner) {
-                            # An external signer only supports the asynchronous path. Layout then runs on
-                            # a thread-pool thread, which cannot execute Add-VellumPdfDrawing script blocks.
-                            if ($Document.PSObject.Properties['PSVellumHasDrawing']) {
-                                throw ('an external signer signs asynchronously, which cannot run the script blocks of ' +
-                                    'Add-VellumPdfDrawing elements in this document')
-                            }
-                            [void][VellumPdf.Signing.SigningExtensions]::SignAsync(
-                                $Document, $Target, $signature.Value, [System.Threading.CancellationToken]::None).GetAwaiter().GetResult()
-                        }
-                        elseif ($signature) {
-                            [VellumPdf.Signing.SigningExtensions]::Sign($Document, $Target, $signature.Value)
-                        }
-                        else {
-                            $Document.Save($Target)
-                        }
-                    }
-                    catch {
-                        # The engine may keep state from the failed attempt: never let a retry write a file.
-                        $Document.PSObject.Properties.Add([psnoteproperty]::new('PSVellumFailed', $true))
-                        # Surface failures with context specific to the operation
-                        # that failed instead of a bare library exception.
-                        $reason = $_.Exception.Message
-                        if ($_.Exception.InnerException) { $reason = $_.Exception.InnerException.Message }
-                        if ($signature) {
-                            $hint = 'Check that the signing certificate is valid and still holds its private key.'
-                            if ($signature.Value.TimestampClient) {
-                                $hint = 'Check that the signing certificate is valid and holds its private key, ' +
-                                    'and that the timestamp authority (-TimestampUrl) is reachable.'
-                            }
-                            if ($signature.Value.Level -ge [VellumPdf.Signing.PadesLevel]::B_LT) {
-                                $hint += ' B-LT/B-LTA also need the OCSP/CRL servers named in the certificate chain to be reachable;' +
-                                    ' if the signature does not fit, raise -EstimatedSignatureSize.'
-                            }
-                            if ($signature.Value.SignaturePage -gt 0) {
-                                $hint += " -SignaturePage $($signature.Value.SignaturePage + 1) must not exceed the document's page count."
-                            }
-                            throw "Save-VellumPdfDocument: failed to sign '$resolved': $reason $hint"
-                        }
-                        throw ("Save-VellumPdfDocument: failed to render '$resolved': $reason " +
-                            'Check for extreme margin values or elements taller than the page.')
-                    }
+            $validateProfile = $null
+            if ($Validate) {
+                $validateProfile = switch ($Document.Conformance) {
+                    ([VellumPdf.Document.PdfConformance]::PdfA2b) { 'PdfA2b' }
+                    ([VellumPdf.Document.PdfConformance]::PdfA2u) { 'PdfA2u' }
+                    ([VellumPdf.Document.PdfConformance]::PdfA2a) { 'PdfA2a' }
+                    ([VellumPdf.Document.PdfConformance]::PdfUA1) { 'PdfUA1' }
+                    default { $null }
                 }
-
-                # Preflight the rendered bytes; nothing reaches the target if they fail.
-                $validateBytes = {
-                    param([byte[]]$Data)
-                    if (-not $validateProfile) { return }
-                    $check = Invoke-VellumPdfPreflight -Bytes $Data -Profile $validateProfile -Source $resolved
-                    if (-not $check.IsCompliant) {
-                        $Document.PSObject.Properties.Add([psnoteproperty]::new('PSVellumFailed', $true))
-                        $top = @($check.Assertions | Where-Object Severity -EQ 'Error' | Select-Object -First 5 |
-                                ForEach-Object { "  - $($_.RuleId): $($_.Message)" }) -join "`n"
-                        $more = if ($check.ErrorCount -gt 5) { "`n  ... and $($check.ErrorCount - 5) more" } else { '' }
-                        throw ("Save-VellumPdfDocument: the rendered PDF is not $validateProfile compliant " +
-                            "($($check.ErrorCount) error(s)); nothing was written.`n$top$more")
-                    }
+                if (-not $validateProfile) {
+                    throw ('Save-VellumPdfDocument: -Validate needs a document created with ' +
+                        'New-VellumPdfDocument -Conformance PdfA2b/PdfA2u/PdfA2a/PdfUA1.')
                 }
-
-                $bytesResult = $null
-                if ($toMemory) {
-                    # Render into memory first so a failure never leaves a partial
-                    # PDF in the caller's stream.
-                    $memory = [System.IO.MemoryStream]::new()
-                    try {
-                        & $render $memory
-                        if ($validateProfile) { & $validateBytes $memory.ToArray() }
-                        if ($PSCmdlet.ParameterSetName -eq 'Stream') {
-                            try { $memory.WriteTo($Stream); $Stream.Flush() }
-                            catch {
-                                throw "Save-VellumPdfDocument: rendered the PDF but could not write it to -Stream: $($_.Exception.Message)"
-                            }
-                        }
-                        else { $bytesResult = $memory.ToArray() }
-                    }
-                    finally { $memory.Dispose() }
+                if ($Document.PSObject.Properties['PSVellumProtected']) {
+                    throw 'Save-VellumPdfDocument: -Validate cannot read an encrypted PDF; validate before Protect-VellumPdfDocument or run Test-VellumPdfConformance -Password afterwards.'
                 }
-                else {
-                    $parent = [System.IO.Path]::GetDirectoryName($resolved)
-                    if ($parent -and $Force -and -not [System.IO.Directory]::Exists($parent)) {
-                        [void][System.IO.Directory]::CreateDirectory($parent)
+            }
+            $toMemory = $PSCmdlet.ParameterSetName -ne 'Path'
+            $resolved = if ($toMemory) {
+                if ($PSCmdlet.ParameterSetName -eq 'Stream') {
+                    if (-not $Stream.CanWrite) {
+                        throw 'Save-VellumPdfDocument: -Stream must be a writable stream.'
                     }
-                    if ($parent -and -not [System.IO.Directory]::Exists($parent)) {
-                        throw "Save-VellumPdfDocument: directory not found: '$parent'. Create it first or pass a path in an existing directory."
-                    }
+                    '<stream>'
+                }
+                else { '<bytes>' }
+            }
+            else {
+                $ExecutionContext.SessionState.Path.GetUnresolvedProviderPathFromPSPath($Path)
+            }
 
-                    # Render/sign to a temporary file beside the target, then move
-                    # it into place only once it is complete. Writing straight to
-                    # -Path would truncate an existing good file the moment a
-                    # render/sign failure occurred.
-                    $temp = "$resolved.$([guid]::NewGuid().ToString('N')).tmp"
-                    try {
-                        $fileStream = [System.IO.File]::Create($temp)
-                        try { & $render $fileStream }
-                        finally { $fileStream.Dispose() }
-                        if ($validateProfile) { & $validateBytes ([System.IO.File]::ReadAllBytes($temp)) }
+            # A signature staged by Set-VellumPdfSignature makes signing the write
+            # step: VellumPdf signs at serialization time, so Sign() replaces Save().
+            $signature = $Document.PSObject.Properties['PSVellumSignature']
+            $action = if ($signature) { 'Save signed PDF' } else { 'Save PDF' }
 
-                        # The rendered file is known good; replace the target now.
+            $attempted = $false
+            try {
+                # Everything below is skipped under -WhatIf (ShouldProcess returns
+                # $false): nothing is written and the document is left open. The
+                # directory check lives here too so a -WhatIf dry run never throws
+                # or disposes the document.
+                if ($PSCmdlet.ShouldProcess($resolved, $action)) {
+                    $attempted = $true
+
+                    # Renders (or signs) the document into an open stream, mapping engine
+                    # failures to messages with context for this operation.
+                    $render = {
+                        param([System.IO.Stream]$Target)
                         try {
-                            [System.IO.File]::Move($temp, $resolved, $true)
+                            # A page-based document accumulates its drawing in per-page canvases.
+                            if ($Document -is [VellumPdf.Document.PdfDocument]) {
+                                Complete-VellumPdfPageDocument -Document $Document
+                                if ($Document.Linearize -and $signature) {
+                                    Write-Warning ('Save-VellumPdfDocument: signing ignores -Linearize; the signed file is not linearized.')
+                                }
+                            }
+                            if ($signature -and $signature.Value.ExternalSigner) {
+                                # An external signer only supports the asynchronous path. Layout then runs on
+                                # a thread-pool thread, which cannot execute Add-VellumPdfDrawing script blocks.
+                                if ($Document.PSObject.Properties['PSVellumHasDrawing']) {
+                                    throw ('an external signer signs asynchronously, which cannot run the script blocks of ' +
+                                        'Add-VellumPdfDrawing elements in this document')
+                                }
+                                [void][VellumPdf.Signing.SigningExtensions]::SignAsync(
+                                    $Document, $Target, $signature.Value, [System.Threading.CancellationToken]::None).GetAwaiter().GetResult()
+                            }
+                            elseif ($signature) {
+                                [VellumPdf.Signing.SigningExtensions]::Sign($Document, $Target, $signature.Value)
+                            }
+                            else {
+                                $Document.Save($Target)
+                            }
                         }
                         catch {
+                            # The engine may keep state from the failed attempt: never let a retry write a file.
+                            $Document.PSObject.Properties.Add([psnoteproperty]::new('PSVellumFailed', $true))
+                            # Surface failures with context specific to the operation
+                            # that failed instead of a bare library exception.
                             $reason = $_.Exception.Message
-                            throw ("Save-VellumPdfDocument: rendered the PDF but could not write it to '$resolved': $reason " +
-                                'Check that -Path is a writable file location (not a directory) and is not locked by another process.')
+                            if ($_.Exception.InnerException) { $reason = $_.Exception.InnerException.Message }
+                            if ($signature) {
+                                $hint = 'Check that the signing certificate is valid and still holds its private key.'
+                                if ($signature.Value.TimestampClient) {
+                                    $hint = 'Check that the signing certificate is valid and holds its private key, ' +
+                                        'and that the timestamp authority (-TimestampUrl) is reachable.'
+                                }
+                                if ($signature.Value.Level -ge [VellumPdf.Signing.PadesLevel]::B_LT) {
+                                    $hint += ' B-LT/B-LTA also need the OCSP/CRL servers named in the certificate chain to be reachable;' +
+                                        ' if the signature does not fit, raise -EstimatedSignatureSize.'
+                                }
+                                if ($signature.Value.SignaturePage -gt 0) {
+                                    $hint += " -SignaturePage $($signature.Value.SignaturePage + 1) must not exceed the document's page count."
+                                }
+                                throw "Save-VellumPdfDocument: failed to sign '$resolved': $reason $hint"
+                            }
+                            throw ("Save-VellumPdfDocument: failed to render '$resolved': $reason " +
+                                'Check for extreme margin values or elements taller than the page.')
                         }
                     }
-                    finally {
-                        # Clean up the temp file if a failure left it behind; on
-                        # success it has already been moved onto the target.
-                        if (Test-Path -LiteralPath $temp) {
-                            Remove-Item -LiteralPath $temp -Force -ErrorAction SilentlyContinue
-                        }
-                    }
-                }
 
-                $Document.PSObject.Properties.Add([psnoteproperty]::new('PSVellumSaved', $true))
-                $diagnostics = Write-VellumPdfSaveDiagnostic -Document $Document
-                if ($PassThru) {
-                    $Document
+                    # Preflight the rendered bytes; nothing reaches the target if they fail.
+                    $validateBytes = {
+                        param([byte[]]$Data)
+                        if (-not $validateProfile) { return }
+                        $check = Invoke-VellumPdfPreflight -Bytes $Data -Profile $validateProfile -Source $resolved
+                        if (-not $check.IsCompliant) {
+                            $Document.PSObject.Properties.Add([psnoteproperty]::new('PSVellumFailed', $true))
+                            $top = @($check.Assertions | Where-Object Severity -EQ 'Error' | Select-Object -First 5 |
+                                    ForEach-Object { "  - $($_.RuleId): $($_.Message)" }) -join "`n"
+                            $more = if ($check.ErrorCount -gt 5) { "`n  ... and $($check.ErrorCount - 5) more" } else { '' }
+                            throw ("Save-VellumPdfDocument: the rendered PDF is not $validateProfile compliant " +
+                                "($($check.ErrorCount) error(s)); nothing was written.`n$top$more")
+                        }
+                    }
+
+                    $bytesResult = $null
+                    if ($toMemory) {
+                        # Render into memory first so a failure never leaves a partial
+                        # PDF in the caller's stream.
+                        $memory = [System.IO.MemoryStream]::new()
+                        try {
+                            & $render $memory
+                            if ($validateProfile) { & $validateBytes $memory.ToArray() }
+                            if ($PSCmdlet.ParameterSetName -eq 'Stream') {
+                                try { $memory.WriteTo($Stream); $Stream.Flush() }
+                                catch {
+                                    throw "Save-VellumPdfDocument: rendered the PDF but could not write it to -Stream: $($_.Exception.Message)"
+                                }
+                            }
+                            else { $bytesResult = $memory.ToArray() }
+                        }
+                        finally { $memory.Dispose() }
+                    }
+                    else {
+                        $parent = [System.IO.Path]::GetDirectoryName($resolved)
+                        if ($parent -and $Force -and -not [System.IO.Directory]::Exists($parent)) {
+                            [void][System.IO.Directory]::CreateDirectory($parent)
+                        }
+                        if ($parent -and -not [System.IO.Directory]::Exists($parent)) {
+                            throw "Save-VellumPdfDocument: directory not found: '$parent'. Create it first or pass a path in an existing directory."
+                        }
+
+                        # Render/sign to a temporary file beside the target, then move
+                        # it into place only once it is complete. Writing straight to
+                        # -Path would truncate an existing good file the moment a
+                        # render/sign failure occurred.
+                        $temp = "$resolved.$([guid]::NewGuid().ToString('N')).tmp"
+                        try {
+                            $fileStream = [System.IO.File]::Create($temp)
+                            try { & $render $fileStream }
+                            finally { $fileStream.Dispose() }
+                            if ($validateProfile) { & $validateBytes ([System.IO.File]::ReadAllBytes($temp)) }
+
+                            # The rendered file is known good; replace the target now.
+                            try {
+                                [System.IO.File]::Move($temp, $resolved, $true)
+                            }
+                            catch {
+                                $reason = $_.Exception.Message
+                                throw ("Save-VellumPdfDocument: rendered the PDF but could not write it to '$resolved': $reason " +
+                                    'Check that -Path is a writable file location (not a directory) and is not locked by another process.')
+                            }
+                        }
+                        finally {
+                            # Clean up the temp file if a failure left it behind; on
+                            # success it has already been moved onto the target.
+                            if (Test-Path -LiteralPath $temp) {
+                                Remove-Item -LiteralPath $temp -Force -ErrorAction SilentlyContinue
+                            }
+                        }
+                    }
+
+                    $Document.PSObject.Properties.Add([psnoteproperty]::new('PSVellumSaved', $true))
+                    $diagnostics = Write-VellumPdfSaveDiagnostic -Document $Document
+                    if ($PassThru) {
+                        $Document
+                    }
+                    elseif ($PSCmdlet.ParameterSetName -eq 'Bytes') {
+                        , $bytesResult
+                    }
+                    elseif ($PSCmdlet.ParameterSetName -eq 'Stream') {
+                        # Nothing to return: the PDF is in the caller's stream. Diagnostics were warned above.
+                    }
+                    else {
+                        $file = Get-Item -LiteralPath $resolved
+                        $file | Add-Member -NotePropertyName TextEncodingWarnings -NotePropertyValue $diagnostics.TextEncodingWarnings
+                        $file | Add-Member -NotePropertyName BandTruncations -NotePropertyValue $diagnostics.BandTruncations
+                        $file
+                    }
                 }
-                elseif ($PSCmdlet.ParameterSetName -eq 'Bytes') {
-                    , $bytesResult
-                }
-                elseif ($PSCmdlet.ParameterSetName -eq 'Stream') {
-                    # Nothing to return: the PDF is in the caller's stream. Diagnostics were warned above.
-                }
-                else {
-                    $file = Get-Item -LiteralPath $resolved
-                    $file | Add-Member -NotePropertyName TextEncodingWarnings -NotePropertyValue $diagnostics.TextEncodingWarnings
-                    $file | Add-Member -NotePropertyName BandTruncations -NotePropertyValue $diagnostics.BandTruncations
-                    $file
+            }
+            finally {
+                # Dispose after any save attempt (success or failure), but leave the
+                # document open under -WhatIf, where no attempt was made. The stamp
+                # lets the other cmdlets reject stale use of this document (VellumPdf
+                # itself accepts Add() on a disposed document without complaint).
+                if ($attempted -and -not $KeepOpen -and -not $PassThru) {
+                    $Document.Dispose()
+                    if (-not $Document.PSObject.Properties['PSVellumDisposed']) {
+                        $Document.PSObject.Properties.Add([psnoteproperty]::new('PSVellumDisposed', $true))
+                    }
+                    # An HttpClient stashed by Set-VellumPdfSignature -TimestampUrl was
+                    # only needed for this signing write; dispose it with the document.
+                    foreach ($clientName in 'PSVellumTimestampHttpClient', 'PSVellumRevocationHttpClient') {
+                        $clientProp = $Document.PSObject.Properties[$clientName]
+                        if ($clientProp -and $clientProp.Value) {
+                            $clientProp.Value.Dispose()
+                            $clientProp.Value = $null
+                        }
+                    }
                 }
             }
         }
-        finally {
-            # Dispose after any save attempt (success or failure), but leave the
-            # document open under -WhatIf, where no attempt was made. The stamp
-            # lets the other cmdlets reject stale use of this document (VellumPdf
-            # itself accepts Add() on a disposed document without complaint).
-            if ($attempted -and -not $KeepOpen -and -not $PassThru) {
-                $Document.Dispose()
-                if (-not $Document.PSObject.Properties['PSVellumDisposed']) {
-                    $Document.PSObject.Properties.Add([psnoteproperty]::new('PSVellumDisposed', $true))
-                }
-                # An HttpClient stashed by Set-VellumPdfSignature -TimestampUrl was
-                # only needed for this signing write; dispose it with the document.
-                foreach ($clientName in 'PSVellumTimestampHttpClient', 'PSVellumRevocationHttpClient') {
-                    $clientProp = $Document.PSObject.Properties[$clientName]
-                    if ($clientProp -and $clientProp.Value) {
-                        $clientProp.Value.Dispose()
-                        $clientProp.Value = $null
-                    }
-                }
-            }
+        catch {
+            $PSCmdlet.ThrowTerminatingError($_)
         }
     }
 }

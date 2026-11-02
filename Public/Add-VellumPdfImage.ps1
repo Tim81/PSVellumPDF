@@ -175,82 +175,87 @@ function Add-VellumPdfImage {
     )
 
     process {
-        Assert-VellumPdfDocumentOpen -Document $Document -CommandName 'Add-VellumPdfImage'
+        try {
+            Assert-VellumPdfDocumentOpen -Document $Document -CommandName 'Add-VellumPdfImage'
 
-        # Resolve the bytes and a format key from either input set.
-        if ($PSCmdlet.ParameterSetName -eq 'Bytes') {
-            $bytes = $ImageBytes
-            $formatKey = $Format.ToLowerInvariant()
-            $source = 'the supplied image bytes'
-        }
-        else {
-            $resolved = $ExecutionContext.SessionState.Path.GetUnresolvedProviderPathFromPSPath($Path)
-            if (-not [System.IO.File]::Exists($resolved)) {
-                throw "Add-VellumPdfImage: file not found: '$resolved'. Verify the path and try again."
+            # Resolve the bytes and a format key from either input set.
+            if ($PSCmdlet.ParameterSetName -eq 'Bytes') {
+                $bytes = $ImageBytes
+                $formatKey = $Format.ToLowerInvariant()
+                $source = 'the supplied image bytes'
             }
-            $bytes = [System.IO.File]::ReadAllBytes($resolved)
-            $source = "'$resolved'"
-            $formatKey = Get-VellumPdfImageFormat -Extension ([System.IO.Path]::GetExtension($resolved)) -CommandName 'Add-VellumPdfImage'
-        }
-
-        # Load options (bit depth / decode mode) exist only on some loaders.
-        $wantsOptions = $ReduceToEightBit -or $DecodeToRaster
-        if ($wantsOptions -and $formatKey -notin @('png', 'tiff', 'jbig2', 'jpeg2000', 'ccitt')) {
-            throw ("Add-VellumPdfImage: -ReduceToEightBit and -DecodeToRaster apply to PNG, TIFF, JBIG2, JPEG 2000 " +
-                "and CCITT images only, not $formatKey.")
-        }
-        $loadOptions = $null
-        if ($wantsOptions) {
-            $loadOptions = [VellumPdf.Images.ImageLoadOptions]::new()
-            if ($ReduceToEightBit) { $loadOptions.BitDepth = [VellumPdf.Images.ImageBitDepth]::ReduceToEight }
-            if ($DecodeToRaster)   { $loadOptions.DecodeMode = [VellumPdf.Images.ImageDecodeMode]::DecodeToRaster }
-        }
-        $ccitt = $null
-        if ($formatKey -eq 'ccitt') {
-            if (-not $PSBoundParameters.ContainsKey('Columns') -or -not $PSBoundParameters.ContainsKey('Rows')) {
-                throw 'Add-VellumPdfImage: -Format Ccitt needs -Columns and -Rows (raw fax data has no header).'
+            else {
+                $resolved = $ExecutionContext.SessionState.Path.GetUnresolvedProviderPathFromPSPath($Path)
+                if (-not [System.IO.File]::Exists($resolved)) {
+                    throw "Add-VellumPdfImage: file not found: '$resolved'. Verify the path and try again."
+                }
+                $bytes = [System.IO.File]::ReadAllBytes($resolved)
+                $source = "'$resolved'"
+                $formatKey = Get-VellumPdfImageFormat -Extension ([System.IO.Path]::GetExtension($resolved)) -CommandName 'Add-VellumPdfImage'
             }
-            $ccitt = [VellumPdf.Images.CcittOptions]::new()
-            $ccitt.K = $CcittK
-            $ccitt.BlackIs1 = $BlackIs1.IsPresent
-            $ccitt.EncodedByteAlign = $EncodedByteAlign.IsPresent
-            $ccitt.EndOfLine = $EndOfLine.IsPresent
+
+            # Load options (bit depth / decode mode) exist only on some loaders.
+            $wantsOptions = $ReduceToEightBit -or $DecodeToRaster
+            if ($wantsOptions -and $formatKey -notin @('png', 'tiff', 'jbig2', 'jpeg2000', 'ccitt')) {
+                throw ("Add-VellumPdfImage: -ReduceToEightBit and -DecodeToRaster apply to PNG, TIFF, JBIG2, JPEG 2000 " +
+                    "and CCITT images only, not $formatKey.")
+            }
+            $loadOptions = $null
+            if ($wantsOptions) {
+                $loadOptions = [VellumPdf.Images.ImageLoadOptions]::new()
+                if ($ReduceToEightBit) { $loadOptions.BitDepth = [VellumPdf.Images.ImageBitDepth]::ReduceToEight }
+                if ($DecodeToRaster)   { $loadOptions.DecodeMode = [VellumPdf.Images.ImageDecodeMode]::DecodeToRaster }
+            }
+            $ccitt = $null
+            if ($formatKey -eq 'ccitt') {
+                if (-not $PSBoundParameters.ContainsKey('Columns') -or -not $PSBoundParameters.ContainsKey('Rows')) {
+                    throw 'Add-VellumPdfImage: -Format Ccitt needs -Columns and -Rows (raw fax data has no header).'
+                }
+                $ccitt = [VellumPdf.Images.CcittOptions]::new()
+                $ccitt.K = $CcittK
+                $ccitt.BlackIs1 = $BlackIs1.IsPresent
+                $ccitt.EncodedByteAlign = $EncodedByteAlign.IsPresent
+                $ccitt.EndOfLine = $EndOfLine.IsPresent
+            }
+            elseif ($PSBoundParameters.ContainsKey('Columns') -or $PSBoundParameters.ContainsKey('Rows') -or $PSBoundParameters.ContainsKey('CcittK') -or
+                    $BlackIs1 -or $EncodedByteAlign -or $EndOfLine) {
+                throw 'Add-VellumPdfImage: -Columns/-Rows/-CcittK/-BlackIs1/-EncodedByteAlign/-EndOfLine apply to -Format Ccitt only.'
+            }
+
+            # Loader errors ("Not a PNG file.") do not mention the source; Import-VellumPdfImage
+            # rethrows them with it so batch scripts can identify the culprit.
+            $xObject = Import-VellumPdfImage -Bytes $bytes -Format $formatKey -LoadOptions $loadOptions -Columns $Columns -Rows $Rows `
+                -CcittOptions $ccitt -CommandName 'Add-VellumPdfImage' -Source $source
+
+            $layoutImage = [VellumPdf.Layout.Elements.LayoutImage]::new($xObject)
+
+            if ($PSBoundParameters.ContainsKey('Width')) {
+                $layoutImage.Width = $Width
+            }
+            if ($PSBoundParameters.ContainsKey('Height')) {
+                $layoutImage.Height = $Height
+            }
+
+            $layoutImage.Alignment = [VellumPdf.Layout.Core.HorizontalAlignment]::$Alignment
+
+            if ($PSBoundParameters.ContainsKey('AltText')) {
+                $layoutImage.AltText = $AltText
+            }
+
+            Set-VellumPdfElementMargin -Element $layoutImage -Top $MarginTop -Bottom $MarginBottom `
+                -BoundParameters $PSBoundParameters -Document $Document
+            if ($PSBoundParameters.ContainsKey('MarginLeft') -or $PSBoundParameters.ContainsKey('MarginRight')) {
+                $cur = $layoutImage.Margins
+                $layoutImage.Margins = [VellumPdf.Layout.Core.EdgeInsets]::new(
+                    $cur.Top, $(if ($PSBoundParameters.ContainsKey('MarginRight')) { $MarginRight } else { $cur.Right }),
+                    $cur.Bottom, $(if ($PSBoundParameters.ContainsKey('MarginLeft')) { $MarginLeft } else { $cur.Left }))
+            }
+
+            [void]$Document.Add($layoutImage)
+            $Document
         }
-        elseif ($PSBoundParameters.ContainsKey('Columns') -or $PSBoundParameters.ContainsKey('Rows') -or $PSBoundParameters.ContainsKey('CcittK') -or
-                $BlackIs1 -or $EncodedByteAlign -or $EndOfLine) {
-            throw 'Add-VellumPdfImage: -Columns/-Rows/-CcittK/-BlackIs1/-EncodedByteAlign/-EndOfLine apply to -Format Ccitt only.'
+        catch {
+            $PSCmdlet.ThrowTerminatingError($_)
         }
-
-        # Loader errors ("Not a PNG file.") do not mention the source; Import-VellumPdfImage
-        # rethrows them with it so batch scripts can identify the culprit.
-        $xObject = Import-VellumPdfImage -Bytes $bytes -Format $formatKey -LoadOptions $loadOptions -Columns $Columns -Rows $Rows `
-            -CcittOptions $ccitt -CommandName 'Add-VellumPdfImage' -Source $source
-
-        $layoutImage = [VellumPdf.Layout.Elements.LayoutImage]::new($xObject)
-
-        if ($PSBoundParameters.ContainsKey('Width')) {
-            $layoutImage.Width = $Width
-        }
-        if ($PSBoundParameters.ContainsKey('Height')) {
-            $layoutImage.Height = $Height
-        }
-
-        $layoutImage.Alignment = [VellumPdf.Layout.Core.HorizontalAlignment]::$Alignment
-
-        if ($PSBoundParameters.ContainsKey('AltText')) {
-            $layoutImage.AltText = $AltText
-        }
-
-        Set-VellumPdfElementMargin -Element $layoutImage -Top $MarginTop -Bottom $MarginBottom `
-            -BoundParameters $PSBoundParameters -Document $Document
-        if ($PSBoundParameters.ContainsKey('MarginLeft') -or $PSBoundParameters.ContainsKey('MarginRight')) {
-            $cur = $layoutImage.Margins
-            $layoutImage.Margins = [VellumPdf.Layout.Core.EdgeInsets]::new(
-                $cur.Top, $(if ($PSBoundParameters.ContainsKey('MarginRight')) { $MarginRight } else { $cur.Right }),
-                $cur.Bottom, $(if ($PSBoundParameters.ContainsKey('MarginLeft')) { $MarginLeft } else { $cur.Left }))
-        }
-
-        [void]$Document.Add($layoutImage)
-        $Document
     }
 }

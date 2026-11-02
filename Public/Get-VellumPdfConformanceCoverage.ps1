@@ -36,45 +36,50 @@ function Get-VellumPdfConformanceCoverage {
         [switch]$Summary
     )
 
-    $names = @{
-        PdfA2b = [VellumPdf.Conformance.PdfConformance]::PdfA2B
-        PdfA2u = [VellumPdf.Conformance.PdfConformance]::PdfA2U
-        PdfA2a = [VellumPdf.Conformance.PdfConformance]::PdfA2A
-        PdfUA1 = [VellumPdf.Conformance.PdfConformance]::PdfUA1
-    }
-    $friendly = @{ PdfA2B = 'PdfA2b'; PdfA2U = 'PdfA2u'; PdfA2A = 'PdfA2a'; PdfUA1 = 'PdfUA1' }
-    $selected = if ($Profile) { $Profile } else { @('PdfA2b', 'PdfA2u', 'PdfA2a', 'PdfUA1') }
+    try {
+        $names = @{
+            PdfA2b = [VellumPdf.Conformance.PdfConformance]::PdfA2B
+            PdfA2u = [VellumPdf.Conformance.PdfConformance]::PdfA2U
+            PdfA2a = [VellumPdf.Conformance.PdfConformance]::PdfA2A
+            PdfUA1 = [VellumPdf.Conformance.PdfConformance]::PdfUA1
+        }
+        $friendly = @{ PdfA2B = 'PdfA2b'; PdfA2U = 'PdfA2u'; PdfA2A = 'PdfA2a'; PdfUA1 = 'PdfUA1' }
+        $selected = if ($Profile) { $Profile } else { @('PdfA2b', 'PdfA2u', 'PdfA2a', 'PdfUA1') }
 
-    if ($Summary) {
+        if ($Summary) {
+            foreach ($p in $selected) {
+                $c = [VellumPdf.Conformance.Coverage.ConformanceCatalog]::Coverage($names[$p])
+                [pscustomobject]@{
+                    PSTypeName         = 'PSVellumPDF.ConformanceCoverage'
+                    Profile            = $p
+                    Total              = $c.Total
+                    Implemented        = $c.Implemented
+                    Partial            = $c.Partial
+                    Deferred           = $c.Deferred
+                    OutOfScope         = $c.OutOfScope
+                    PercentImplemented = [math]::Round($c.Percent, 1)
+                }
+            }
+            return
+        }
+
+        $seen = [System.Collections.Generic.HashSet[string]]::new()
         foreach ($p in $selected) {
-            $c = [VellumPdf.Conformance.Coverage.ConformanceCatalog]::Coverage($names[$p])
-            [pscustomobject]@{
-                PSTypeName         = 'PSVellumPDF.ConformanceCoverage'
-                Profile            = $p
-                Total              = $c.Total
-                Implemented        = $c.Implemented
-                Partial            = $c.Partial
-                Deferred           = $c.Deferred
-                OutOfScope         = $c.OutOfScope
-                PercentImplemented = [math]::Round($c.Percent, 1)
+            foreach ($check in [VellumPdf.Conformance.Coverage.ConformanceCatalog]::For($names[$p])) {
+                if ($Status -and ([string]$check.Status) -notin $Status) { continue }
+                if (-not $seen.Add($check.TestId)) { continue }   # a check shared by several profiles is listed once
+                [pscustomobject]@{
+                    PSTypeName = 'PSVellumPDF.ConformanceCheck'
+                    TestId     = $check.TestId
+                    Profiles   = @($check.Profiles | ForEach-Object { $friendly[[string]$_] })
+                    Clause     = $check.Clause
+                    Status     = [string]$check.Status
+                    Note       = $check.Note
+                }
             }
         }
-        return
     }
-
-    $seen = [System.Collections.Generic.HashSet[string]]::new()
-    foreach ($p in $selected) {
-        foreach ($check in [VellumPdf.Conformance.Coverage.ConformanceCatalog]::For($names[$p])) {
-            if ($Status -and ([string]$check.Status) -notin $Status) { continue }
-            if (-not $seen.Add($check.TestId)) { continue }   # a check shared by several profiles is listed once
-            [pscustomobject]@{
-                PSTypeName = 'PSVellumPDF.ConformanceCheck'
-                TestId     = $check.TestId
-                Profiles   = @($check.Profiles | ForEach-Object { $friendly[[string]$_] })
-                Clause     = $check.Clause
-                Status     = [string]$check.Status
-                Note       = $check.Note
-            }
-        }
+    catch {
+        $PSCmdlet.ThrowTerminatingError($_)
     }
 }

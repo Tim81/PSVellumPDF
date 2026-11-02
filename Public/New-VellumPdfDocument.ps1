@@ -141,49 +141,54 @@ function New-VellumPdfDocument {
         [switch]$UseObjectStreams
     )
 
-    $doc = [VellumPdf.Layout.Document]::new()
-    $doc.Conformance = [VellumPdf.Document.PdfConformance]::$Conformance
-    $doc.PageSize = if ($PSCmdlet.ParameterSetName -eq 'CustomPage') {
-        [VellumPdf.Document.PageSize]::Mm($PageWidthMm, $PageHeightMm)
-    } else {
-        [VellumPdf.Document.PageSize]::$PageSize
+    try {
+        $doc = [VellumPdf.Layout.Document]::new()
+        $doc.Conformance = [VellumPdf.Document.PdfConformance]::$Conformance
+        $doc.PageSize = if ($PSCmdlet.ParameterSetName -eq 'CustomPage') {
+            [VellumPdf.Document.PageSize]::Mm($PageWidthMm, $PageHeightMm)
+        } else {
+            [VellumPdf.Document.PageSize]::$PageSize
+        }
+        if ($Tagged) { $doc.Tagged = $true }
+        if ($Language) { $doc.Language = $Language }
+        if ($UseObjectStreams) { $doc.UseObjectStreams = $true }
+
+        $style = New-VellumTextStyle -Font $DefaultFont -FontSize $DefaultFontSize
+        [void]$doc.SetDefaultFont($style)
+
+        # VellumPdf has no getter for the default style, and a TextStyle without a
+        # font falls back to the library-global Helvetica rather than this default.
+        # Stash what we applied so other cmdlets can fill style gaps correctly
+        # (read back via Resolve-VellumPdfDefault).
+        $doc.PSObject.Properties.Add([psnoteproperty]::new(
+            'PSVellumDefault', @{ Font = $DefaultFont; FontSize = $DefaultFontSize }))
+
+        $hasUniform = $PSBoundParameters.ContainsKey('Margin')
+        $hasPerSide = $PSBoundParameters.ContainsKey('MarginTop') -or
+                      $PSBoundParameters.ContainsKey('MarginRight') -or
+                      $PSBoundParameters.ContainsKey('MarginBottom') -or
+                      $PSBoundParameters.ContainsKey('MarginLeft')
+
+        if ($hasPerSide) {
+            # Start from -Margin uniform value if given, else from current document margins.
+            $baseTop    = if ($hasUniform) { $Margin } else { $doc.Margins.Top }
+            $baseRight  = if ($hasUniform) { $Margin } else { $doc.Margins.Right }
+            $baseBottom = if ($hasUniform) { $Margin } else { $doc.Margins.Bottom }
+            $baseLeft   = if ($hasUniform) { $Margin } else { $doc.Margins.Left }
+
+            $top    = if ($PSBoundParameters.ContainsKey('MarginTop'))    { $MarginTop }    else { $baseTop }
+            $right  = if ($PSBoundParameters.ContainsKey('MarginRight'))  { $MarginRight }  else { $baseRight }
+            $bottom = if ($PSBoundParameters.ContainsKey('MarginBottom')) { $MarginBottom } else { $baseBottom }
+            $left   = if ($PSBoundParameters.ContainsKey('MarginLeft'))   { $MarginLeft }   else { $baseLeft }
+
+            $doc.Margins = [VellumPdf.Layout.Core.EdgeInsets]::new($top, $right, $bottom, $left)
+        } elseif ($hasUniform) {
+            $doc.Margins = [VellumPdf.Layout.Core.EdgeInsets]::new($Margin)
+        }
+
+        return $doc
     }
-    if ($Tagged) { $doc.Tagged = $true }
-    if ($Language) { $doc.Language = $Language }
-    if ($UseObjectStreams) { $doc.UseObjectStreams = $true }
-
-    $style = New-VellumTextStyle -Font $DefaultFont -FontSize $DefaultFontSize
-    [void]$doc.SetDefaultFont($style)
-
-    # VellumPdf has no getter for the default style, and a TextStyle without a
-    # font falls back to the library-global Helvetica rather than this default.
-    # Stash what we applied so other cmdlets can fill style gaps correctly
-    # (read back via Resolve-VellumPdfDefault).
-    $doc.PSObject.Properties.Add([psnoteproperty]::new(
-        'PSVellumDefault', @{ Font = $DefaultFont; FontSize = $DefaultFontSize }))
-
-    $hasUniform = $PSBoundParameters.ContainsKey('Margin')
-    $hasPerSide = $PSBoundParameters.ContainsKey('MarginTop') -or
-                  $PSBoundParameters.ContainsKey('MarginRight') -or
-                  $PSBoundParameters.ContainsKey('MarginBottom') -or
-                  $PSBoundParameters.ContainsKey('MarginLeft')
-
-    if ($hasPerSide) {
-        # Start from -Margin uniform value if given, else from current document margins.
-        $baseTop    = if ($hasUniform) { $Margin } else { $doc.Margins.Top }
-        $baseRight  = if ($hasUniform) { $Margin } else { $doc.Margins.Right }
-        $baseBottom = if ($hasUniform) { $Margin } else { $doc.Margins.Bottom }
-        $baseLeft   = if ($hasUniform) { $Margin } else { $doc.Margins.Left }
-
-        $top    = if ($PSBoundParameters.ContainsKey('MarginTop'))    { $MarginTop }    else { $baseTop }
-        $right  = if ($PSBoundParameters.ContainsKey('MarginRight'))  { $MarginRight }  else { $baseRight }
-        $bottom = if ($PSBoundParameters.ContainsKey('MarginBottom')) { $MarginBottom } else { $baseBottom }
-        $left   = if ($PSBoundParameters.ContainsKey('MarginLeft'))   { $MarginLeft }   else { $baseLeft }
-
-        $doc.Margins = [VellumPdf.Layout.Core.EdgeInsets]::new($top, $right, $bottom, $left)
-    } elseif ($hasUniform) {
-        $doc.Margins = [VellumPdf.Layout.Core.EdgeInsets]::new($Margin)
+    catch {
+        $PSCmdlet.ThrowTerminatingError($_)
     }
-
-    return $doc
 }

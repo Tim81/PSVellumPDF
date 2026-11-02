@@ -15,7 +15,8 @@ function Get-VellumPdfInput {
         [string]$CommandName
     )
 
-    if ($Bytes) {
+    if ($null -ne $Bytes) {
+        if ($Bytes.Length -eq 0) { throw "${CommandName}: the byte array is empty, so it is not a PDF." }
         [pscustomobject]@{ Name = '<bytes>'; Data = $Bytes }
         return
     }
@@ -24,13 +25,19 @@ function Get-VellumPdfInput {
     }
     else {
         foreach ($p in $Path) {
-            $found = @($ExecutionContext.SessionState.Path.GetResolvedProviderPathFromPSPath($p, [ref]$null))
-            if (-not $found) { throw "${CommandName}: no file matches '$p'." }
+            $found = try { @($ExecutionContext.SessionState.Path.GetResolvedProviderPathFromPSPath($p, [ref]$null)) }
+            catch [System.Management.Automation.ItemNotFoundException] { @() }
+            if (-not $found) {
+                if ([System.Management.Automation.WildcardPattern]::ContainsWildcardCharacters($p)) { throw "${CommandName}: no file matches '$p'." }
+                throw "${CommandName}: file not found: '$p'."
+            }
             $found
         }
     }
     foreach ($file in $files) {
         if (-not [System.IO.File]::Exists($file)) { throw "${CommandName}: file not found: '$file'." }
-        [pscustomobject]@{ Name = $file; Data = [System.IO.File]::ReadAllBytes($file) }
+        $data = [System.IO.File]::ReadAllBytes($file)
+        if ($data.Length -eq 0) { throw "${CommandName}: '$file' is empty, so it is not a PDF." }
+        [pscustomobject]@{ Name = $file; Data = $data }
     }
 }

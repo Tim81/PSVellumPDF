@@ -55,13 +55,18 @@ function Set-VellumPdfDocumentInfo {
     )
 
     process {
-        Assert-VellumPdfDocumentOpen -Document $Document -CommandName 'Set-VellumPdfDocumentInfo'
-        if ($PSBoundParameters.ContainsKey('Title'))    { $Document.Info.Title    = $Title }
-        if ($PSBoundParameters.ContainsKey('Author'))   { $Document.Info.Author   = $Author }
-        if ($PSBoundParameters.ContainsKey('Subject'))  { $Document.Info.Subject  = $Subject }
-        if ($PSBoundParameters.ContainsKey('Keywords')) { $Document.Info.Keywords = $Keywords }
-        if ($PSBoundParameters.ContainsKey('Creator'))  { $Document.Info.Creator  = $Creator }
-        if ($PSBoundParameters.ContainsKey('Producer')) { $Document.Info.Producer = $Producer }
-        $Document
+        try {
+            Assert-VellumPdfDocumentOpen -Document $Document -CommandName 'Set-VellumPdfDocumentInfo'
+            if ($PSBoundParameters.ContainsKey('Title'))    { $Document.Info.Title    = $Title }
+            if ($PSBoundParameters.ContainsKey('Author'))   { $Document.Info.Author   = $Author }
+            if ($PSBoundParameters.ContainsKey('Subject'))  { $Document.Info.Subject  = $Subject }
+            if ($PSBoundParameters.ContainsKey('Keywords')) { $Document.Info.Keywords = $Keywords }
+            if ($PSBoundParameters.ContainsKey('Creator'))  { $Document.Info.Creator  = $Creator }
+            if ($PSBoundParameters.ContainsKey('Producer')) { $Document.Info.Producer = $Producer }
+            $Document
+        }
+        catch {
+            $PSCmdlet.ThrowTerminatingError($_)
+        }
     }
 }

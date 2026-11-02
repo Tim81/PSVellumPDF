@@ -101,25 +101,30 @@ function New-VellumPdfPageDocument {
         [System.DateTimeOffset]$Timestamp
     )
 
-    if ($Linearize -and $UseObjectStreams) {
-        throw 'New-VellumPdfPageDocument: -Linearize cannot be combined with -UseObjectStreams.'
-    }
-    if ($PSBoundParameters.ContainsKey('DocumentId') -and $DocumentId.Length -ne 16) {
-        throw "New-VellumPdfPageDocument: -DocumentId must be exactly 16 bytes; got $($DocumentId.Length)."
-    }
+    try {
+        if ($Linearize -and $UseObjectStreams) {
+            throw 'New-VellumPdfPageDocument: -Linearize cannot be combined with -UseObjectStreams.'
+        }
+        if ($PSBoundParameters.ContainsKey('DocumentId') -and $DocumentId.Length -ne 16) {
+            throw "New-VellumPdfPageDocument: -DocumentId must be exactly 16 bytes; got $($DocumentId.Length)."
+        }
 
-    $doc = [VellumPdf.Document.PdfDocument]::new()
-    $doc.Conformance = [VellumPdf.Document.PdfConformance]::$Conformance
-    if ($Tagged -or $Conformance -in 'PdfA2a', 'PdfUA1') { $doc.Tagged = $true }
-    $doc.DefaultPageSize = if ($PSCmdlet.ParameterSetName -eq 'CustomPage') {
-        [VellumPdf.Document.PageSize]::Mm($PageWidthMm, $PageHeightMm)
-    } else {
-        [VellumPdf.Document.PageSize]::$PageSize
+        $doc = [VellumPdf.Document.PdfDocument]::new()
+        $doc.Conformance = [VellumPdf.Document.PdfConformance]::$Conformance
+        if ($Tagged -or $Conformance -in 'PdfA2a', 'PdfUA1') { $doc.Tagged = $true }
+        $doc.DefaultPageSize = if ($PSCmdlet.ParameterSetName -eq 'CustomPage') {
+            [VellumPdf.Document.PageSize]::Mm($PageWidthMm, $PageHeightMm)
+        } else {
+            [VellumPdf.Document.PageSize]::$PageSize
+        }
+        if ($Language) { $doc.Language = $Language }
+        if ($UseObjectStreams) { $doc.UseObjectStreams = $true }
+        if ($Linearize) { $doc.Linearize = $true }
+        if ($PSBoundParameters.ContainsKey('DocumentId')) { $doc.DocumentId = $DocumentId }
+        if ($PSBoundParameters.ContainsKey('Timestamp')) { $doc.Timestamp = $Timestamp }
+        $doc
     }
-    if ($Language) { $doc.Language = $Language }
-    if ($UseObjectStreams) { $doc.UseObjectStreams = $true }
-    if ($Linearize) { $doc.Linearize = $true }
-    if ($PSBoundParameters.ContainsKey('DocumentId')) { $doc.DocumentId = $DocumentId }
-    if ($PSBoundParameters.ContainsKey('Timestamp')) { $doc.Timestamp = $Timestamp }
-    $doc
+    catch {
+        $PSCmdlet.ThrowTerminatingError($_)
+    }
 }

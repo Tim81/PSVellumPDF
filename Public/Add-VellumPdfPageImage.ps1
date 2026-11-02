@@ -75,48 +75,53 @@ function Add-VellumPdfPageImage {
     )
 
     process {
-        Assert-VellumPdfDocumentOpen -Document $Document -CommandName 'Add-VellumPdfPageImage'
-        if (-not [double]::IsFinite($X) -or -not [double]::IsFinite($Y)) { throw 'Add-VellumPdfPageImage: -X and -Y must be finite.' }
-        $pdfPage = Get-VellumPdfPage -Document $Document -Page $Page -CommandName 'Add-VellumPdfPageImage'
-        if ($Decorative -and $AltText) { throw 'Add-VellumPdfPageImage: -AltText and -Decorative cannot be combined.' }
-        if ($Document.Tagged -and -not $Decorative -and -not $AltText) {
-            throw ('Add-VellumPdfPageImage: this document is tagged, so every image needs -AltText (what it shows) ' +
-                'or -Decorative (assistive technology should skip it).')
-        }
-
-        if ($PSCmdlet.ParameterSetName -eq 'Bytes') {
-            $bytes = $ImageBytes; $key = $Format.ToLowerInvariant(); $source = 'the supplied image bytes'
-        }
-        else {
-            $resolved = $ExecutionContext.SessionState.Path.GetUnresolvedProviderPathFromPSPath($Path)
-            if (-not [System.IO.File]::Exists($resolved)) { throw "Add-VellumPdfPageImage: file not found: '$resolved'." }
-            $bytes = [System.IO.File]::ReadAllBytes($resolved)
-            $source = "'$resolved'"
-            $key = Get-VellumPdfImageFormat -Extension ([System.IO.Path]::GetExtension($resolved)) -CommandName 'Add-VellumPdfPageImage'
-        }
-        $image = Import-VellumPdfImage -Bytes $bytes -Format $key -CommandName 'Add-VellumPdfPageImage' -Source $source
-
-        $w = if ($PSBoundParameters.ContainsKey('Width')) { $Width } elseif ($PSBoundParameters.ContainsKey('Height')) { $Height * $image.Width / $image.Height } else { [double]$image.Width }
-        $h = if ($PSBoundParameters.ContainsKey('Height')) { $Height } elseif ($PSBoundParameters.ContainsKey('Width')) { $Width * $image.Height / $image.Width } else { [double]$image.Height }
-
-        $counterProp = $Document.PSObject.Properties['PSVellumImageCount']
-        if (-not $counterProp) {
-            $Document.PSObject.Properties.Add([psnoteproperty]::new('PSVellumImageCount', 0))
-            $counterProp = $Document.PSObject.Properties['PSVellumImageCount']
-        }
-        $counterProp.Value++
-        $name = "VIm$($counterProp.Value)"
-        [void]$Document.RegisterImageXObject($pdfPage, $image, $name)
-
-        $canvas = Get-VellumPdfPageCanvas -Document $Document -Page $Page -CommandName 'Add-VellumPdfPageImage'
-        [void]$canvas.SaveState()
         try {
-            $kind = if ($Decorative) { 'Artifact' } else { 'Structure' }
-            Invoke-VellumPdfTagged -Document $Document -Canvas $canvas -PdfPage $pdfPage -Kind $kind -StructType Figure -AltText $AltText -Draw {
-                [void]$canvas.Concat($w, 0, 0, $h, $X, $Y).DoXObject($name)
+            Assert-VellumPdfDocumentOpen -Document $Document -CommandName 'Add-VellumPdfPageImage'
+            Assert-VellumPdfCoordinate $X 'X' 'Add-VellumPdfPageImage'; Assert-VellumPdfCoordinate $Y 'Y' 'Add-VellumPdfPageImage'
+            $pdfPage = Get-VellumPdfPage -Document $Document -Page $Page -CommandName 'Add-VellumPdfPageImage'
+            if ($Decorative -and $AltText) { throw 'Add-VellumPdfPageImage: -AltText and -Decorative cannot be combined.' }
+            if ($Document.Tagged -and -not $Decorative -and -not $AltText) {
+                throw ('Add-VellumPdfPageImage: this document is tagged, so every image needs -AltText (what it shows) ' +
+                    'or -Decorative (assistive technology should skip it).')
             }
+
+            if ($PSCmdlet.ParameterSetName -eq 'Bytes') {
+                $bytes = $ImageBytes; $key = $Format.ToLowerInvariant(); $source = 'the supplied image bytes'
+            }
+            else {
+                $resolved = $ExecutionContext.SessionState.Path.GetUnresolvedProviderPathFromPSPath($Path)
+                if (-not [System.IO.File]::Exists($resolved)) { throw "Add-VellumPdfPageImage: file not found: '$resolved'." }
+                $bytes = [System.IO.File]::ReadAllBytes($resolved)
+                $source = "'$resolved'"
+                $key = Get-VellumPdfImageFormat -Extension ([System.IO.Path]::GetExtension($resolved)) -CommandName 'Add-VellumPdfPageImage'
+            }
+            $image = Import-VellumPdfImage -Bytes $bytes -Format $key -CommandName 'Add-VellumPdfPageImage' -Source $source
+
+            $w = if ($PSBoundParameters.ContainsKey('Width')) { $Width } elseif ($PSBoundParameters.ContainsKey('Height')) { $Height * $image.Width / $image.Height } else { [double]$image.Width }
+            $h = if ($PSBoundParameters.ContainsKey('Height')) { $Height } elseif ($PSBoundParameters.ContainsKey('Width')) { $Width * $image.Height / $image.Width } else { [double]$image.Height }
+
+            $counterProp = $Document.PSObject.Properties['PSVellumImageCount']
+            if (-not $counterProp) {
+                $Document.PSObject.Properties.Add([psnoteproperty]::new('PSVellumImageCount', 0))
+                $counterProp = $Document.PSObject.Properties['PSVellumImageCount']
+            }
+            $counterProp.Value++
+            $name = "VIm$($counterProp.Value)"
+            [void]$Document.RegisterImageXObject($pdfPage, $image, $name)
+
+            $canvas = Get-VellumPdfPageCanvas -Document $Document -Page $Page -CommandName 'Add-VellumPdfPageImage'
+            [void]$canvas.SaveState()
+            try {
+                $kind = if ($Decorative) { 'Artifact' } else { 'Structure' }
+                Invoke-VellumPdfTagged -Document $Document -Canvas $canvas -PdfPage $pdfPage -Kind $kind -StructType Figure -AltText $AltText -Draw {
+                    [void]$canvas.Concat($w, 0, 0, $h, $X, $Y).DoXObject($name)
+                }
+            }
+            finally { [void]$canvas.RestoreState() }
+            $Document
         }
-        finally { [void]$canvas.RestoreState() }
-        $Document
+        catch {
+            $PSCmdlet.ThrowTerminatingError($_)
+        }
     }
 }
