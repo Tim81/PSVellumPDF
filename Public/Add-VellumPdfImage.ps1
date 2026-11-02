@@ -159,6 +159,8 @@ function Add-VellumPdfImage {
         [ValidateSet('Left', 'Center', 'Right', 'Justify')]
         [string]$Alignment = 'Left',
 
+        [ValidateScript({ -not [string]::IsNullOrWhiteSpace($_) }, ErrorMessage = '-AltText must not be empty or whitespace.')]
+
         [string]$AltText,
 
         [ValidateRange(0, 10000)]

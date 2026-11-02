@@ -149,7 +149,7 @@ function Add-VellumPdfPageBarcode {
         [ValidateRange(2, 3)] [double]$WideNarrowRatio,
         [string]$AddOn,
         [ValidateSet('Frame', 'Horizontal', 'None')] [string]$BearerBars,
-        [ValidateNotNullOrEmpty()] [string]$AltText,
+        [ValidateScript({ -not [string]::IsNullOrWhiteSpace($_) }, ErrorMessage = '-AltText must not be empty or whitespace.')] [string]$AltText,
         [switch]$Decorative
     )
 
@@ -159,8 +159,7 @@ function Add-VellumPdfPageBarcode {
             Assert-VellumPdfCoordinate $X 'X' 'Add-VellumPdfPageBarcode'; Assert-VellumPdfCoordinate $Y 'Y' 'Add-VellumPdfPageBarcode'
             # Validates -Page up front (the canvas lookup below would do so too, but after building the symbol).
             [void](Get-VellumPdfPage -Document $Document -Page $Page -CommandName 'Add-VellumPdfPageBarcode')
-            $isPdfA = $Document.Conformance -in @([VellumPdf.Document.PdfConformance]::PdfA2b, [VellumPdf.Document.PdfConformance]::PdfA2u,
-                [VellumPdf.Document.PdfConformance]::PdfA2a)
+            $isPdfA = (Get-VellumPdfConformanceNeeds -Document $Document).NeedsEmbeddedFonts
 
             try {
                 $barcode = New-VellumPdfBarcodeSet -Parameters $PSBoundParameters -IsPdfA $isPdfA -ParameterSetName $PSCmdlet.ParameterSetName |

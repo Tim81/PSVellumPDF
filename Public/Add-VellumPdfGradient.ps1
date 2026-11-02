@@ -58,7 +58,7 @@ function Add-VellumPdfGradient {
         [ValidateSet('LeftToRight', 'BottomToTop', 'Diagonal')]
         [string]$Direction = 'LeftToRight',
 
-        [ValidateNotNullOrEmpty()]
+        [ValidateScript({ -not [string]::IsNullOrWhiteSpace($_) }, ErrorMessage = '-AltText must not be empty or whitespace.')]
         [string]$AltText
     )
 

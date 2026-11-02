@@ -68,7 +68,7 @@ function Add-VellumPdfPageImage {
         [double]$Height,
 
         # Tagged documents: alternate text for the image, or -Decorative to mark it as an artifact.
-        [ValidateNotNullOrEmpty()]
+        [ValidateScript({ -not [string]::IsNullOrWhiteSpace($_) }, ErrorMessage = '-AltText must not be empty or whitespace.')]
         [string]$AltText,
 
         [switch]$Decorative

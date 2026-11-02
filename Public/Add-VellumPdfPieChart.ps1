@@ -105,6 +105,8 @@ function Add-VellumPdfPieChart {
 
         [switch]$CounterClockwise,
 
+        [ValidateScript({ -not [string]::IsNullOrWhiteSpace($_) }, ErrorMessage = '-AltText must not be empty or whitespace.')]
+
         [string]$AltText,
 
         [switch]$Decorative,

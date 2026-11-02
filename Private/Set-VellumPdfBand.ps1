@@ -28,6 +28,7 @@ function Set-VellumPdfBand {
     Assert-VellumPdfDocumentOpen -Document $Document -CommandName $command
     if ($FontHandle) {
         Assert-VellumPdfFontHandle -FontHandle $FontHandle -Document $Document -CommandName $command
+        Write-VellumPdfMissingGlyphWarning -Handle $FontHandle -Text ($Template -replace '\{pages?\}', '0') -CommandName $command
     }
     else {
         Write-VellumPdfEncodingWarning -Text $Template -CommandName $command

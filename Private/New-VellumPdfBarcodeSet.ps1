@@ -92,10 +92,10 @@ function New-VellumPdfBarcodeSet {
         $showTextValue = if ($bound.ContainsKey('ShowText')) { $ShowText } else { -not $isPdfA }
         if ($is1D -and $isPdfA -and $showTextValue) {
             throw ('Add-VellumPdfBarcode: the human-readable line of a linear barcode uses a non-embedded base-14 ' +
-                'font, which PDF/A forbids. Leave -ShowText off and use -Caption with an embedded -FontHandle instead.')
+                'font, which PDF/A and PDF/UA forbid. Leave -ShowText off and use -Caption with an embedded -FontHandle instead.')
         }
         if ($is1D -and $isPdfA -and $bound.ContainsKey('TextFont')) {
-            throw 'Add-VellumPdfBarcode: -TextFont uses a base-14 font, which PDF/A forbids; use -Caption with -FontHandle.'
+            throw 'Add-VellumPdfBarcode: -TextFont uses a base-14 font, which PDF/A and PDF/UA forbid; use -Caption with -FontHandle.'
         }
 
         # --- build the symbol(s) ----------------------------------------------------

@@ -134,7 +134,7 @@ function Add-VellumPdfShape {
         [double]$MiterLimit,
 
         # Alternate text: in a tagged document the shape becomes a Figure instead of an artifact.
-        [ValidateNotNullOrEmpty()]
+        [ValidateScript({ -not [string]::IsNullOrWhiteSpace($_) }, ErrorMessage = '-AltText must not be empty or whitespace.')]
         [string]$AltText
     )
 
@@ -190,7 +190,7 @@ function Add-VellumPdfShape {
             }
 
             if (($bound.ContainsKey('FillCmyk') -or $bound.ContainsKey('StrokeCmyk')) -and
-                $Document.Conformance -ne [VellumPdf.Document.PdfConformance]::None -and
+                (Get-VellumPdfConformanceNeeds -Document $Document).IsPdfA -and
                 -not $Document.PSObject.Properties['PSVellumCmykIntent']) {
                 Write-Warning ('Add-VellumPdfShape: PDF/A allows CMYK colour only with a CMYK output intent. Call ' +
                     'Set-VellumPdfOutputIntent -Cmyk on this document, or use RGB colours.')

@@ -117,7 +117,8 @@ function New-VellumPdfPageDocument {
         } else {
             [VellumPdf.Document.PageSize]::$PageSize
         }
-        if ($Language) { $doc.Language = $Language }
+        Assert-VellumPdfLanguageTag -Value $Language -CommandName 'New-VellumPdfPageDocument'
+            if ($Language) { $doc.Language = $Language }
         if ($UseObjectStreams) { $doc.UseObjectStreams = $true }
         if ($Linearize) { $doc.Linearize = $true }
         if ($PSBoundParameters.ContainsKey('DocumentId')) { $doc.DocumentId = $DocumentId }

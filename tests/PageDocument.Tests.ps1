@@ -220,7 +220,7 @@ Describe 'Page drawing cmdlets' {
 
         $doc = New-VellumPdfPageDocument -Conformance PdfA2b | Add-VellumPdfPage
         try {
-            { $doc | Add-VellumPdfPageBarcode Ean13 '5901234123457' -X 1 -Y 1 -ShowText $true } | Should -Throw 'Add-VellumPdfPageBarcode:*PDF/A forbids*'
+            { $doc | Add-VellumPdfPageBarcode Ean13 '5901234123457' -X 1 -Y 1 -ShowText $true } | Should -Throw 'Add-VellumPdfPageBarcode:*PDF/A and PDF/UA forbid*'
             { $doc | Add-VellumPdfPageBarcode Ean13 'letters' -X 1 -Y 1 } | Should -Throw 'Add-VellumPdfPageBarcode:*'
             { $doc | Add-VellumPdfPageBarcode QrCode 'x' -X 1 -Y 1 -BarHeight 5 } | Should -Throw '*only applies to linear*'
         }

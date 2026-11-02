@@ -126,6 +126,7 @@ function Set-VellumPdfPageBand {
             }
             if ($Template -match '[\r\n]') { throw 'Set-VellumPdfPageBand: -Template must be a single line.' }
             $resolved = Get-VellumPdfPageFont -Document $Document -FontHandle $FontHandle -Font $Font -CommandName 'Set-VellumPdfPageBand'
+            Write-VellumPdfMissingGlyphWarning -Handle $resolved.Handle -Text ($Template -replace '\{pages?\}', '0') -CommandName 'Set-VellumPdfPageBand'
             if (-not $resolved.Handle -and $Document.Conformance -eq [VellumPdf.Document.PdfConformance]::None) {
                 Write-VellumPdfEncodingWarning -Text ($Template -replace '\{pages?\}', '0') -CommandName 'Set-VellumPdfPageBand'
             }

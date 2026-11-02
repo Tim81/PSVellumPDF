@@ -30,8 +30,8 @@ function Set-VellumPdfOutputIntent {
     .PARAMETER IccProfilePath
         Path to an ICC profile file (.icc/.icm) to embed as the output intent.
     .PARAMETER ComponentCount
-        Number of colour components in the profile: 1 (Gray), 3 (RGB), or
-        4 (CMYK).
+        Optional. The profile's number of colour components (1 Gray, 3 RGB, 4 CMYK) is read
+        from the profile itself; if you give it, it must match.
     .PARAMETER OutputConditionIdentifier
         The OutputConditionIdentifier string written to the OutputIntent
         dictionary (e.g. 'sRGB IEC61966-2.1'). Defaults to 'Generic CMYK' when
@@ -65,7 +65,7 @@ function Set-VellumPdfOutputIntent {
         [Parameter(Mandatory, Position = 0, ParameterSetName = 'IccProfile')]
         [string]$IccProfilePath,
 
-        [Parameter(Mandatory, ParameterSetName = 'IccProfile')]
+        [Parameter(ParameterSetName = 'IccProfile')]
         [ValidateSet(1, 3, 4)]
         [int]$ComponentCount,
 
@@ -107,6 +107,12 @@ function Set-VellumPdfOutputIntent {
                     throw "Set-VellumPdfOutputIntent: ICC profile not found: '$resolved'."
                 }
                 $bytes = [System.IO.File]::ReadAllBytes($resolved)
+                $profileCount = Get-VellumPdfIccComponentCount -Profile $bytes -CommandName 'Set-VellumPdfOutputIntent'
+                if ($PSBoundParameters.ContainsKey('ComponentCount') -and $ComponentCount -ne $profileCount) {
+                    throw ("Set-VellumPdfOutputIntent: -ComponentCount $ComponentCount does not match the profile, which has " +
+                        "$profileCount colour component(s). Omit -ComponentCount to use the profile's own.")
+                }
+                $ComponentCount = $profileCount
                 $infoValue = if ($PSBoundParameters.ContainsKey('Info')) { $Info } else { $null }
                 $Document.SetPdfAOutputIntent($bytes, $ComponentCount, $OutputConditionIdentifier, $infoValue)
             }

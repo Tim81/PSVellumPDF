@@ -85,6 +85,7 @@ function New-VellumPdfTextRun {
         # Always produce at least a bare TextStyle (never $null) because the
         # VellumPdf renderer requires a non-null style on every TextRun in a
         # runs-based paragraph.
+        Write-VellumPdfMissingGlyphWarning -Handle $FontHandle -Text $Text -CommandName 'New-VellumPdfTextRun'
         $styleParams = @{}
         if ($PSBoundParameters.ContainsKey('Font'))       { $styleParams['Font']       = $Font }
         if ($PSBoundParameters.ContainsKey('FontSize'))   { $styleParams['FontSize']   = $FontSize }

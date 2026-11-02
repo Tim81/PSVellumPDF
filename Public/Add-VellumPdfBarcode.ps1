@@ -169,6 +169,8 @@ function Add-VellumPdfBarcode {
         [ValidateSet('Left', 'Center', 'Right')]
         [string]$Alignment = 'Left',
 
+        [ValidateScript({ -not [string]::IsNullOrWhiteSpace($_) }, ErrorMessage = '-AltText must not be empty or whitespace.')]
+
         [string]$AltText,
         [switch]$Decorative,
 
@@ -268,10 +270,7 @@ function Add-VellumPdfBarcode {
         try {
             Assert-VellumPdfDocumentOpen -Document $Document -CommandName 'Add-VellumPdfBarcode'
             $bound = $PSBoundParameters
-            $isPdfA = $Document.Conformance -in @(
-                [VellumPdf.Document.PdfConformance]::PdfA2b,
-                [VellumPdf.Document.PdfConformance]::PdfA2u,
-                [VellumPdf.Document.PdfConformance]::PdfA2a)
+            $isPdfA = (Get-VellumPdfConformanceNeeds -Document $Document).NeedsEmbeddedFonts
 
             # Option validation and symbol construction are shared with Add-VellumPdfPageBarcode.
             $barcodes = @(New-VellumPdfBarcodeSet -Parameters $PSBoundParameters -IsPdfA $isPdfA -ParameterSetName $PSCmdlet.ParameterSetName)

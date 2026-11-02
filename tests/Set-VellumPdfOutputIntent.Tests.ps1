@@ -6,10 +6,9 @@ BeforeAll {
     Import-Module $manifest -Force
     $script:fontPath = Join-Path $PSScriptRoot 'assets/DejaVuSans.ttf'
 
-    # The library embeds ICC profile bytes as-is (no validation), so a synthetic
-    # profile is sufficient to assert the wrapper forwards everything correctly.
-    $script:iccPath = Join-Path $TestDrive 'synthetic.icc'
-    [System.IO.File]::WriteAllBytes($script:iccPath, [byte[]](1..128))
+    # The cmdlet reads the colour space from the profile header, so use the engine's real sRGB profile.
+    $script:iccPath = Join-Path $TestDrive 'srgb-test.icc'
+    [System.IO.File]::WriteAllBytes($script:iccPath, [VellumPdf.Document.IccProfiles]::Srgb)
 
     function script:New-PdfADocument {
         $doc = New-VellumPdfDocument -Conformance PdfA2b

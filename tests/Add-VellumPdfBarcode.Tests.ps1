@@ -151,8 +151,8 @@ Describe 'Add-VellumPdfBarcode in PDF/A documents' {
         $doc = New-VellumPdfDocument -Conformance PdfA2b
         try {
             { $doc | Add-VellumPdfBarcode Ean13 '5901234123457' } | Should -Not -Throw
-            { $doc | Add-VellumPdfBarcode Ean13 '5901234123457' -ShowText $true } | Should -Throw '*PDF/A forbids*'
-            { $doc | Add-VellumPdfBarcode Ean13 '5901234123457' -TextFont Courier } | Should -Throw '*PDF/A forbids*'
+            { $doc | Add-VellumPdfBarcode Ean13 '5901234123457' -ShowText $true } | Should -Throw '*PDF/A and PDF/UA forbid*'
+            { $doc | Add-VellumPdfBarcode Ean13 '5901234123457' -TextFont Courier } | Should -Throw '*PDF/A and PDF/UA forbid*'
         }
         finally { $doc.Dispose() }
     }

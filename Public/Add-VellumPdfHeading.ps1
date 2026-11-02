@@ -101,8 +101,10 @@ function Add-VellumPdfHeading {
     process {
         try {
             Assert-VellumPdfDocumentOpen -Document $Document -CommandName 'Add-VellumPdfHeading'
+            Assert-VellumPdfLanguageTag -Value $Language -CommandName 'Add-VellumPdfHeading'
             if ($FontHandle) {
                 Assert-VellumPdfFontHandle -FontHandle $FontHandle -Document $Document -CommandName 'Add-VellumPdfHeading'
+                Write-VellumPdfMissingGlyphWarning -Handle $FontHandle -Text $Text -CommandName 'Add-VellumPdfHeading'
             }
             if (-not $FontHandle) {
                 Write-VellumPdfEncodingWarning -Text $Text -CommandName 'Add-VellumPdfHeading'

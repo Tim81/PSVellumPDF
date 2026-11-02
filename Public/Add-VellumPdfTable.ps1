@@ -349,6 +349,7 @@ function Add-VellumPdfTable {
                     Assert-VellumPdfFontHandle -FontHandle $cellHandle -Document $Document -CommandName 'Add-VellumPdfTable'
                 }
                 $effHandle = if ($cellHandle) { $cellHandle } else { $FontHandle }
+                Write-VellumPdfMissingGlyphWarning -Handle $effHandle -Text ([string]$spec['Text']) -CommandName 'Add-VellumPdfTable'
 
                 if ($null -ne $spec['Leading']) {
                     $lead = $spec['Leading'] -as [double]
@@ -387,7 +388,7 @@ function Add-VellumPdfTable {
                 elseif ($tablePadding) {
                     $cell.Padding = $tablePadding
                 }
-                if ($spec['Language']) { $cell.Language = [string]$spec['Language'] }
+                if ($spec['Language']) { Assert-VellumPdfLanguageTag -Value ([string]$spec['Language']) -CommandName 'Add-VellumPdfTable' -Name 'Language (cell)'; $cell.Language = [string]$spec['Language'] }
                 $cell
             }
 

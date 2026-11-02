@@ -108,10 +108,12 @@ function Add-VellumPdfText {
     process {
         try {
             Assert-VellumPdfDocumentOpen -Document $Document -CommandName 'Add-VellumPdfText'
+            Assert-VellumPdfLanguageTag -Value $Language -CommandName 'Add-VellumPdfText'
             Assert-VellumPdfCoordinate $X 'X' 'Add-VellumPdfText'; Assert-VellumPdfCoordinate $Y 'Y' 'Add-VellumPdfText'
             if ($Text -match '[\r\n]') { throw 'Add-VellumPdfText: -Text must be a single line; use New-VellumPdfDocument for wrapped text.' }
 
             $resolved = Get-VellumPdfPageFont -Document $Document -FontHandle $FontHandle -Font $Font -CommandName 'Add-VellumPdfText'
+            Write-VellumPdfMissingGlyphWarning -Handle $resolved.Handle -Text $Text -CommandName 'Add-VellumPdfText'
             if (-not $resolved.Handle -and $Document.Conformance -eq [VellumPdf.Document.PdfConformance]::None) {
                 Write-VellumPdfEncodingWarning -Text $Text -CommandName 'Add-VellumPdfText'
             }

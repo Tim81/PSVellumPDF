@@ -116,11 +116,13 @@ function Add-VellumPdfTextBox {
     process {
         try {
             Assert-VellumPdfDocumentOpen -Document $Document -CommandName 'Add-VellumPdfTextBox'
+            Assert-VellumPdfLanguageTag -Value $Language -CommandName 'Add-VellumPdfTextBox'
             Assert-VellumPdfCoordinate $X 'X' 'Add-VellumPdfTextBox'; Assert-VellumPdfCoordinate $Y 'Y' 'Add-VellumPdfTextBox'; Assert-VellumPdfCoordinate $Width 'Width' 'Add-VellumPdfTextBox'
             $bound = $PSBoundParameters
             if (-not $bound.ContainsKey('Leading')) { $Leading = 1.2 * $FontSize }
 
             $resolved = Get-VellumPdfPageFont -Document $Document -FontHandle $FontHandle -Font $Font -CommandName 'Add-VellumPdfTextBox'
+            Write-VellumPdfMissingGlyphWarning -Handle $resolved.Handle -Text $Text -CommandName 'Add-VellumPdfTextBox'
             if (-not $resolved.Handle -and $Document.Conformance -eq [VellumPdf.Document.PdfConformance]::None) {
                 Write-VellumPdfEncodingWarning -Text $Text -CommandName 'Add-VellumPdfTextBox'
             }
@@ -171,6 +173,16 @@ function Add-VellumPdfTextBox {
                 }
             }
             $height = $lines.Count * $Leading
+
+            # A box without any word draws nothing: an empty tagged paragraph or heading is not valid structure.
+            if (-not ($lines | Where-Object { $_.Words.Count -gt 0 })) {
+                if ($Document.Tagged -and $Role -match '^H[1-6]$') {
+                    throw "Add-VellumPdfTextBox: -Text has no words, so a $Role heading would be empty. Give it text or leave the box out."
+                }
+                Write-Verbose 'Add-VellumPdfTextBox: -Text has no words; nothing was drawn.'
+                if ($PassThru) { return [pscustomobject]@{ Document = $Document; LineCount = $lines.Count; Height = $height; Bottom = $Y - $height } }
+                return $Document
+            }
 
             $canvas = Get-VellumPdfPageCanvas -Document $Document -Page $Page -CommandName 'Add-VellumPdfTextBox'
             $pdfPage = $Document.Pages[$Page - 1]

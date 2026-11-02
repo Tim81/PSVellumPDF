@@ -130,7 +130,7 @@ function Add-VellumPdfPath {
         [ValidateRange(0, 1)]
         [double]$StrokeOpacity,
 
-        [ValidateNotNullOrEmpty()]
+        [ValidateScript({ -not [string]::IsNullOrWhiteSpace($_) }, ErrorMessage = '-AltText must not be empty or whitespace.')]
         [string]$AltText
     )
 
@@ -155,7 +155,7 @@ function Add-VellumPdfPath {
                 $ops = ConvertTo-VellumPdfPathOps -Data $Data -CommandName 'Add-VellumPdfPath'
             }
             if (($bound.ContainsKey('FillCmyk') -or $bound.ContainsKey('StrokeCmyk')) -and
-                $Document.Conformance -ne [VellumPdf.Document.PdfConformance]::None -and
+                (Get-VellumPdfConformanceNeeds -Document $Document).IsPdfA -and
                 -not $Document.PSObject.Properties['PSVellumCmykIntent']) {
                 Write-Warning ('Add-VellumPdfPath: PDF/A allows CMYK colour only with a CMYK output intent. Call ' +
                     'Set-VellumPdfOutputIntent -Cmyk on this document, or use RGB colours.')

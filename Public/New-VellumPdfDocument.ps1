@@ -150,7 +150,8 @@ function New-VellumPdfDocument {
             [VellumPdf.Document.PageSize]::$PageSize
         }
         if ($Tagged) { $doc.Tagged = $true }
-        if ($Language) { $doc.Language = $Language }
+        Assert-VellumPdfLanguageTag -Value $Language -CommandName 'New-VellumPdfDocument'
+            if ($Language) { $doc.Language = $Language }
         if ($UseObjectStreams) { $doc.UseObjectStreams = $true }
 
         $style = New-VellumTextStyle -Font $DefaultFont -FontSize $DefaultFontSize

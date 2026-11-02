@@ -135,7 +135,7 @@ function Save-VellumPdfDocument {
                 }
                 if (-not $validateProfile) {
                     throw ('Save-VellumPdfDocument: -Validate needs a document created with ' +
-                        'New-VellumPdfDocument -Conformance PdfA2b/PdfA2u/PdfA2a/PdfUA1.')
+                        'New-VellumPdfDocument or New-VellumPdfPageDocument with -Conformance PdfA2b/PdfA2u/PdfA2a/PdfUA1.')
                 }
                 if ($Document.PSObject.Properties['PSVellumProtected']) {
                     throw 'Save-VellumPdfDocument: -Validate cannot read an encrypted PDF; validate before Protect-VellumPdfDocument or run Test-VellumPdfConformance -Password afterwards.'

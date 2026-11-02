@@ -124,6 +124,7 @@ function Add-VellumPdfList {
     process {
         try {
             Assert-VellumPdfDocumentOpen -Document $Document -CommandName 'Add-VellumPdfList'
+            Assert-VellumPdfLanguageTag -Value $Language -CommandName 'Add-VellumPdfList'
             if ($FontHandle) {
                 Assert-VellumPdfFontHandle -FontHandle $FontHandle -Document $Document -CommandName 'Add-VellumPdfList'
             }
@@ -136,6 +137,14 @@ function Add-VellumPdfList {
 
             # Gather every label (recursing into nested children) for the encoding
             # warning, which scans for characters the base-14 fonts cannot render.
+            $collectAllText = {
+                param($spec)
+                if ($spec -is [System.Collections.IDictionary]) {
+                    if ($spec.Contains('Text')) { [string]$spec['Text'] }
+                    if ($spec['Children']) { foreach ($c in @($spec['Children'])) { & $collectAllText $c } }
+                }
+                else { [string]$spec }
+            }
             $collectText = {
                 param($spec, $depth = 0)
                 if ($depth -gt $maxDepth) {
@@ -153,6 +162,10 @@ function Add-VellumPdfList {
                 elseif (-not $FontHandle) {
                     [string]$spec
                 }
+            }
+            if ($FontHandle) {
+                $itemTexts = @(foreach ($spec in $Item) { & $collectAllText $spec })
+                Write-VellumPdfMissingGlyphWarning -Handle $FontHandle -Text $itemTexts -CommandName 'Add-VellumPdfList'
             }
             Write-VellumPdfEncodingWarning -Text @(foreach ($spec in $Item) { & $collectText $spec }) `
                 -CommandName 'Add-VellumPdfList'

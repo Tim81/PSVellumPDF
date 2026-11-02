@@ -130,8 +130,10 @@ function Add-VellumPdfParagraph {
     process {
         try {
             Assert-VellumPdfDocumentOpen -Document $Document -CommandName 'Add-VellumPdfParagraph'
+            Assert-VellumPdfLanguageTag -Value $Language -CommandName 'Add-VellumPdfParagraph'
             if ($FontHandle) {
                 Assert-VellumPdfFontHandle -FontHandle $FontHandle -Document $Document -CommandName 'Add-VellumPdfParagraph'
+                Write-VellumPdfMissingGlyphWarning -Handle $FontHandle -Text $Text -CommandName 'Add-VellumPdfParagraph'
             }
 
             if ($PSCmdlet.ParameterSetName -eq 'Runs') {
