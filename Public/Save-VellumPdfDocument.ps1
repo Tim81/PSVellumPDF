@@ -41,6 +41,12 @@ function Save-VellumPdfDocument {
         File system path for the output PDF file. The parent directory must
         already exist; an existing file at this path is overwritten. Mandatory
         and positional (position 0).
+    .PARAMETER Validate
+        Run the in-process preflight (see Test-VellumPdfConformance) on the rendered
+        PDF against the document's own conformance level (PdfA2b/2u/2a/PdfUA1) and
+        fail with the first findings - writing nothing - when it is not compliant.
+        The document is then unusable, like after any failed save. Not available
+        for encrypted documents.
     .PARAMETER Stream
         Write the PDF to this writable stream instead of a file (for example a
         response or blob stream). The PDF is rendered in memory first, so a failure
@@ -85,6 +91,10 @@ function Save-VellumPdfDocument {
         [Parameter(Mandatory, ParameterSetName = 'Bytes')]
         [switch]$AsByteArray,
 
+        # Run the in-process PDF/A / PDF/UA preflight on the rendered PDF and fail
+        # (writing nothing) when it is not compliant. Needs -Conformance on the document.
+        [switch]$Validate,
+
         # Keep the document open after saving (caller must Dispose it).
         [switch]$KeepOpen,
 
@@ -113,6 +123,23 @@ function Save-VellumPdfDocument {
                 'document can be written only once; build a new document with New-VellumPdfDocument.')
         }
 
+        $validateProfile = $null
+        if ($Validate) {
+            $validateProfile = switch ($Document.Conformance) {
+                ([VellumPdf.Document.PdfConformance]::PdfA2b) { 'PdfA2b' }
+                ([VellumPdf.Document.PdfConformance]::PdfA2u) { 'PdfA2u' }
+                ([VellumPdf.Document.PdfConformance]::PdfA2a) { 'PdfA2a' }
+                ([VellumPdf.Document.PdfConformance]::PdfUA1) { 'PdfUA1' }
+                default { $null }
+            }
+            if (-not $validateProfile) {
+                throw ('Save-VellumPdfDocument: -Validate needs a document created with ' +
+                    'New-VellumPdfDocument -Conformance PdfA2b/PdfA2u/PdfA2a/PdfUA1.')
+            }
+            if ($Document.PSObject.Properties['PSVellumProtected']) {
+                throw 'Save-VellumPdfDocument: -Validate cannot read an encrypted PDF; validate before Protect-VellumPdfDocument or run Test-VellumPdfConformance -Password afterwards.'
+            }
+        }
         $toMemory = $PSCmdlet.ParameterSetName -ne 'Path'
         $resolved = if ($toMemory) {
             if ($PSCmdlet.ParameterSetName -eq 'Stream') {
@@ -173,6 +200,21 @@ function Save-VellumPdfDocument {
                     }
                 }
 
+                # Preflight the rendered bytes; nothing reaches the target if they fail.
+                $validateBytes = {
+                    param([byte[]]$Data)
+                    if (-not $validateProfile) { return }
+                    $check = Invoke-VellumPdfPreflight -Bytes $Data -Profile $validateProfile -Source $resolved
+                    if (-not $check.IsCompliant) {
+                        $Document.PSObject.Properties.Add([psnoteproperty]::new('PSVellumFailed', $true))
+                        $top = @($check.Assertions | Where-Object Severity -EQ 'Error' | Select-Object -First 5 |
+                                ForEach-Object { "  - $($_.RuleId): $($_.Message)" }) -join "`n"
+                        $more = if ($check.ErrorCount -gt 5) { "`n  ... and $($check.ErrorCount - 5) more" } else { '' }
+                        throw ("Save-VellumPdfDocument: the rendered PDF is not $validateProfile compliant " +
+                            "($($check.ErrorCount) error(s)); nothing was written.`n$top$more")
+                    }
+                }
+
                 $bytesResult = $null
                 if ($toMemory) {
                     # Render into memory first so a failure never leaves a partial
@@ -180,6 +222,7 @@ function Save-VellumPdfDocument {
                     $memory = [System.IO.MemoryStream]::new()
                     try {
                         & $render $memory
+                        if ($validateProfile) { & $validateBytes $memory.ToArray() }
                         if ($PSCmdlet.ParameterSetName -eq 'Stream') {
                             try { $memory.WriteTo($Stream); $Stream.Flush() }
                             catch {
@@ -208,6 +251,7 @@ function Save-VellumPdfDocument {
                         $fileStream = [System.IO.File]::Create($temp)
                         try { & $render $fileStream }
                         finally { $fileStream.Dispose() }
+                        if ($validateProfile) { & $validateBytes ([System.IO.File]::ReadAllBytes($temp)) }
 
                         # The rendered file is known good; replace the target now.
                         try {

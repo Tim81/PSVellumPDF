@@ -137,3 +137,40 @@ Describe 'Save-VellumPdfDocument in-memory output' {
         finally { $doc.Dispose(); $ms.Dispose() }
     }
 }
+
+Describe 'Save-VellumPdfDocument -Validate' {
+    BeforeAll { $script:fontPath = Join-Path $PSScriptRoot 'assets' 'DejaVuSans.ttf' }
+
+    It 'writes a compliant PDF/A document' {
+        $doc = New-VellumPdfDocument -Conformance PdfA2b -Language en
+        $h = Register-VellumPdfFont -Document $doc -Path $script:fontPath
+        $out = Join-Path $TestDrive 'valid.pdf'
+        $doc | Add-VellumPdfParagraph -Text 'ok' -FontHandle $h | Save-VellumPdfDocument -Path $out -Validate | Out-Null
+        Test-Path $out | Should -BeTrue
+    }
+
+    It 'refuses a non-compliant document and writes nothing, in every output mode' {
+        $out = Join-Path $TestDrive 'invalid.pdf'
+        $doc = New-VellumPdfDocument -Conformance PdfA2b -Language en | Add-VellumPdfParagraph -Text 'base-14 text'
+        { $doc | Save-VellumPdfDocument -Path $out -Validate } | Should -Throw '*not PdfA2b compliant*font-embedding*'
+        Test-Path $out | Should -BeFalse
+
+        $ms = [System.IO.MemoryStream]::new()
+        $doc2 = New-VellumPdfDocument -Conformance PdfA2b -Language en | Add-VellumPdfParagraph -Text 'base-14 text'
+        { $doc2 | Save-VellumPdfDocument -Stream $ms -Validate } | Should -Throw '*nothing was written*'
+        $ms.Length | Should -Be 0
+        $ms.Dispose()
+    }
+
+    It 'needs a conformance level and refuses encrypted documents' {
+        $doc = New-VellumPdfDocument | Add-VellumPdfParagraph -Text 'x'
+        try { { $doc | Save-VellumPdfDocument -Path (Join-Path $TestDrive 'n.pdf') -Validate } | Should -Throw '*needs a document created with*' }
+        finally { $doc.Dispose() }
+
+        $enc = New-VellumPdfDocument -Language en | Add-VellumPdfParagraph -Text 'x'
+        $enc.Conformance = [VellumPdf.Document.PdfConformance]::PdfUA1
+        $enc | Protect-VellumPdfDocument -UserPassword (ConvertTo-SecureString 'p' -AsPlainText -Force) -Permission Extract | Out-Null
+        try { { $enc | Save-VellumPdfDocument -Path (Join-Path $TestDrive 'e.pdf') -Validate } | Should -Throw '*cannot read an encrypted PDF*' }
+        finally { $enc.Dispose() }
+    }
+}

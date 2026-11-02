@@ -45,6 +45,7 @@ PSVellumPDF only writes new PDFs. It cannot read, edit, split, or merge an exist
         'Set-VellumPdfDocumentInfo'
         'Set-VellumPdfOutputIntent'
         'Set-VellumPdfSignature'
+        'Test-VellumPdfConformance'
         'Protect-VellumPdfDocument'
     )
     CmdletsToExport   = @()

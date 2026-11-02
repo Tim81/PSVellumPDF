@@ -21,8 +21,12 @@ function New-VellumPdfDocument {
         The conformance level for the document. Use PdfA2b, PdfA2u, or PdfA2a to
         produce an ISO 19005-2 compliant archive file, or PdfUA1 for ISO 14289-1
         (PDF/UA-1) accessibility; None (default) produces a standard PDF without
-        conformance requirements. PDF/UA-1 forces a tagged document: also set
-        -Language and give images -AltText. Hyperlinks (-LinkUri) are not tagged by
+        conformance requirements. PDF/UA-1 forces a tagged document. To pass the
+        preflight (Test-VellumPdfConformance, or Save-VellumPdfDocument -Validate)
+        also set -Language, give the document a title with Set-VellumPdfDocumentInfo
+        -Title, embed a TrueType font (Register-VellumPdfFont + -FontHandle on
+        every text element; base-14 fonts are not embedded), and give images,
+        charts and barcodes alternate text. PDF/A likewise requires embedded fonts. Hyperlinks (-LinkUri) are not tagged by
         VellumPdf, so a PDF/UA document containing them is not fully conformant.
         Note that PDF/A forbids encryption, so PDF/A is incompatible with
         Protect-VellumPdfDocument; PDF/UA-1 may be encrypted if Extract is kept.
