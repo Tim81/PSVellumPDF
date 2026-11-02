@@ -252,7 +252,8 @@ Describe 'CCITT without end-of-line codes' {
         $reference = (Get-ChildItem "$base*.png" | Select-Object -First 1).FullName
         $exported = Join-Path $TestDrive 'rle-out.png'
         & convert $file.FullName -colorspace Gray -filter point -resize 400% $exported
-        (& compare -metric AE -fuzz 20% $reference $exported null: 2>&1) | Should -Be '0'
+        # ImageMagick 6 prints '0', ImageMagick 7 prints '0 (0)': compare the differing-pixel count only.
+        (((& (Get-Command compare -CommandType Application | Select-Object -First 1) -metric AE -fuzz 20% $reference $exported null: 2>&1) | Out-String).Trim() -split '\s+')[0] | Should -Be '0'
     }
 
     It 'skips Group 3 data TIFF cannot describe, and absurd sizes' {

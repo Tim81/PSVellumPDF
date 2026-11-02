@@ -56,7 +56,8 @@ Describe 'CCITT fax images' {
             $reference = Convert-PdfToPng $source 288
             $exported = Join-Path $TestDrive "export-$Compression.png"
             & convert $files[0].FullName -colorspace Gray -filter point -resize 400% $exported
-            (& compare -metric AE -fuzz 20% $reference $exported null: 2>&1) | Should -Be '0'
+            # ImageMagick 6 prints '0', ImageMagick 7 prints '0 (0)': compare the differing-pixel count only.
+        (((& (Get-Command compare -CommandType Application | Select-Object -First 1) -metric AE -fuzz 20% $reference $exported null: 2>&1) | Out-String).Trim() -split '\s+')[0] | Should -Be '0'
         }
     }
 
