@@ -236,57 +236,14 @@ function Add-VellumPdfBarcode {
     process {
         Assert-VellumPdfDocumentOpen -Document $Document -CommandName 'Add-VellumPdfBarcode'
         $bound = $PSBoundParameters
-        $is1D = $Type -in @('Code128', 'Code39', 'Ean13', 'Ean8', 'UpcA', 'UpcE', 'Itf14')
-        $isEan = $Type -in @('Ean13', 'Ean8', 'UpcA', 'UpcE')
+        $isPdfA = $Document.Conformance -in @(
+            [VellumPdf.Document.PdfConformance]::PdfA2b,
+            [VellumPdf.Document.PdfConformance]::PdfA2u,
+            [VellumPdf.Document.PdfConformance]::PdfA2a)
 
-        # --- reject options that do not belong to this symbology -------------------
-        $allowed = @{
-            ErrorCorrection             = @('QrCode', 'MicroQrCode')
-            QrVersion                   = @('QrCode', 'MicroQrCode')
-            QrMask                      = @('QrCode')
-            TextEncoding                = @('QrCode')
-            QrGs1                       = @('QrCode')
-            Gs1                         = @('Code128', 'DataMatrix')
-            Shape                       = @('DataMatrix')
-            AztecFormat                 = @('Aztec')
-            AztecErrorCorrectionPercent = @('Aztec')
-            Columns                     = @('Pdf417')
-            Rows                        = @('Pdf417')
-            Compact                     = @('Pdf417')
-            ErrorCorrectionLevel        = @('Pdf417')
-            CheckDigit                  = @('Code39')
-            FullAscii                   = @('Code39')
-            WideNarrowRatio             = @('Code39', 'Itf14')
-            AddOn                       = @('Ean13', 'Ean8', 'UpcA', 'UpcE')
-            BearerBars                  = @('Itf14')
-            FileId                      = @('Pdf417')
-        }
-        foreach ($name in $allowed.Keys) {
-            if ($bound.ContainsKey($name) -and $Type -notin $allowed[$name]) {
-                throw ("Add-VellumPdfBarcode: -$name does not apply to -Type $Type (it applies to: " +
-                    "$($allowed[$name] -join ', ')).")
-            }
-        }
-        foreach ($name in 'BarHeight', 'ShowText', 'TextSize', 'TextFont') {
-            if ($bound.ContainsKey($name) -and -not $is1D) {
-                throw "Add-VellumPdfBarcode: -$name only applies to linear (1-D) barcodes, not -Type $Type."
-            }
-        }
-        if ($bound.ContainsKey('Bytes') -and $Type -ne 'QrCode') {
-            throw 'Add-VellumPdfBarcode: -Bytes is supported for -Type QrCode only; use -Content for other symbologies.'
-        }
-        if ($bound.ContainsKey('SplitInto') -and $Type -notin @('QrCode', 'Pdf417')) {
-            throw 'Add-VellumPdfBarcode: -SplitInto applies to QrCode (Structured Append) and Pdf417 (Macro PDF417) only.'
-        }
-        if ($bound.ContainsKey('SplitInto') -and $bound.ContainsKey('Bytes')) {
-            throw 'Add-VellumPdfBarcode: -SplitInto needs -Content text, not -Bytes.'
-        }
-        if ($bound.ContainsKey('ModuleSize') -and $bound.ContainsKey('TargetWidth')) {
-            throw 'Add-VellumPdfBarcode: -ModuleSize and -TargetWidth cannot be combined; choose one.'
-        }
-        if ($Decorative -and $AltText) {
-            throw 'Add-VellumPdfBarcode: -AltText and -Decorative cannot be combined.'
-        }
+        # Option validation and symbol construction are shared with Add-VellumPdfPageBarcode.
+        $barcodes = @(New-VellumPdfBarcodeSet -Parameters $PSBoundParameters -IsPdfA $isPdfA -ParameterSetName $PSCmdlet.ParameterSetName)
+
         if ($FontHandle) {
             Assert-VellumPdfFontHandle -FontHandle $FontHandle -Document $Document -CommandName 'Add-VellumPdfBarcode'
         }
@@ -294,123 +251,25 @@ function Add-VellumPdfBarcode {
             throw 'Add-VellumPdfBarcode: -FontHandle is only used for -Caption; add -Caption or drop -FontHandle.'
         }
 
-        # PDF/A forbids the non-embedded base-14 font used for the human-readable line.
-        $isPdfA = $Document.Conformance -in @(
-            [VellumPdf.Document.PdfConformance]::PdfA2b,
-            [VellumPdf.Document.PdfConformance]::PdfA2u,
-            [VellumPdf.Document.PdfConformance]::PdfA2a)
-        $showTextValue = if ($bound.ContainsKey('ShowText')) { $ShowText } else { -not $isPdfA }
-        if ($is1D -and $isPdfA -and $showTextValue) {
-            throw ('Add-VellumPdfBarcode: the human-readable line of a linear barcode uses a non-embedded base-14 ' +
-                'font, which PDF/A forbids. Leave -ShowText off and use -Caption with an embedded -FontHandle instead.')
-        }
-        if ($is1D -and $isPdfA -and $bound.ContainsKey('TextFont')) {
-            throw 'Add-VellumPdfBarcode: -TextFont uses a base-14 font, which PDF/A forbids; use -Caption with -FontHandle.'
-        }
-
-        # --- build the symbol(s) ----------------------------------------------------
-        $barcodes = [System.Collections.Generic.List[VellumPdf.Barcodes.Barcode]]::new()
-        try {
-            switch ($Type) {
-                'QrCode' {
-                    if ($bound.ContainsKey('SplitInto')) {
-                        $ec = if ($bound.ContainsKey('ErrorCorrection')) { [VellumPdf.Barcodes.QrErrorCorrection]::$ErrorCorrection } else { [VellumPdf.Barcodes.QrErrorCorrection]::M }
-                        $te = if ($bound.ContainsKey('TextEncoding')) { [VellumPdf.Barcodes.QrTextEncoding]::$TextEncoding } else { [VellumPdf.Barcodes.QrTextEncoding]::Auto }
-                        foreach ($b in [VellumPdf.Barcodes.QrCode]::StructuredAppend($Content, $SplitInto, $ec, $te)) { $barcodes.Add($b) }
-                    }
-                    elseif ($PSCmdlet.ParameterSetName -eq 'Bytes') { $barcodes.Add([VellumPdf.Barcodes.QrCode]::new($Bytes)) }
-                    else { $barcodes.Add([VellumPdf.Barcodes.QrCode]::new($Content)) }
-                }
-                'MicroQrCode' { $barcodes.Add([VellumPdf.Barcodes.MicroQrCode]::new($Content)) }
-                'DataMatrix'  { $barcodes.Add([VellumPdf.Barcodes.DataMatrixBarcode]::new($Content)) }
-                'Aztec'       { $barcodes.Add([VellumPdf.Barcodes.AztecCode]::new($Content)) }
-                'Pdf417' {
-                    if ($bound.ContainsKey('SplitInto')) {
-                        $id = if ($bound.ContainsKey('FileId')) { $FileId } else { Get-Random -Minimum 0 -Maximum 900 }
-                        foreach ($b in [VellumPdf.Barcodes.Pdf417Barcode]::MacroSet($Content, $SplitInto, $id)) { $barcodes.Add($b) }
-                    }
-                    else { $barcodes.Add([VellumPdf.Barcodes.Pdf417Barcode]::new($Content)) }
-                }
-                'Code128' { $barcodes.Add([VellumPdf.Barcodes.Code128Barcode]::new($Content)) }
-                'Code39'  { $barcodes.Add([VellumPdf.Barcodes.Code39Barcode]::new($Content)) }
-                'Itf14'   { $barcodes.Add([VellumPdf.Barcodes.Itf14Barcode]::new($Content)) }
-                default   { $barcodes.Add([VellumPdf.Barcodes.EanBarcode]::new([VellumPdf.Barcodes.EanSymbology]::$Type, $Content)) }
+        $contentWidth = $Document.PageSize.Width - $Document.Margins.Left - $Document.Margins.Right
+        foreach ($barcode in $barcodes) {
+            # Top/bottom go through the shared helper (which also adds any space the
+            # previous element's -MarginBottom deferred); left/right are set directly.
+            Set-VellumPdfElementMargin -Element $barcode -Top $MarginTop -Bottom $MarginBottom `
+                -BoundParameters $PSBoundParameters -Document $Document
+            if ($bound.ContainsKey('MarginLeft') -or $bound.ContainsKey('MarginRight')) {
+                $edges = $barcode.Margins
+                $barcode.Margins = [VellumPdf.Layout.Core.EdgeInsets]::new($edges.Top,
+                    $(if ($bound.ContainsKey('MarginRight')) { $MarginRight } else { $edges.Right }),
+                    $edges.Bottom,
+                    $(if ($bound.ContainsKey('MarginLeft')) { $MarginLeft } else { $edges.Left }))
             }
 
-            $fg = if ($bound.ContainsKey('Foreground')) { ConvertTo-VellumColor $Foreground }
-            $bg = if ($bound.ContainsKey('Background')) { ConvertTo-VellumColor $Background }
-            foreach ($barcode in $barcodes) {
-                if ($fg) { $barcode.Foreground = [VellumPdf.Layout.Core.ColorRgb]::new($fg[0], $fg[1], $fg[2]) }
-                if ($bg) { $barcode.Background = [VellumPdf.Layout.Core.ColorRgb]::new($bg[0], $bg[1], $bg[2]) }
-                if ($NoQuietZone) { $barcode.IncludeQuietZone = $false }
-                $barcode.Alignment = [VellumPdf.Layout.Core.HorizontalAlignment]::$Alignment
-                if ($bound.ContainsKey('ModuleSize')) { $barcode.ModuleSize = $ModuleSize }
-                if ($bound.ContainsKey('TargetWidth')) { $barcode.TargetWidth = $TargetWidth }
-                if ($AltText) { $barcode.AltText = $AltText }
-                if ($Decorative) { $barcode.Decorative = $true }
-
-                if ($is1D) {
-                    $barcode.ShowText = $showTextValue
-                    if ($bound.ContainsKey('BarHeight')) { $barcode.BarHeight = $BarHeight }
-                    if ($bound.ContainsKey('TextSize')) { $barcode.TextSize = $TextSize }
-                    if ($bound.ContainsKey('TextFont')) { $barcode.TextFont = [VellumPdf.Fonts.Standard14]::$TextFont }
-                }
-                switch ($Type) {
-                    { $_ -in 'QrCode', 'MicroQrCode' } {
-                        if ($bound.ContainsKey('ErrorCorrection')) { $barcode.ErrorCorrection = [VellumPdf.Barcodes.QrErrorCorrection]::$ErrorCorrection }
-                        if ($bound.ContainsKey('QrVersion')) { $barcode.Version = $QrVersion }
-                    }
-                }
-                if ($Type -eq 'QrCode') {
-                    if ($bound.ContainsKey('QrMask')) { $barcode.Mask = $QrMask }
-                    if ($bound.ContainsKey('TextEncoding')) { $barcode.TextEncoding = [VellumPdf.Barcodes.QrTextEncoding]::$TextEncoding }
-                    if ($bound.ContainsKey('QrGs1')) { $barcode.Gs1 = [VellumPdf.Barcodes.QrGs1Mode]::$QrGs1 }
-                }
-                if (($Type -in 'Code128', 'DataMatrix') -and $Gs1) { $barcode.Gs1 = $true }
-                if ($Type -eq 'DataMatrix' -and $bound.ContainsKey('Shape')) { $barcode.Shape = [VellumPdf.Barcodes.DataMatrixShape]::$Shape }
-                if ($Type -eq 'Aztec') {
-                    if ($bound.ContainsKey('AztecFormat')) { $barcode.Format = [VellumPdf.Barcodes.AztecFormat]::$AztecFormat }
-                    if ($bound.ContainsKey('AztecErrorCorrectionPercent')) { $barcode.ErrorCorrectionPercent = $AztecErrorCorrectionPercent }
-                }
-                if ($Type -eq 'Pdf417') {
-                    if ($bound.ContainsKey('Columns')) { $barcode.Columns = $Columns }
-                    if ($bound.ContainsKey('Rows')) { $barcode.Rows = $Rows }
-                    if ($Compact) { $barcode.Compact = $true }
-                    if ($bound.ContainsKey('ErrorCorrectionLevel')) { $barcode.ErrorCorrectionLevel = $ErrorCorrectionLevel }
-                }
-                if ($Type -eq 'Code39') {
-                    if ($CheckDigit) { $barcode.CheckDigit = $true }
-                    if ($FullAscii) { $barcode.FullAscii = $true }
-                }
-                if (($Type -in 'Code39', 'Itf14') -and $bound.ContainsKey('WideNarrowRatio')) { $barcode.WideNarrowRatio = $WideNarrowRatio }
-                if ($isEan -and $bound.ContainsKey('AddOn')) { $barcode.AddOn = $AddOn }
-                if ($Type -eq 'Itf14' -and $bound.ContainsKey('BearerBars')) { $barcode.BearerBars = [VellumPdf.Barcodes.ItfBearerBarStyle]::$BearerBars }
-
-                # Top/bottom go through the shared helper (which also adds any space the
-                # previous element's -MarginBottom deferred); left/right are set directly.
-                Set-VellumPdfElementMargin -Element $barcode -Top $MarginTop -Bottom $MarginBottom `
-                    -BoundParameters $PSBoundParameters -Document $Document
-                if ($bound.ContainsKey('MarginLeft') -or $bound.ContainsKey('MarginRight')) {
-                    $edges = $barcode.Margins
-                    $barcode.Margins = [VellumPdf.Layout.Core.EdgeInsets]::new($edges.Top,
-                        $(if ($bound.ContainsKey('MarginRight')) { $MarginRight } else { $edges.Right }),
-                        $edges.Bottom,
-                        $(if ($bound.ContainsKey('MarginLeft')) { $MarginLeft } else { $edges.Left }))
-                }
-
-                # Fail now, at the call site, for content or options the symbology cannot encode.
-                $size = $barcode.Measure()
-                $contentWidth = $Document.PageSize.Width - $Document.Margins.Left - $Document.Margins.Right
-                if ($size.Width -gt $contentWidth) {
-                    throw ("Add-VellumPdfBarcode: the symbol is $([math]::Round($size.Width, 1))pt wide but the page content area " +
-                        "is only $([math]::Round($contentWidth, 1))pt. Reduce -ModuleSize/-TargetWidth or the margins.")
-                }
+            $size = $barcode.Measure()
+            if ($size.Width -gt $contentWidth) {
+                throw ("Add-VellumPdfBarcode: the symbol is $([math]::Round($size.Width, 1))pt wide but the page content area " +
+                    "is only $([math]::Round($contentWidth, 1))pt. Reduce -ModuleSize/-TargetWidth or the margins.")
             }
-        }
-        catch {
-            if ($_.Exception.Message -like 'Add-VellumPdfBarcode:*') { throw }
-            $inner = if ($_.Exception.InnerException) { $_.Exception.InnerException.Message } else { $_.Exception.Message }
-            throw "Add-VellumPdfBarcode: cannot create the $Type symbol: $inner"
         }
 
         # --- add to the document ----------------------------------------------------

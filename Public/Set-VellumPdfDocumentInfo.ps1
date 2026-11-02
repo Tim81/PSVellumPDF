@@ -41,10 +41,10 @@ function Set-VellumPdfDocumentInfo {
     [Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSUseShouldProcessForStateChangingFunctions', '',
         Justification = 'Mutates an in-memory document object only; no external/system state change.')]
     [CmdletBinding()]
-    [OutputType([VellumPdf.Layout.Document])]
+    [OutputType([VellumPdf.Layout.Document], [VellumPdf.Document.PdfDocument])]
     param(
         [Parameter(Mandatory, ValueFromPipeline)]
-        [VellumPdf.Layout.Document]$Document,
+        [object]$Document,
 
         [string]$Title,
         [string]$Author,

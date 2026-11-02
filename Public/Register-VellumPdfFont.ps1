@@ -47,7 +47,7 @@ function Register-VellumPdfFont {
     [OutputType([VellumPdf.Fonts.EmbeddedFontHandle])]
     param(
         [Parameter(Mandatory, ValueFromPipeline)]
-        [VellumPdf.Layout.Document]$Document,
+        [object]$Document,
 
         [Parameter(Mandatory, Position = 0, ParameterSetName = 'Path')]
         [string]$Path,
@@ -67,7 +67,8 @@ function Register-VellumPdfFont {
             if (-not [System.IO.File]::Exists($resolved)) {
                 throw "Register-VellumPdfFont: font file not found: '$resolved'. Verify the path and try again."
             }
-            $Document.LoadTrueTypeFont($resolved)
+            if ($Document -is [VellumPdf.Layout.Document]) { $Document.LoadTrueTypeFont($resolved) }
+            else { $Document.UseTrueTypeFont([System.IO.File]::ReadAllBytes($resolved)) }
         }
 
         # Tag the handle with its owning document so the content cmdlets can

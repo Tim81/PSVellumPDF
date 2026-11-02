@@ -57,10 +57,10 @@ function Set-VellumPdfOutputIntent {
     [Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSUseShouldProcessForStateChangingFunctions', '',
         Justification = 'Mutates an in-memory document object only; no external/system state change.')]
     [CmdletBinding(DefaultParameterSetName = 'IccProfile')]
-    [OutputType([VellumPdf.Layout.Document])]
+    [OutputType([VellumPdf.Layout.Document], [VellumPdf.Document.PdfDocument])]
     param(
         [Parameter(Mandatory, ValueFromPipeline)]
-        [VellumPdf.Layout.Document]$Document,
+        [object]$Document,
 
         [Parameter(Mandatory, Position = 0, ParameterSetName = 'IccProfile')]
         [string]$IccProfilePath,
@@ -108,6 +108,11 @@ function Set-VellumPdfOutputIntent {
             $bytes = [System.IO.File]::ReadAllBytes($resolved)
             $infoValue = if ($PSBoundParameters.ContainsKey('Info')) { $Info } else { $null }
             $Document.SetPdfAOutputIntent($bytes, $ComponentCount, $OutputConditionIdentifier, $infoValue)
+        }
+        # Remember a CMYK-capable intent: PDF/A allows DeviceCMYK drawing only with one
+        # (Add-VellumPdfShape -FillCmyk warns when it is missing).
+        if (($PSCmdlet.ParameterSetName -eq 'Cmyk' -or $ComponentCount -eq 4) -and -not $Document.PSObject.Properties['PSVellumCmykIntent']) {
+            $Document.PSObject.Properties.Add([psnoteproperty]::new('PSVellumCmykIntent', $true))
         }
         $Document
     }

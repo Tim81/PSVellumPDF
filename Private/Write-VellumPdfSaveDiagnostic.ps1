@@ -19,17 +19,23 @@ function Write-VellumPdfSaveDiagnostic {
     [OutputType([pscustomobject])]
     param(
         [Parameter(Mandatory)]
-        [VellumPdf.Layout.Document]$Document
+        [object]$Document
     )
 
-    $encoding = @(foreach ($w in $Document.TextEncodingWarnings) {
+    # Layout documents expose the engine's lists; a page-based document collects the
+    # warnings of the canvases it drew on (Invoke-VellumPdfCanvas and friends).
+    $encodingSource = if ($Document -is [VellumPdf.Layout.Document]) { $Document.TextEncodingWarnings }
+        elseif ($Document.PSObject.Properties['PSVellumTextWarnings']) { $Document.PSVellumTextWarnings }
+        else { @() }
+    $bandSource = if ($Document -is [VellumPdf.Layout.Document]) { $Document.BandTruncations } else { @() }
+    $encoding = @(foreach ($w in $encodingSource) {
             [pscustomobject]@{
                 PSTypeName = 'PSVellumPDF.TextEncodingWarning'
                 CodePoint  = $w.CodePoint
                 Character  = $w.Character.ToString()
             }
         })
-    $bands = @(foreach ($b in $Document.BandTruncations) {
+    $bands = @(foreach ($b in $bandSource) {
             [pscustomobject]@{
                 PSTypeName         = 'PSVellumPDF.BandTruncation'
                 Band               = [string]$b.Band

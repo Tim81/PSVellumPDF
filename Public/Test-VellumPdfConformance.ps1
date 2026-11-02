@@ -15,7 +15,8 @@ function Test-VellumPdfConformance {
 
         The preflight covers the checks that can be decided in-process; it is a
         fast regression gate, not a replacement for a certified validator when a
-        formal compliance statement is required.
+        formal compliance statement is required. Known gap: it does not examine
+        fonts that are used only by form fields or other annotation appearances.
     .PARAMETER Path
         The PDF file(s). Accepts wildcards, and pipeline input by property name, so
         the file returned by Save-VellumPdfDocument can be piped straight in.

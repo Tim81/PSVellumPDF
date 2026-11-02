@@ -78,7 +78,7 @@ function Save-VellumPdfDocument {
     [OutputType([byte[]], ParameterSetName = 'Bytes')]
     param(
         [Parameter(Mandatory, ValueFromPipeline)]
-        [VellumPdf.Layout.Document]$Document,
+        [object]$Document,
 
         [Parameter(Mandatory, Position = 0, ParameterSetName = 'Path')]
         [string]$Path,
@@ -173,6 +173,13 @@ function Save-VellumPdfDocument {
                 $render = {
                     param([System.IO.Stream]$Target)
                     try {
+                        # A page-based document accumulates its drawing in per-page canvases.
+                        if ($Document -is [VellumPdf.Document.PdfDocument]) {
+                            Complete-VellumPdfPageDocument -Document $Document
+                            if ($Document.Linearize -and $signature) {
+                                Write-Warning ('Save-VellumPdfDocument: signing ignores -Linearize; the signed file is not linearized.')
+                            }
+                        }
                         if ($signature -and $signature.Value.ExternalSigner) {
                             # An external signer only supports the asynchronous path. Layout then runs on
                             # a thread-pool thread, which cannot execute Add-VellumPdfDrawing script blocks.

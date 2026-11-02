@@ -87,10 +87,10 @@ function Protect-VellumPdfDocument {
     [Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSUseShouldProcessForStateChangingFunctions', '',
         Justification = 'Mutates an in-memory document object only; no external/system state change.')]
     [CmdletBinding()]
-    [OutputType([VellumPdf.Layout.Document])]
+    [OutputType([VellumPdf.Layout.Document], [VellumPdf.Document.PdfDocument])]
     param(
         [Parameter(Mandatory, ValueFromPipeline)]
-        [VellumPdf.Layout.Document]$Document,
+        [object]$Document,
 
         [securestring]$UserPassword,
 
@@ -160,6 +160,12 @@ function Protect-VellumPdfDocument {
         elseif ($conformance -ne [VellumPdf.Document.PdfConformance]::None) {
             throw ("Protect-VellumPdfDocument: PDF/A conformance ($conformance) does not allow " +
                 'encryption. Remove -Conformance or use a non-conformant document.')
+        }
+
+        # A linearized ("fast web view") file cannot be encrypted (page documents only).
+        if ($Document -is [VellumPdf.Document.PdfDocument] -and $Document.Linearize) {
+            throw ('Protect-VellumPdfDocument: encryption cannot be combined with a linearized document ' +
+                '(New-VellumPdfPageDocument -Linearize). Create the document without -Linearize.')
         }
 
         # The engine cannot write encrypted files with object streams.

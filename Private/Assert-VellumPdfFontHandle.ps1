@@ -16,7 +16,7 @@ function Assert-VellumPdfFontHandle {
         [VellumPdf.Fonts.EmbeddedFontHandle]$FontHandle,
 
         [Parameter(Mandatory)]
-        [VellumPdf.Layout.Document]$Document,
+        [object]$Document,
 
         [Parameter(Mandatory)]
         [string]$CommandName

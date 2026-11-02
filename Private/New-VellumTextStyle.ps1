@@ -47,16 +47,7 @@ function New-VellumTextStyle {
     $LinkUri = if ($PSBoundParameters.ContainsKey('LinkUri')) { $LinkUri.Trim() } else { '' }
     $wantsLink = $LinkUri -ne ''
     if ($wantsLink) {
-        $normalized = $LinkUri -replace '[\s\p{Cc}\p{Cf}]', ''
-        $scheme = [regex]::Match($normalized, '^(?<s>[a-zA-Z][a-zA-Z0-9+.-]*):').Groups['s'].Value
-        if ($scheme.ToLowerInvariant() -notin @('http', 'https', 'mailto')) {
-            $what = if ($scheme) { "scheme '$scheme'" } else { 'a relative or scheme-less URI' }
-            throw ("-LinkUri uses $what; only http, https, and mailto URLs are allowed in " +
-                "generated documents (got '$LinkUri').")
-        }
-        # Store the normalised value so embedded whitespace/control/format chars
-        # never reach the /URI action (a valid URL has none of them anyway).
-        $LinkUri = $normalized
+        $LinkUri = Test-VellumPdfLinkUri -Uri $LinkUri
     }
 
     if (-not $Font -and -not $PSBoundParameters.ContainsKey('FontSize') -and -not $FontHandle `

@@ -11,13 +11,19 @@ function Assert-VellumPdfDocumentOpen {
     #>
     [CmdletBinding()]
     param(
+        # A flow-layout document (New-VellumPdfDocument) or a page-based Kernel
+        # document (New-VellumPdfPageDocument).
         [Parameter(Mandatory)]
-        [VellumPdf.Layout.Document]$Document,
+        [object]$Document,
 
         [Parameter(Mandatory)]
         [string]$CommandName
     )
 
+    if ($Document -isnot [VellumPdf.Layout.Document] -and $Document -isnot [VellumPdf.Document.PdfDocument]) {
+        throw ("${CommandName}: -Document must come from New-VellumPdfDocument or New-VellumPdfPageDocument; " +
+            "got $(if ($null -eq $Document) { 'null' } else { $Document.GetType().FullName }).")
+    }
     if ($Document.PSObject.Properties['PSVellumDisposed']) {
         throw ("${CommandName}: this document was already saved and disposed by " +
             'Save-VellumPdfDocument. Create a new document with New-VellumPdfDocument, ' +

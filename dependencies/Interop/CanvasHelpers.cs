@@ -1,6 +1,7 @@
 // PSVellumPDF.Interop: thin C# shims for VellumPdf members that PowerShell's
 // method binder cannot call directly (ReadOnlySpan<T> parameters).
 using VellumPdf.Canvas;
+using VellumPdf.Fonts;
 
 namespace PSVellumPDF.Interop;
 
@@ -41,5 +42,21 @@ public static class CanvasHelpers
         ArgumentNullException.ThrowIfNull(canvas);
         ArgumentNullException.ThrowIfNull(glyphIds);
         return canvas.ShowGlyphs(glyphIds);
+    }
+
+    /// <summary>
+    /// Shows <paramref name="text"/> in an embedded TrueType font at (x, y), aligned about x.
+    /// Call between BeginText/EndText after SetFontByName(font.ResourceName, size).
+    /// </summary>
+    public static PdfCanvas ShowEmbeddedText(PdfCanvas canvas, EmbeddedFontHandle font, string text, double fontSize,
+        double x, double y, TextAlignment align = TextAlignment.Left)
+    {
+        ArgumentNullException.ThrowIfNull(canvas);
+        ArgumentNullException.ThrowIfNull(font);
+        ArgumentNullException.ThrowIfNull(text);
+        var ids = new List<ushort>(text.Length);
+        foreach (var rune in text.EnumerateRunes())
+            ids.Add(font.GetGlyphId(rune.Value));
+        return canvas.ShowGlyphsAligned(ids.ToArray(), font.MeasureString(text, fontSize), x, y, align);
     }
 }
