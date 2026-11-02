@@ -31,3 +31,32 @@ Describe 'Add-VellumPdfHeading level mapping' {
         [System.IO.File]::ReadAllText($path, [System.Text.Encoding]::Latin1) | Should -Match '/S\s*/H1'
     }
 }
+
+Describe 'Add-VellumPdfHeading colour, leading and language' {
+    BeforeAll {
+        # /Lang strings are UTF-16BE with a byte-order mark.
+        function script:Get-LangPattern([string]$Tag) {
+            '/Lang\s*\(\xFE\xFF' + (($Tag.ToCharArray() | ForEach-Object { '\x00' + [regex]::Escape([string]$_) }) -join '') + '\)'
+        }
+    }
+
+    It 'writes the requested colour, and a language tag on the heading and paragraph' {
+        $path = Join-Path $TestDrive 'opts.pdf'
+        New-VellumPdfDocument -Tagged -Language en |
+            Add-VellumPdfHeading -Text 'Titre' -Color '#ff0000' -Leading 30 -Language fr |
+            Add-VellumPdfParagraph -Text 'Texte' -Language de |
+            Save-VellumPdfDocument -Path $path | Out-Null
+        $text = [System.IO.File]::ReadAllText($path, [System.Text.Encoding]::Latin1)
+        $text | Should -Match (Get-LangPattern 'fr')
+        $text | Should -Match (Get-LangPattern 'de')
+    }
+
+    It 'rejects an unknown colour and an empty language' {
+        $doc = New-VellumPdfDocument
+        try {
+            { $doc | Add-VellumPdfHeading -Text 'x' -Color 'notacolour' } | Should -Throw
+            { $doc | Add-VellumPdfHeading -Text 'x' -Language '' } | Should -Throw
+        }
+        finally { $doc.Dispose() }
+    }
+}

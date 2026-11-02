@@ -18,6 +18,14 @@ function Add-VellumPdfHeading {
         The heading level from 1 (top-level) to 6 (lowest). Controls the PDF
         outline depth and the H1-H6 structure tag in tagged documents (level 1
         is tagged H1). Defaults to 1.
+    .PARAMETER Color
+        Heading text colour: an R,G,B triple in 0..1, a hex string ('#3366cc'),
+        or a colour name.
+    .PARAMETER Leading
+        Line height in points; 0 (the default) means 1.2 x the font size.
+    .PARAMETER Language
+        A BCP 47 language tag (e.g. 'fr') written for this heading; only used in
+        tagged documents. VellumPdf does not validate the tag.
     .PARAMETER Font
         A base-14 font name for the heading. Defaults to HelveticaBold. Ignored
         when -FontHandle is supplied.
@@ -73,6 +81,16 @@ function Add-VellumPdfHeading {
 
         [VellumPdf.Fonts.EmbeddedFontHandle]$FontHandle,
 
+        # RGB triple (0..1), a hex string ('#3366cc'/'#36c'), or a colour name.
+        [object]$Color,
+
+        [ValidateRange(0, 1000)]
+        [double]$Leading,
+
+        # BCP 47 language tag for this heading (tagged documents only).
+        [ValidateNotNullOrEmpty()]
+        [string]$Language,
+
         [ValidateRange(0, 10000)]
         [double]$MarginTop,
 
@@ -93,12 +111,15 @@ function Add-VellumPdfHeading {
         } else {
             @{ Font = $Font; FontSize = $FontSize }
         }
+        if ($PSBoundParameters.ContainsKey('Color'))   { $styleParams['Color'] = ConvertTo-VellumColor $Color }
+        if ($PSBoundParameters.ContainsKey('Leading')) { $styleParams['Leading'] = $Leading }
         $style = New-VellumTextStyle @styleParams
         $heading = [VellumPdf.Layout.Elements.Heading]::new($Text, $style)
         # VellumPdf.Layout counts heading levels from 0 (0 = H1); the cmdlet takes 1..6.
         $heading.Level = $Level - 1
         $heading.Alignment = [VellumPdf.Layout.Core.HorizontalAlignment]::$Alignment
         if ($BookmarkTitle) { $heading.BookmarkTitle = $BookmarkTitle }
+        if ($Language) { $heading.Language = $Language }
 
         Set-VellumPdfElementMargin -Element $heading -Top $MarginTop -Bottom $MarginBottom `
             -BoundParameters $PSBoundParameters -Document $Document -DeferBottom

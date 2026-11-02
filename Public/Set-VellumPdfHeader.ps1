@@ -19,6 +19,17 @@ function Set-VellumPdfHeader {
         The header text template. Use {page} for the current page number and
         {pages} for the total page count (e.g. 'Page {page} of {pages}').
         Mandatory.
+    .PARAMETER FontHandle
+        An embedded TrueType font from Register-VellumPdfFont, used for the header
+        text (takes precedence over -Font). Needed for text outside Windows-1252 and
+        for PDF/A documents.
+    .PARAMETER Color
+        Text colour: an R,G,B triple in 0..1, a hex string ('#3366cc'), or a colour
+        name. Honoured by VellumPdf 2.x.
+    .PARAMETER Height
+        The header band height in points. Defaults to the line height plus 4. A
+        header wider than the page is truncated at a word boundary; Save-VellumPdfDocument
+        warns when that happens. A link style is ignored in bands.
     .PARAMETER Font
         A base-14 font name for the header text. When omitted the document
         default font is used.
@@ -55,25 +66,25 @@ function Set-VellumPdfHeader {
         [ValidateRange(1, 1000)]
         [double]$FontSize,
 
+        # An embedded TrueType font from Register-VellumPdfFont (takes precedence
+        # over -Font); needed for Unicode text and PDF/A documents.
+        [VellumPdf.Fonts.EmbeddedFontHandle]$FontHandle,
+
+        # Text colour: R,G,B in 0..1, '#rrggbb', or a colour name.
+        [object]$Color,
+
+        # Band height in points (default: line height + 4). Text wider than the
+        # page is truncated at a word boundary and reported when saving.
+        [ValidateRange(0.1, 10000)]
+        [double]$Height,
+
         [ValidateSet('Left', 'Center', 'Right', 'Justify')]
         [string]$Alignment = 'Center'
     )
 
     process {
-        Assert-VellumPdfDocumentOpen -Document $Document -CommandName 'Set-VellumPdfHeader'
-        Write-VellumPdfEncodingWarning -Text $Template -CommandName 'Set-VellumPdfHeader'
-        $wantsFont = [bool]$Font -or $PSBoundParameters.ContainsKey('FontSize')
-        $style = if ($wantsFont) {
-            $default = Resolve-VellumPdfDefault -Document $Document
-            $effFont = if ($Font) { $Font } else { $default.Font }
-            $effSize = if ($PSBoundParameters.ContainsKey('FontSize')) { $FontSize } else { $default.FontSize }
-            New-VellumTextStyle -Font $effFont -FontSize $effSize
-        } else {
-            $null
-        }
-
-        $halign = [VellumPdf.Layout.Core.HorizontalAlignment]::$Alignment
-        [void]$Document.SetHeader($Template, $style, $halign)
-        $Document
+        Set-VellumPdfBand -Document $Document -Kind Header -Template $Template -Font $Font -FontSize $FontSize `
+            -FontHandle $FontHandle -Color $Color -Height $Height -Alignment $Alignment `
+            -BoundParameters $PSBoundParameters
     }
 }

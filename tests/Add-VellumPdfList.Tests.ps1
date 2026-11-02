@@ -204,3 +204,45 @@ Describe 'Add-VellumPdfList' {
         finally { $doc.Dispose() }
     }
 }
+
+Describe 'Add-VellumPdfList embedded fonts, colour and language' {
+    BeforeAll {
+        $script:fontPath = Join-Path $PSScriptRoot 'assets' 'DejaVuSans.ttf'
+        $script:czech = 'P' + [char]0x0159 + 'ilis'
+    }
+
+    It 'renders in an embedded font under PDF/A with no encoding warning' {
+        $doc = New-VellumPdfDocument -Conformance PdfA2b
+        $handle = Register-VellumPdfFont -Document $doc -Path $script:fontPath
+        $out = Join-Path $TestDrive 'listfont.pdf'
+        $doc | Add-VellumPdfList -Item $script:czech, @{ Text = 'two'; Children = @($script:czech) } `
+            -FontHandle $handle -WarningVariable wv | Save-VellumPdfDocument -Path $out | Out-Null
+        @($wv).Count | Should -Be 0
+        [System.IO.File]::ReadAllText($out, [System.Text.Encoding]::Latin1) | Should -Match '/FontFile2'
+    }
+
+    It 'applies list colour/leading/language and per-item overrides' {
+        $out = Join-Path $TestDrive 'listopts.pdf'
+        New-VellumPdfDocument -Tagged -Language en |
+            Add-VellumPdfList -Style OrderedDecimal -Color navy -Leading 18 -Language fr -Item @(
+                'plain',
+                @{ Text = 'bold red'; Font = 'HelveticaBold'; FontSize = 14; Color = '#cc0000'; Language = 'de' }) |
+            Save-VellumPdfDocument -Path $out | Out-Null
+        $text = [System.IO.File]::ReadAllText($out, [System.Text.Encoding]::Latin1)
+        # /Lang strings are UTF-16BE with a byte-order mark: FE FF 00 'f' 00 'r'.
+        $lang = { param($t) '/Lang\s*\(\xFE\xFF' + (($t.ToCharArray() | ForEach-Object { '\x00' + [regex]::Escape([string]$_) }) -join '') + '\)' }
+        $text | Should -Match (& $lang 'fr')
+        $text | Should -Match (& $lang 'de')
+    }
+
+    It 'validates item style keys' {
+        $doc = New-VellumPdfDocument
+        try {
+            { $doc | Add-VellumPdfList -Item @(@{ Text = 'a'; Font = 'Comic' }) } | Should -Throw '*not a base-14 font*'
+            { $doc | Add-VellumPdfList -Item @(@{ Text = 'a'; FontSize = 0 }) } | Should -Throw '*between 1 and 1000*'
+            { $doc | Add-VellumPdfList -Item @(@{ Text = 'a'; Leading = -1 }) } | Should -Throw '*Leading*'
+            { $doc | Add-VellumPdfList -Item @(@{ Text = 'a'; FontHandle = 5 }) } | Should -Throw '*EmbeddedFontHandle*'
+        }
+        finally { $doc.Dispose() }
+    }
+}

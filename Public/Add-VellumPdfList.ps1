@@ -24,13 +24,26 @@ function Add-VellumPdfList {
         One level of children is supported: VellumPdf.Layout draws a child's own
         children nowhere (a grandchild's text would silently vanish), so deeper
         nesting is refused with an error. Flatten deeper trees or add separate
-        lists. A nested item in an Unordered list is marked with U+25E6, which
+        lists. An item hashtable may also set Font, FontSize, FontHandle, Color,
+        Leading and Language for that item alone. A nested item in an Unordered list is marked with U+25E6, which
         the base-14 fonts cannot encode (it shows as '?'). Empty strings are
         permitted. Mandatory.
     .PARAMETER Style
         The list marker style. Unordered uses bullet points; OrderedDecimal,
         OrderedAlpha, and OrderedRoman use numbered, alphabetic, and Roman
         numeral markers respectively. Defaults to Unordered.
+    .PARAMETER FontHandle
+        An embedded TrueType font from Register-VellumPdfFont, applied to every
+        item (takes precedence over -Font). Needed for text outside Windows-1252
+        and for PDF/A documents. An item may override it with its own FontHandle key.
+    .PARAMETER Color
+        Text colour for every item: an R,G,B triple in 0..1, a hex string
+        ('#3366cc'), or a colour name.
+    .PARAMETER Leading
+        Line height in points for every item; 0 (the default) means 1.2 x the font size.
+    .PARAMETER Language
+        A BCP 47 language tag written for every item (e.g. 'fr'); only used in tagged
+        documents. An item hashtable may carry its own Language key.
     .PARAMETER Indent
         Left indent for the list in points, between 0 and 1000. When omitted
         the VellumPdf library default indent is used.
@@ -87,6 +100,20 @@ function Add-VellumPdfList {
         [ValidateRange(1, 1000)]
         [double]$FontSize,
 
+        # An embedded TrueType font from Register-VellumPdfFont (takes precedence
+        # over -Font); needed for Unicode text and PDF/A documents.
+        [VellumPdf.Fonts.EmbeddedFontHandle]$FontHandle,
+
+        # Text colour for every item: R,G,B in 0..1, '#rrggbb', or a colour name.
+        [object]$Color,
+
+        [ValidateRange(0, 1000)]
+        [double]$Leading,
+
+        # BCP 47 language tag applied to every item (tagged documents only).
+        [ValidateNotNullOrEmpty()]
+        [string]$Language,
+
         [ValidateRange(0, 10000)]
         [double]$MarginTop,
 
@@ -96,6 +123,9 @@ function Add-VellumPdfList {
 
     process {
         Assert-VellumPdfDocumentOpen -Document $Document -CommandName 'Add-VellumPdfList'
+        if ($FontHandle) {
+            Assert-VellumPdfFontHandle -FontHandle $FontHandle -Document $Document -CommandName 'Add-VellumPdfList'
+        }
 
         # VellumPdf.Layout renders exactly one nesting level (ListItem.Children
         # is read, a child's own Children never are). Refuse deeper input rather
@@ -116,10 +146,10 @@ function Add-VellumPdfList {
                 if (-not $spec.Contains('Text')) {
                     throw "Add-VellumPdfList: a nested-item hashtable must include a 'Text' key."
                 }
-                [string]$spec['Text']
+                if (-not $FontHandle -and -not $spec['FontHandle']) { [string]$spec['Text'] }
                 if ($spec['Children']) { foreach ($c in @($spec['Children'])) { & $collectText $c ($depth + 1) } }
             }
-            else {
+            elseif (-not $FontHandle) {
                 [string]$spec
             }
         }
@@ -136,32 +166,86 @@ function Add-VellumPdfList {
             $list.Indent = $Indent
         }
 
-        # Build a TextStyle only when font or size overrides were requested.
-        # Gaps are filled from the document defaults: a style without a font
-        # renders in the library-global Helvetica, not the document default.
-        $wantsStyle = [bool]$Font -or $PSBoundParameters.ContainsKey('FontSize')
-        $textStyle = $null
-        if ($wantsStyle) {
-            $default = Resolve-VellumPdfDefault -Document $Document
-            $effFont = if ($Font) { $Font } else { $default.Font }
-            $effSize = if ($PSBoundParameters.ContainsKey('FontSize')) { $FontSize } else { $default.FontSize }
-            $textStyle = New-VellumTextStyle -Font $effFont -FontSize $effSize
+        # List-level style values. Gaps are filled from the document defaults: a
+        # style without a font renders in the library-global Helvetica, not the
+        # document default. A $null style lets an item fall back to the engine's
+        # list default.
+        $default = Resolve-VellumPdfDefault -Document $Document
+        $listColor = if ($PSBoundParameters.ContainsKey('Color')) { ConvertTo-VellumColor $Color }
+        $base = @{
+            Font       = if ($Font) { $Font } else { $default.Font }
+            FontSize   = if ($PSBoundParameters.ContainsKey('FontSize')) { $FontSize } else { $default.FontSize }
+            FontHandle = $FontHandle
+            Color      = $listColor
+            Leading    = if ($PSBoundParameters.ContainsKey('Leading')) { $Leading }
+        }
+        $listWantsStyle = [bool]$Font -or $PSBoundParameters.ContainsKey('FontSize') -or $FontHandle `
+            -or $listColor -or $PSBoundParameters.ContainsKey('Leading')
+
+        $fontNames = [Enum]::GetNames([VellumPdf.Fonts.Standard14])
+
+        # Builds the TextStyle for one item: the list-level values overlaid with
+        # the item's own Font/FontSize/FontHandle/Color/Leading keys.
+        $styleFor = {
+            param($spec)
+            $over = @('Font', 'FontSize', 'FontHandle', 'Color', 'Leading') | Where-Object {
+                $spec -is [System.Collections.IDictionary] -and $null -ne $spec[$_]
+            }
+            if (-not $listWantsStyle -and -not $over) { return $null }
+
+            $handle = $FontHandle
+            if ($spec -is [System.Collections.IDictionary] -and $spec['FontHandle']) {
+                if ($spec['FontHandle'] -isnot [VellumPdf.Fonts.EmbeddedFontHandle]) {
+                    throw 'Add-VellumPdfList: item FontHandle must be an EmbeddedFontHandle from Register-VellumPdfFont.'
+                }
+                Assert-VellumPdfFontHandle -FontHandle $spec['FontHandle'] -Document $Document -CommandName 'Add-VellumPdfList'
+                $handle = $spec['FontHandle']
+            }
+            $itemFont = $base.Font
+            if ($spec -is [System.Collections.IDictionary] -and $spec['Font']) {
+                if ([string]$spec['Font'] -notin $fontNames) {
+                    throw "Add-VellumPdfList: item Font '$($spec['Font'])' is not a base-14 font name."
+                }
+                $itemFont = [string]$spec['Font']
+                if (-not $spec['FontHandle']) { $handle = $null }   # an explicit base-14 Font on the item wins over the list handle
+            }
+            $size = $base.FontSize
+            if ($spec -is [System.Collections.IDictionary] -and $null -ne $spec['FontSize']) {
+                $size = $spec['FontSize'] -as [double]
+                if ($null -eq $size -or $size -lt 1 -or $size -gt 1000) {
+                    throw "Add-VellumPdfList: item FontSize must be between 1 and 1000; got '$($spec['FontSize'])'."
+                }
+            }
+            $args2 = @{ FontSize = $size }
+            if ($handle) { $args2['FontHandle'] = $handle } else { $args2['Font'] = $itemFont }
+            $colorValue = $base.Color
+            if ($spec -is [System.Collections.IDictionary] -and $spec['Color']) { $colorValue = ConvertTo-VellumColor $spec['Color'] }
+            if ($colorValue) { $args2['Color'] = $colorValue }
+            $lead = $base.Leading
+            if ($spec -is [System.Collections.IDictionary] -and $null -ne $spec['Leading']) {
+                $lead = $spec['Leading'] -as [double]
+                if ($null -eq $lead -or $lead -lt 0 -or $lead -gt 1000) {
+                    throw "Add-VellumPdfList: item Leading must be between 0 and 1000; got '$($spec['Leading'])'."
+                }
+            }
+            if ($null -ne $lead) { $args2['Leading'] = $lead }
+            New-VellumTextStyle @args2
         }
 
-        # Build each item (recursing into Children via ListItem.AddChild). A
-        # $null style lets the item fall back to the list DefaultStyle.
+        # Build each item (recursing into Children via ListItem.AddChild).
         $buildItem = {
             param($spec)
-            if ($spec -is [System.Collections.IDictionary]) {
-                $li = [VellumPdf.Layout.Elements.ListItem]::new([string]$spec['Text'], $textStyle)
-                if ($spec['Children']) {
-                    foreach ($child in @($spec['Children'])) {
-                        [void]$li.AddChild((& $buildItem $child))
-                    }
+            $text = if ($spec -is [System.Collections.IDictionary]) { [string]$spec['Text'] } else { [string]$spec }
+            $li = [VellumPdf.Layout.Elements.ListItem]::new($text, (& $styleFor $spec))
+            $lang = if ($spec -is [System.Collections.IDictionary] -and $spec['Language']) { [string]$spec['Language'] }
+                    elseif ($Language) { $Language }
+            if ($lang) { $li.Language = $lang }
+            if ($spec -is [System.Collections.IDictionary] -and $spec['Children']) {
+                foreach ($child in @($spec['Children'])) {
+                    [void]$li.AddChild((& $buildItem $child))
                 }
-                return $li
             }
-            return [VellumPdf.Layout.Elements.ListItem]::new([string]$spec, $textStyle)
+            $li
         }
         foreach ($spec in $Item) {
             [void]$list.Add((& $buildItem $spec))

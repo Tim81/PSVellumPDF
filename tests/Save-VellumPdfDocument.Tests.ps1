@@ -64,3 +64,30 @@ Describe 'Save-VellumPdfDocument engine diagnostics' {
         $file.BandTruncations[0].DroppedCharacters | Should -BeGreaterThan 0
     }
 }
+
+Describe 'Save-VellumPdfDocument -PassThru and -Force' {
+    It '-PassThru returns the live document and keeps it open' {
+        $doc = New-VellumPdfDocument | Add-VellumPdfParagraph -Text 'x'
+        $out = Join-Path $TestDrive 'pt.pdf'
+        $result = $doc | Save-VellumPdfDocument -Path $out -PassThru
+        try {
+            $result | Should -BeOfType ([VellumPdf.Layout.Document])
+            [object]::ReferenceEquals($result, $doc) | Should -BeTrue
+            Test-Path $out | Should -BeTrue
+            { $doc | Add-VellumPdfParagraph -Text 'still open' | Out-Null } | Should -Not -Throw
+        }
+        finally { $doc.Dispose() }
+    }
+
+    It '-Force creates a missing parent directory; without it saving fails' {
+        $dir = Join-Path $TestDrive 'new' 'nested'
+        $path = Join-Path $dir 'f.pdf'
+        $doc = New-VellumPdfDocument | Add-VellumPdfParagraph -Text 'x'
+        try {
+            { $doc | Save-VellumPdfDocument -Path $path -KeepOpen } | Should -Throw '*directory not found*'
+            $doc | Save-VellumPdfDocument -Path $path -Force | Out-Null
+        }
+        catch { $doc.Dispose(); throw }
+        Test-Path $path | Should -BeTrue
+    }
+}

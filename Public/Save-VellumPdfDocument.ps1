@@ -46,10 +46,18 @@ function Save-VellumPdfDocument {
         responsible for calling $doc.Dispose() when finished. Useful when the
         same document object must be inspected after the file is written. The
         document cannot be saved a second time.
+    .PARAMETER PassThru
+        Return the live document instead of the written file, and keep it open
+        (implies -KeepOpen). The caller disposes it. The document still cannot be
+        saved a second time; use it to read TextEncodingWarnings or BandTruncations.
+    .PARAMETER Force
+        Create the parent directory of -Path when it does not exist (without it a
+        missing directory is an error).
     .EXAMPLE
         $doc | Save-VellumPdfDocument -Path ./out.pdf
     .OUTPUTS
-        System.IO.FileInfo for the written file, with extra TextEncodingWarnings
+        System.IO.FileInfo for the written file (VellumPdf.Layout.Document with
+        -PassThru), with extra TextEncodingWarnings
         (CodePoint, Character) and BandTruncations (Band, PageNumber,
         DrawnCharacters, ResolvedCharacters, DroppedCharacters) properties.
     #>
@@ -63,7 +71,13 @@ function Save-VellumPdfDocument {
         [string]$Path,
 
         # Keep the document open after saving (caller must Dispose it).
-        [switch]$KeepOpen
+        [switch]$KeepOpen,
+
+        # Return the live document instead of the file. Implies -KeepOpen.
+        [switch]$PassThru,
+
+        # Create the parent directory when it does not exist.
+        [switch]$Force
     )
 
     process {
@@ -98,6 +112,9 @@ function Save-VellumPdfDocument {
                 $attempted = $true
 
                 $parent = [System.IO.Path]::GetDirectoryName($resolved)
+                if ($parent -and $Force -and -not [System.IO.Directory]::Exists($parent)) {
+                    [void][System.IO.Directory]::CreateDirectory($parent)
+                }
                 if ($parent -and -not [System.IO.Directory]::Exists($parent)) {
                     throw "Save-VellumPdfDocument: directory not found: '$parent'. Create it first or pass a path in an existing directory."
                 }
@@ -162,10 +179,15 @@ function Save-VellumPdfDocument {
 
                 $Document.PSObject.Properties.Add([psnoteproperty]::new('PSVellumSaved', $true))
                 $diagnostics = Write-VellumPdfSaveDiagnostic -Document $Document
-                $file = Get-Item -LiteralPath $resolved
-                $file | Add-Member -NotePropertyName TextEncodingWarnings -NotePropertyValue $diagnostics.TextEncodingWarnings
-                $file | Add-Member -NotePropertyName BandTruncations -NotePropertyValue $diagnostics.BandTruncations
-                $file
+                if ($PassThru) {
+                    $Document
+                }
+                else {
+                    $file = Get-Item -LiteralPath $resolved
+                    $file | Add-Member -NotePropertyName TextEncodingWarnings -NotePropertyValue $diagnostics.TextEncodingWarnings
+                    $file | Add-Member -NotePropertyName BandTruncations -NotePropertyValue $diagnostics.BandTruncations
+                    $file
+                }
             }
         }
         finally {
@@ -173,7 +195,7 @@ function Save-VellumPdfDocument {
             # document open under -WhatIf, where no attempt was made. The stamp
             # lets the other cmdlets reject stale use of this document (VellumPdf
             # itself accepts Add() on a disposed document without complaint).
-            if ($attempted -and -not $KeepOpen) {
+            if ($attempted -and -not $KeepOpen -and -not $PassThru) {
                 $Document.Dispose()
                 if (-not $Document.PSObject.Properties['PSVellumDisposed']) {
                     $Document.PSObject.Properties.Add([psnoteproperty]::new('PSVellumDisposed', $true))

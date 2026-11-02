@@ -9,7 +9,7 @@ function ConvertTo-VellumColor {
 
           - an R,G,B array of three numbers in 0..1 (the original contract);
           - a hex string '#RRGGBB', 'RRGGBB', '#RGB', or 'RGB';
-          - a known colour name (the 16 HTML basic colours plus a few aliases).
+          - a known colour name (the 16 HTML basic colours plus about 35 more CSS names).
 
         Returns the normalised triple, or $null when the input is $null (callers
         treat $null as "not specified"). Throws a clear error on anything else.
@@ -93,8 +93,30 @@ function ConvertTo-VellumColor {
         return [double[]]$named[$key]
     }
 
+    # More CSS colour names, as 0xRRGGBB.
+    $css = @{
+        pink = 0xFFC0CB; hotpink = 0xFF69B4; brown = 0xA52A2A; gold = 0xFFD700; coral = 0xFF7F50
+        salmon = 0xFA8072; crimson = 0xDC143C; indigo = 0x4B0082; violet = 0xEE82EE; turquoise = 0x40E0D0
+        khaki = 0xF0E68C; beige = 0xF5F5DC; ivory = 0xFFFFF0; lavender = 0xE6E6FA; tan = 0xD2B48C
+        chocolate = 0xD2691E; sienna = 0xA0522D; orchid = 0xDA70D6; plum = 0xDDA0DD; skyblue = 0x87CEEB
+        steelblue = 0x4682B4; royalblue = 0x4169E1; slategray = 0x708090; slategrey = 0x708090
+        darkgray = 0xA9A9A9; darkgrey = 0xA9A9A9; lightgray = 0xD3D3D3; lightgrey = 0xD3D3D3
+        darkgreen = 0x006400; forestgreen = 0x228B22; seagreen = 0x2E8B57; darkblue = 0x00008B
+        darkred = 0x8B0000; orangered = 0xFF4500; darkorange = 0xFF8C00; lightblue = 0xADD8E6
+        lightgreen = 0x90EE90; midnightblue = 0x191970; whitesmoke = 0xF5F5F5; gainsboro = 0xDCDCDC
+    }
+    if ($css.ContainsKey($key)) {
+        $rgb = [int]$css[$key]
+        return [double[]]@(
+            ((($rgb -shr 16) -band 255) / 255.0),
+            ((($rgb -shr 8) -band 255) / 255.0),
+            (($rgb -band 255) / 255.0))
+    }
+
     throw ("ConvertTo-VellumColor: unrecognised colour '$Color'. Use an R,G,B array of three " +
         "numbers in 0..1, a hex string like '#3366cc' or '#36c', or a known name " +
         '(black, white, red, lime, green, blue, yellow, cyan, magenta, silver, gray, ' +
-        'maroon, olive, navy, teal, purple, orange).')
+        'maroon, olive, navy, teal, purple, orange, pink, brown, gold, coral, crimson, indigo, ' +
+        'violet, turquoise, khaki, beige, ivory, lavender, tan, steelblue, skyblue, royalblue, ' +
+        'lightgray, darkgray, lightblue, lightgreen, darkgreen, darkblue, darkred, ... - any standard CSS name).')
 }

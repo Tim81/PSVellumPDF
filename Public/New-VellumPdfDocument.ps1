@@ -18,11 +18,20 @@ function New-VellumPdfDocument {
         -UseObjectStreams enables PDF cross-reference object streams, which
         reduces file size for documents with many objects.
     .PARAMETER Conformance
-        The PDF/A conformance level for the document. Use PdfA2b, PdfA2u, or
-        PdfA2a to produce an ISO 19005-2 compliant archive file; None (default)
-        produces a standard PDF without conformance requirements. Note that PDF/A
-        forbids encryption, so -Conformance is incompatible with
-        Protect-VellumPdfDocument.
+        The conformance level for the document. Use PdfA2b, PdfA2u, or PdfA2a to
+        produce an ISO 19005-2 compliant archive file, or PdfUA1 for ISO 14289-1
+        (PDF/UA-1) accessibility; None (default) produces a standard PDF without
+        conformance requirements. PDF/UA-1 forces a tagged document: also set
+        -Language and give images -AltText. Hyperlinks (-LinkUri) are not tagged by
+        VellumPdf, so a PDF/UA document containing them is not fully conformant.
+        Note that PDF/A forbids encryption, so PDF/A is incompatible with
+        Protect-VellumPdfDocument; PDF/UA-1 may be encrypted if Extract is kept.
+    .PARAMETER PageWidthMm
+        Custom page width in millimetres (1..5080), used together with
+        -PageHeightMm instead of -PageSize. For a landscape page make the width
+        the larger value.
+    .PARAMETER PageHeightMm
+        Custom page height in millimetres (1..5080); see -PageWidthMm.
     .PARAMETER PageSize
         The paper size for every page in the document. Accepts standard ISO and
         US names (A0-A6, Ledger, Legal, Letter). Defaults to A4.
@@ -76,14 +85,25 @@ function New-VellumPdfDocument {
     #>
     [Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSUseShouldProcessForStateChangingFunctions', '',
         Justification = 'Returns a new in-memory document object; performs no external/system state change.')]
-    [CmdletBinding()]
+    [CmdletBinding(DefaultParameterSetName = 'NamedPage')]
     [OutputType([VellumPdf.Layout.Document])]
     param(
-        [ValidateSet('None', 'PdfA2b', 'PdfA2u', 'PdfA2a')]
+        [ValidateSet('None', 'PdfA2b', 'PdfA2u', 'PdfA2a', 'PdfUA1')]
         [string]$Conformance = 'None',
 
+        [Parameter(ParameterSetName = 'NamedPage')]
         [ValidateSet('A0', 'A1', 'A2', 'A3', 'A4', 'A5', 'A6', 'Ledger', 'Legal', 'Letter')]
         [string]$PageSize = 'A4',
+
+        # Custom page size in millimetres (max 5080 mm = 14400 pt, the PDF default
+        # user-space limit). Use instead of -PageSize; swap the two for landscape.
+        [Parameter(Mandatory, ParameterSetName = 'CustomPage')]
+        [ValidateRange(1, 5080)]
+        [double]$PageWidthMm,
+
+        [Parameter(Mandatory, ParameterSetName = 'CustomPage')]
+        [ValidateRange(1, 5080)]
+        [double]$PageHeightMm,
 
         [ValidateSet('Courier', 'CourierBold', 'CourierBoldOblique', 'CourierOblique',
             'Helvetica', 'HelveticaBold', 'HelveticaBoldOblique', 'HelveticaOblique',
@@ -119,7 +139,11 @@ function New-VellumPdfDocument {
 
     $doc = [VellumPdf.Layout.Document]::new()
     $doc.Conformance = [VellumPdf.Document.PdfConformance]::$Conformance
-    $doc.PageSize = [VellumPdf.Document.PageSize]::$PageSize
+    $doc.PageSize = if ($PSCmdlet.ParameterSetName -eq 'CustomPage') {
+        [VellumPdf.Document.PageSize]::Mm($PageWidthMm, $PageHeightMm)
+    } else {
+        [VellumPdf.Document.PageSize]::$PageSize
+    }
     if ($Tagged) { $doc.Tagged = $true }
     if ($Language) { $doc.Language = $Language }
     if ($UseObjectStreams) { $doc.UseObjectStreams = $true }

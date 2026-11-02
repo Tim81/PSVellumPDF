@@ -62,6 +62,31 @@ function Add-VellumPdfImage {
     .PARAMETER MarginBottom
         Extra spacing in points below the image element. Does not affect the
         left/right page margins.
+    .PARAMETER Columns
+        Pixel width of raw CCITT data (-Format Ccitt only; the fax bits have no header).
+    .PARAMETER Rows
+        Pixel height of raw CCITT data (-Format Ccitt only).
+    .PARAMETER CcittK
+        CCITT encoding: -1 Group 4 (default), 0 Group 3 one-dimensional, >0 Group 3
+        two-dimensional.
+    .PARAMETER BlackIs1
+        CCITT: a 1 bit means black (default: 0 is black).
+    .PARAMETER EncodedByteAlign
+        CCITT: each encoded row starts on a byte boundary.
+    .PARAMETER EndOfLine
+        CCITT: the data contains end-of-line codes.
+    .PARAMETER ReduceToEightBit
+        Downsample high-bit-depth sources to 8 bits per component. Smaller file,
+        less precision. PNG, TIFF, JBIG2, JPEG 2000 and CCITT only.
+    .PARAMETER DecodeToRaster
+        Decode the source image into a raster rather than embedding its
+        codestream with the matching PDF filter (the default keeps the original
+        compression). Supported for JBIG2; VellumPdf 2.3 refuses JPEG 2000 and
+        CCITT Group 4 ("not yet supported") and PNG/TIFF are rasters already.
+    .PARAMETER MarginLeft
+        Extra space in points to the left of the image.
+    .PARAMETER MarginRight
+        Extra space in points to the right of the image.
     .EXAMPLE
         New-VellumPdfDocument |
             Add-VellumPdfImage -Path ./logo.png |
@@ -90,8 +115,40 @@ function Add-VellumPdfImage {
 
         # Image format of -ImageBytes, since there is no file extension to infer it.
         [Parameter(Mandatory, ParameterSetName = 'Bytes')]
-        [ValidateSet('Jpeg', 'Png', 'Bmp', 'Gif', 'Tiff', 'Jbig2', 'Jpeg2000')]
+        [ValidateSet('Jpeg', 'Png', 'Bmp', 'Gif', 'Tiff', 'Jbig2', 'Jpeg2000', 'Ccitt')]
         [string]$Format,
+
+        # --- CCITT Group 3/4 fax data (-Format Ccitt only): raw bits carry no header ---
+        [Parameter(ParameterSetName = 'Bytes')]
+        [ValidateRange(1, 100000)]
+        [int]$Columns,
+
+        [Parameter(ParameterSetName = 'Bytes')]
+        [ValidateRange(1, 100000)]
+        [int]$Rows,
+
+        # CCITT K: -1 = Group 4 (default), 0 = Group 3 1-D, >0 = Group 3 2-D.
+        [Parameter(ParameterSetName = 'Bytes')]
+        [ValidateRange(-1, 1000)]
+        [int]$CcittK = -1,
+
+        [Parameter(ParameterSetName = 'Bytes')]
+        [switch]$BlackIs1,
+
+        [Parameter(ParameterSetName = 'Bytes')]
+        [switch]$EncodedByteAlign,
+
+        [Parameter(ParameterSetName = 'Bytes')]
+        [switch]$EndOfLine,
+
+        # Downsample 16-bit sources to 8 bits per component (smaller, less precise).
+        # PNG, TIFF, JBIG2, JPEG 2000 and CCITT only.
+        [switch]$ReduceToEightBit,
+
+        # Decode the source into a raster instead of embedding the codestream as
+        # a PDF-native filter. Works for JBIG2; JPEG 2000 and CCITT Group 4 are
+        # refused by the engine.
+        [switch]$DecodeToRaster,
 
         [ValidateRange(1, 100000)]
         [double]$Width,
@@ -108,7 +165,13 @@ function Add-VellumPdfImage {
         [double]$MarginTop,
 
         [ValidateRange(0, 10000)]
-        [double]$MarginBottom
+        [double]$MarginBottom,
+
+        [ValidateRange(0, 10000)]
+        [double]$MarginLeft,
+
+        [ValidateRange(0, 10000)]
+        [double]$MarginRight
     )
 
     process {
@@ -142,17 +205,44 @@ function Add-VellumPdfImage {
             }
         }
 
+        # Load options (bit depth / decode mode) exist only on some loaders.
+        $wantsOptions = $ReduceToEightBit -or $DecodeToRaster
+        if ($wantsOptions -and $formatKey -notin @('png', 'tiff', 'jbig2', 'jpeg2000', 'ccitt')) {
+            throw ("Add-VellumPdfImage: -ReduceToEightBit and -DecodeToRaster apply to PNG, TIFF, JBIG2, JPEG 2000 " +
+                "and CCITT images only, not $formatKey.")
+        }
+        $loadOptions = $null
+        if ($wantsOptions) {
+            $loadOptions = [VellumPdf.Images.ImageLoadOptions]::new()
+            if ($ReduceToEightBit) { $loadOptions.BitDepth = [VellumPdf.Images.ImageBitDepth]::ReduceToEight }
+            if ($DecodeToRaster)   { $loadOptions.DecodeMode = [VellumPdf.Images.ImageDecodeMode]::DecodeToRaster }
+        }
+        if ($formatKey -eq 'ccitt') {
+            if (-not $PSBoundParameters.ContainsKey('Columns') -or -not $PSBoundParameters.ContainsKey('Rows')) {
+                throw 'Add-VellumPdfImage: -Format Ccitt needs -Columns and -Rows (raw fax data has no header).'
+            }
+            $ccitt = [VellumPdf.Images.CcittOptions]::new()
+            $ccitt.K = $CcittK
+            $ccitt.BlackIs1 = $BlackIs1.IsPresent
+            $ccitt.EncodedByteAlign = $EncodedByteAlign.IsPresent
+            $ccitt.EndOfLine = $EndOfLine.IsPresent
+        }
+        elseif ($PSBoundParameters.ContainsKey('Columns') -or $PSBoundParameters.ContainsKey('Rows')) {
+            throw 'Add-VellumPdfImage: -Columns/-Rows/-CcittK/-BlackIs1/-EncodedByteAlign/-EndOfLine apply to -Format Ccitt only.'
+        }
+
         # Loader errors ("Not a PNG file.") do not mention the source; rethrow
         # with it so batch scripts can identify the culprit.
         try {
             $xObject = switch ($formatKey) {
                 'jpeg'     { [VellumPdf.Images.JpegImageLoader]::Load($bytes) }
-                'png'      { [VellumPdf.Images.PngImageLoader]::Load($bytes) }
+                'png'      { if ($loadOptions) { [VellumPdf.Images.PngImageLoader]::Load($bytes, $loadOptions) } else { [VellumPdf.Images.PngImageLoader]::Load($bytes) } }
                 'bmp'      { [VellumPdf.Images.BmpImageLoader]::Load($bytes) }
                 'gif'      { [VellumPdf.Images.GifImageLoader]::Load($bytes) }
-                'tiff'     { [VellumPdf.Images.TiffImageLoader]::Load($bytes) }
-                'jbig2'    { [VellumPdf.Images.Jbig2ImageLoader]::Load($bytes) }
-                'jpeg2000' { [VellumPdf.Images.JpxImageLoader]::Load($bytes) }
+                'tiff'     { if ($loadOptions) { [VellumPdf.Images.TiffImageLoader]::Load($bytes, $loadOptions) } else { [VellumPdf.Images.TiffImageLoader]::Load($bytes) } }
+                'jbig2'    { if ($loadOptions) { [VellumPdf.Images.Jbig2ImageLoader]::Load($bytes, $loadOptions) } else { [VellumPdf.Images.Jbig2ImageLoader]::Load($bytes) } }
+                'jpeg2000' { if ($loadOptions) { [VellumPdf.Images.JpxImageLoader]::Load($bytes, $loadOptions) } else { [VellumPdf.Images.JpxImageLoader]::Load($bytes) } }
+                'ccitt'    { [VellumPdf.Images.CcittImageLoader]::Load($bytes, $Columns, $Rows, $ccitt, $loadOptions) }
             }
         }
         catch {
@@ -178,6 +268,12 @@ function Add-VellumPdfImage {
 
         Set-VellumPdfElementMargin -Element $layoutImage -Top $MarginTop -Bottom $MarginBottom `
             -BoundParameters $PSBoundParameters -Document $Document
+        if ($PSBoundParameters.ContainsKey('MarginLeft') -or $PSBoundParameters.ContainsKey('MarginRight')) {
+            $cur = $layoutImage.Margins
+            $layoutImage.Margins = [VellumPdf.Layout.Core.EdgeInsets]::new(
+                $cur.Top, $(if ($PSBoundParameters.ContainsKey('MarginRight')) { $MarginRight } else { $cur.Right }),
+                $cur.Bottom, $(if ($PSBoundParameters.ContainsKey('MarginLeft')) { $MarginLeft } else { $cur.Left }))
+        }
 
         [void]$Document.Add($layoutImage)
         $Document

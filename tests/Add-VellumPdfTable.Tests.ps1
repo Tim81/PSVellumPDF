@@ -218,3 +218,80 @@ Describe 'Add-VellumPdfTable' {
         $doc.Dispose()
     }
 }
+
+Describe 'Add-VellumPdfTable embedded fonts, padding and rich headers' {
+    BeforeAll {
+        $script:fontPath = Join-Path $PSScriptRoot 'assets' 'DejaVuSans.ttf'
+        $script:czech = 'P' + [char]0x0159 + 'ilis'
+        function script:Get-PdfText([string]$Path) {
+            [System.IO.File]::ReadAllText($Path, [System.Text.Encoding]::Latin1)
+        }
+    }
+
+    It 'renders a table in an embedded font without an encoding warning' {
+        $doc = New-VellumPdfDocument -Conformance PdfA2b
+        $handle = Register-VellumPdfFont -Document $doc -Path $script:fontPath
+        $out = Join-Path $TestDrive 'font.pdf'
+        $doc | Add-VellumPdfTable -Header 'Name' -Row @(, @($script:czech)) -FontHandle $handle `
+            -WarningVariable wv |
+            Save-VellumPdfDocument -Path $out | Out-Null
+        @($wv).Count | Should -Be 0
+        Get-PdfText $out | Should -Match '/FontFile2'
+    }
+
+    It 'lets a colour-only cell inherit the table embedded font' {
+        $doc = New-VellumPdfDocument
+        $handle = Register-VellumPdfFont -Document $doc -Path $script:fontPath
+        $out = Join-Path $TestDrive 'inherit.pdf'
+        { $doc | Add-VellumPdfTable -Row @(, @(@{ Text = $script:czech; Color = 'navy' })) -FontHandle $handle |
+            Save-VellumPdfDocument -Path $out } | Should -Not -Throw
+    }
+
+    It 'accepts a per-cell FontHandle and does not warn for that cell' {
+        $doc = New-VellumPdfDocument
+        $handle = Register-VellumPdfFont -Document $doc -Path $script:fontPath
+        $out = Join-Path $TestDrive 'cellfont.pdf'
+        $doc | Add-VellumPdfTable -Row @(, @(@{ Text = $script:czech; FontHandle = $handle }, 'ascii')) `
+            -WarningVariable wv | Save-VellumPdfDocument -Path $out | Out-Null
+        @($wv).Count | Should -Be 0
+    }
+
+    It 'rejects a font handle from another document' {
+        $other = New-VellumPdfDocument
+        $foreign = Register-VellumPdfFont -Document $other -Path $script:fontPath
+        $doc = New-VellumPdfDocument
+        try {
+            { $doc | Add-VellumPdfTable -Row @(, @('a')) -FontHandle $foreign } | Should -Throw '*DIFFERENT document*'
+        }
+        finally { $doc.Dispose(); $other.Dispose() }
+    }
+
+    It 'accepts rich header cells' {
+        $out = Join-Path $TestDrive 'richheader.pdf'
+        New-VellumPdfDocument |
+            Add-VellumPdfTable -Header @('A', @{ Text = 'Total'; Alignment = 'Right'; Background = '#eeeeee' }) `
+                -Row @(, @('1', '2')) |
+            Save-VellumPdfDocument -Path $out | Out-Null
+        Test-Path $out | Should -BeTrue
+    }
+
+    It 'applies -CellPadding and per-cell Padding/Language/Leading' {
+        $out = Join-Path $TestDrive 'padding.pdf'
+        { New-VellumPdfDocument -Tagged -Language en |
+                Add-VellumPdfTable -CellPadding 2, 4 -Row @(, @(@{ Text = 'x'; Padding = 1, 2, 3, 4; Language = 'fr'; Leading = 14 }, 'y')) |
+                Save-VellumPdfDocument -Path $out } | Should -Not -Throw
+    }
+
+    It 'validates padding, leading and link keys' {
+        $doc = New-VellumPdfDocument
+        try {
+            { $doc | Add-VellumPdfTable -Row @(, @('a')) -CellPadding -1 } | Should -Throw '*between 0 and 1000*'
+            { $doc | Add-VellumPdfTable -Row @(, @('a')) -CellPadding 1, 2, 3 } | Should -Throw '*1 (all sides)*'
+            { $doc | Add-VellumPdfTable -Row @(, @(@{ Text = 'a'; Padding = 'wide' })) } | Should -Throw '*between 0 and 1000*'
+            { $doc | Add-VellumPdfTable -Row @(, @(@{ Text = 'a'; Leading = 5000 })) } | Should -Throw '*Leading*'
+            { $doc | Add-VellumPdfTable -Row @(, @(@{ Text = 'a'; LinkUri = 'https://example.com' })) } | Should -Throw '*ignores hyperlinks*'
+            { $doc | Add-VellumPdfTable -Row @(, @(@{ Text = 'a'; FontHandle = 'nope' })) } | Should -Throw '*EmbeddedFontHandle*'
+        }
+        finally { $doc.Dispose() }
+    }
+}
