@@ -9,7 +9,10 @@ param()
 
 BeforeDiscovery {
     $script:haveQpdf = [bool](Get-Command qpdf -ErrorAction SilentlyContinue)
-    $script:havePdftotext = [bool](Get-Command pdftotext -ErrorAction SilentlyContinue)
+    # The word-box tests parse poppler's 'pdftotext -bbox'. The Windows runner has a pdftotext that is not poppler's
+    # (no -bbox output), so require poppler, not just a command of that name.
+    $script:havePdftotext = [bool](Get-Command pdftotext -ErrorAction SilentlyContinue) -and
+        ((& pdftotext -v 2>&1 | Out-String) -match 'poppler')
 }
 
 BeforeAll {
