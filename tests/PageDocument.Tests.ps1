@@ -56,7 +56,6 @@ Describe 'New-VellumPdfPageDocument and Add-VellumPdfPage' {
     It 'refuses conflicting or invalid options' {
         { New-VellumPdfPageDocument -Linearize -UseObjectStreams } | Should -Throw '*cannot be combined*'
         { New-VellumPdfPageDocument -DocumentId ([byte[]](1, 2, 3)) } | Should -Throw '*exactly 16 bytes*'
-        { New-VellumPdfPageDocument -Conformance PdfUA1 } | Should -Throw
         { New-VellumPdfPageDocument -PageWidthMm 5081 -PageHeightMm 10 } | Should -Throw
     }
 
@@ -443,6 +442,111 @@ Describe 'Why form fields are refused in PDF/A' {
         $t | Should -Match '/BaseFont /Helvetica'
         ([regex]::Matches($t, '/FontFile2')).Count | Should -Be 1
         ([regex]::Matches($t, '/BaseFont\s*/')).Count | Should -BeGreaterThan 1
+    }
+}
+
+Describe 'Tagged page documents (PDF/UA-1, PDF/A-2a)' {
+    BeforeAll {
+        function script:Save-Tagged([scriptblock]$Build, [string]$Name, [string]$Conformance = 'PdfUA1') {
+            $path = Join-Path $TestDrive "$Name.pdf"
+            $doc = New-VellumPdfPageDocument -Conformance $Conformance -Language en-US | Add-VellumPdfPage |
+                Set-VellumPdfDocumentInfo -Title 'Tagged'
+            $doc = & $Build $doc
+            $doc | Save-VellumPdfDocument -Path $path | Out-Null
+            $path
+        }
+    }
+
+    It 'a PDF/UA-1 page document with headings, text, artifacts, figures and a barcode passes the preflight' {
+        $path = Save-Tagged {
+            param($d)
+            $d | Add-VellumPdfText 'Heading' -X 72 -Y 760 -FontSize 22 -Font HelveticaBold -Role H1 |
+                Add-VellumPdfText 'Body paragraph.' -X 72 -Y 730 -Language en-GB |
+                Add-VellumPdfShape Rectangle -X 72 -Y 600 -Width 100 -Height 40 -FillColor navy |
+                Add-VellumPdfGradient -X 200 -Y 600 -Width 100 -Height 40 -StartColor red -EndColor white -AltText 'A gradient swatch' |
+                Add-VellumPdfPageImage $script:gray16 -X 72 -Y 500 -Width 40 -AltText 'A grey square' |
+                Add-VellumPdfPageBarcode QrCode 'https://example.com' -X 200 -Y 480 -TargetWidth 70 |
+                Invoke-VellumPdfCanvas -ScriptBlock { param($c) $c.Rectangle(10, 10, 5, 5).Fill() | Out-Null }
+        } 'ua'
+        $r = Test-VellumPdfConformance -Path $path -Profile PdfUA1
+        ($r.Assertions | Where-Object Severity -EQ 'Error' | ForEach-Object { "$($_.RuleId): $($_.Message)" }) | Should -BeNullOrEmpty
+        $r.IsCompliant | Should -BeTrue
+        $t = Get-PdfText $path
+        $t | Should -Match '/S /H1'
+        $t | Should -Match '/S /Figure'
+        $t | Should -Match '/StructTreeRoot'
+        (Get-PdfContentText $path) | Should -Match '/Artifact BMC'
+    }
+
+    It 'PDF/A-2a is accepted for a tagged page document' {
+        $path = Save-Tagged { param($d) $d | Add-VellumPdfText 'Archive' -X 72 -Y 700 } 'a2a' 'PdfA2a'
+        (Test-VellumPdfConformance -Path $path -Profile PdfA2a).IsCompliant | Should -BeTrue
+    }
+
+    It 'requires alternate text or -Decorative for images in a tagged document, but not in an untagged one' {
+        $tagged = New-VellumPdfPageDocument -Tagged | Add-VellumPdfPage
+        $plain = New-VellumPdfPageDocument | Add-VellumPdfPage
+        try {
+            { $tagged | Add-VellumPdfPageImage $script:gray16 -X 1 -Y 1 } | Should -Throw '*needs -AltText*'
+            { $tagged | Add-VellumPdfPageImage $script:gray16 -X 1 -Y 1 -Decorative } | Should -Not -Throw
+            { $tagged | Add-VellumPdfPageImage $script:gray16 -X 1 -Y 1 -AltText a -Decorative } | Should -Throw '*cannot be combined*'
+            { $plain | Add-VellumPdfPageImage $script:gray16 -X 1 -Y 1 } | Should -Not -Throw
+        }
+        finally { $tagged.Dispose(); $plain.Dispose() }
+    }
+
+    It 'warns once that links and form fields cannot be tagged, and only in tagged documents' {
+        $doc = New-VellumPdfPageDocument -Tagged | Add-VellumPdfPage -Count 2
+        $plain = New-VellumPdfPageDocument | Add-VellumPdfPage
+        try {
+            $doc | Add-VellumPdfLink -X 1 -Y 1 -Width 5 -Height 5 -TargetPage 2 -WarningVariable w1 -WarningAction SilentlyContinue | Out-Null
+            $doc | Add-VellumPdfLink -X 1 -Y 9 -Width 5 -Height 5 -TargetPage 2 -WarningVariable w2 -WarningAction SilentlyContinue | Out-Null
+            $doc | Add-VellumPdfFormField Text -Name f -X 1 -Y 30 -Width 50 -Height 20 -WarningVariable w3 -WarningAction SilentlyContinue | Out-Null
+            @($w1).Count | Should -Be 1
+            @($w2).Count | Should -Be 0
+            @($w3).Count | Should -Be 1
+            $plain | Add-VellumPdfLink -X 1 -Y 1 -Width 5 -Height 5 -Uri 'https://x.test' -WarningVariable w4 | Out-Null
+            @($w4).Count | Should -Be 0
+        }
+        finally { $doc.Dispose(); $plain.Dispose() }
+    }
+
+    It 'leaves untagged documents without marked content' {
+        $path = Save-Page { param($d) $d | Add-VellumPdfText 'x' -X 72 -Y 700 -Role H1 | Add-VellumPdfShape Rectangle -X 1 -Y 1 -Width 5 -Height 5 } 'untagged'
+        $c = Get-PdfContentText $path
+        $c | Should -Not -Match 'BDC'
+        $c | Should -Not -Match 'Artifact'
+    }
+}
+
+Describe 'Text spacing and line options' {
+    It 'writes character spacing, word spacing, rise and scaling' {
+        $path = Save-Page { param($d) $d | Add-VellumPdfText 'spaced out' -X 72 -Y 700 -CharSpacing 2 -WordSpacing 5 -Rise 4 -HorizontalScale 80 } 'spacing'
+        $c = Get-PdfContentText $path
+        $c | Should -Match '2 Tc'
+        $c | Should -Match '5 Tw'
+        $c | Should -Match '4 Ts'
+        $c | Should -Match '80 Tz'
+    }
+
+    It 'accounts for spacing when centring' {
+        $x = {
+            param($extra, $name)
+            $p = Save-Page { param($d) $d | Add-VellumPdfText 'centre' -X 300 -Y 700 -Align Center @extra } $name
+            [double][regex]::Match((Get-PdfContentText $p), '1 0 0 1 ([\d.]+) 700 Tm').Groups[1].Value
+        }
+        $plain = & $x @{} 'c-plain'
+        $wide = & $x @{ CharSpacing = 10 } 'c-wide'
+        $wide | Should -BeLessThan $plain   # wider text starts further left to stay centred on x
+        ([math]::Abs((300 - $plain) - ((300 - $wide) - 30))) | Should -BeLessThan 0.5   # 6 chars x 10pt = 60, half of it is 30
+    }
+
+    It 'writes line cap, join and miter limit' {
+        $path = Save-Page { param($d) $d | Add-VellumPdfShape Line -X 10 -Y 10 -X2 90 -Y2 90 -StrokeWidth 4 -LineCap Round -LineJoin Bevel -MiterLimit 5 } 'caps'
+        $c = Get-PdfContentText $path
+        $c | Should -Match '(?m)^1 J$'
+        $c | Should -Match '(?m)^2 j$'
+        $c | Should -Match '(?m)^5 M$'
     }
 }
 

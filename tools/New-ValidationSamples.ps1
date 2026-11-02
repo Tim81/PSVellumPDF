@@ -15,6 +15,8 @@
       pdfa2b-pages.pdf  - PDF/A-2b page-based document: shapes, text, gradient,
                           image, barcode, links and nested outline
       pdfua1.pdf        - PDF/UA-1 flow document (title, embedded font, alt text)
+      pdfua1-pages.pdf  - tagged PDF/UA-1 page-based document (headings, text, figure,
+                          barcode, artifacts)
       linearized.pdf    - page-based document written as "fast web view"
       forms.pdf         - page-based document with AcroForm fields
       encrypted.pdf     - password-protected (user password: validate)
@@ -165,6 +167,17 @@ $ua |
     Add-VellumPdfPieChart -Slice @(@{ Value = 1; Label = 'a' }, @{ Value = 2; Label = 'b' }) -AltText 'Two slices' |
     Add-VellumPdfBarcode -Type QrCode -Content 'https://github.com/Tim81/PSVellumPDF' -TargetWidth 70 -AltText 'Project link' |
     Save-VellumPdfDocument -Path (Join-Path $OutputPath 'pdfua1.pdf') -Validate | Out-Null
+
+# --- pdfua1-pages.pdf: tagged page-based document --------------------------------
+$uaPages = New-VellumPdfPageDocument -Conformance PdfUA1 -Language 'en-US' | Add-VellumPdfPage
+$uaPages |
+    Set-VellumPdfDocumentInfo -Title 'Tagged Page Document Sample' -Author 'PSVellumPDF CI' |
+    Add-VellumPdfText 'Tagged page document' -X 72 -Y 760 -FontSize 22 -Font HelveticaBold -Role H1 |
+    Add-VellumPdfText 'Text, figures and decoration are tagged or marked as artifacts.' -X 72 -Y 730 |
+    Add-VellumPdfShape Rectangle -X 72 -Y 640 -Width 200 -Height 40 -FillColor navy |
+    Add-VellumPdfPageImage $pngPath -X 72 -Y 560 -Width 40 -AltText 'A single grey pixel' |
+    Add-VellumPdfPageBarcode QrCode 'https://github.com/Tim81/PSVellumPDF' -X 300 -Y 540 -TargetWidth 80 -AltText 'Project link' |
+    Save-VellumPdfDocument -Path (Join-Path $OutputPath 'pdfua1-pages.pdf') -Validate | Out-Null
 
 # --- linearized.pdf / forms.pdf: page documents ---------------------------------
 New-VellumPdfPageDocument -Linearize -Language 'en-US' | Add-VellumPdfPage -Count 3 |

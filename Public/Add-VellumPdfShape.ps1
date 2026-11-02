@@ -58,6 +58,15 @@ function Add-VellumPdfShape {
         Outline colour as C,M,Y,K in 0..1.
     .PARAMETER StrokeWidth
         Outline width in points (default 1).
+    .PARAMETER LineCap
+        How open line ends look: Butt (default), Round or Square.
+    .PARAMETER LineJoin
+        How corners look: Miter (default), Round or Bevel.
+    .PARAMETER MiterLimit
+        Longest miter, as a multiple of the line width, before a Miter join is bevelled.
+    .PARAMETER AltText
+        Alternate text. In a tagged page document the shape is then a Figure with this
+        text; without it the shape is an artifact that assistive technology skips.
     .PARAMETER Dash
         Dash pattern in points, e.g. 4,2 (4 on, 2 off).
     .PARAMETER Opacity
@@ -113,7 +122,20 @@ function Add-VellumPdfShape {
         [double]$Opacity,
 
         [ValidateRange(0, 1)]
-        [double]$StrokeOpacity
+        [double]$StrokeOpacity,
+
+        [ValidateSet('Butt', 'Round', 'Square')]
+        [string]$LineCap,
+
+        [ValidateSet('Miter', 'Round', 'Bevel')]
+        [string]$LineJoin,
+
+        [ValidateRange(1, 100)]
+        [double]$MiterLimit,
+
+        # Alternate text: in a tagged document the shape becomes a Figure instead of an artifact.
+        [ValidateNotNullOrEmpty()]
+        [string]$AltText
     )
 
     process {
@@ -195,12 +217,15 @@ function Add-VellumPdfShape {
         }
         $hasFill = $bound.ContainsKey('FillColor') -or $bound.ContainsKey('FillCmyk') -or $bound.ContainsKey('FillIcc')
         # Any stroke option asks for an outline (black unless a colour is given), even beside a fill.
-        $strokeRequested = $bound.ContainsKey('StrokeColor') -or $bound.ContainsKey('StrokeCmyk') -or $bound.ContainsKey('StrokeIcc') -or $bound.ContainsKey('StrokeWidth') -or
+        $strokeRequested = $bound.ContainsKey('LineCap') -or $bound.ContainsKey('LineJoin') -or $bound.ContainsKey('MiterLimit') -or $bound.ContainsKey('StrokeColor') -or $bound.ContainsKey('StrokeCmyk') -or $bound.ContainsKey('StrokeIcc') -or $bound.ContainsKey('StrokeWidth') -or
             $bound.ContainsKey('Dash') -or $bound.ContainsKey('StrokeOpacity')
         $hasStroke = $strokeRequested -or $Shape -eq 'Line' -or -not $hasFill
 
         [void]$canvas.SaveState()
         try {
+            # Tagged documents: decorative graphics are artifacts; -AltText makes the shape a Figure.
+            $tagKind = if ($AltText) { 'Structure' } else { 'Artifact' }
+            Invoke-VellumPdfTagged -Document $Document -Canvas $canvas -PdfPage $Document.Pages[$Page - 1] -Kind $tagKind -StructType Figure -AltText $AltText -Draw {
             if ($bound.ContainsKey('FillColor')) { $c = ConvertTo-VellumColor $FillColor; [void]$canvas.SetFillColorRgb($c[0], $c[1], $c[2]) }
             if ($bound.ContainsKey('FillCmyk')) { [void]$canvas.SetFillColorCmyk($FillCmyk[0], $FillCmyk[1], $FillCmyk[2], $FillCmyk[3]) }
             if ($bound.ContainsKey('StrokeColor')) { $c = ConvertTo-VellumColor $StrokeColor; [void]$canvas.SetStrokeColorRgb($c[0], $c[1], $c[2]) }
@@ -217,6 +242,9 @@ function Add-VellumPdfShape {
             if ($bound.ContainsKey('StrokeOpacity')) { [void]$canvas.SetStrokeAlpha($StrokeOpacity) }
             if ($hasStroke) {
                 [void]$canvas.SetLineWidth($StrokeWidth)
+                if ($bound.ContainsKey('LineCap')) { [void]$canvas.SetLineCap(@('Butt', 'Round', 'Square').IndexOf($LineCap)) }
+                if ($bound.ContainsKey('LineJoin')) { [void]$canvas.SetLineJoin(@('Miter', 'Round', 'Bevel').IndexOf($LineJoin)) }
+                if ($bound.ContainsKey('MiterLimit')) { [void]$canvas.SetMiterLimit($MiterLimit) }
                 if ($Dash) { [void][PSVellumPDF.Interop.CanvasHelpers]::SetLineDash($canvas, $Dash, 0) }
             }
 
@@ -247,6 +275,7 @@ function Add-VellumPdfShape {
             elseif ($hasFill -and $strokeRequested) { [void]$canvas.FillAndStroke() }
             elseif ($hasFill) { [void]$canvas.Fill() }
             else { [void]$canvas.Stroke() }
+            }
         }
         finally { [void]$canvas.RestoreState() }
         $Document

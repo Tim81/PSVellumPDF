@@ -95,7 +95,8 @@ Test-VellumPdfConformance ./report.pdf            # in-process PDF/A / PDF/UA pr
 | `Add-VellumPdfList` | Ordered/unordered lists with one nesting level and per-item styles: `-FontHandle`, `-Color`, `-Language` |
 | `Add-VellumPdfImage` | JPEG, PNG, BMP, GIF, TIFF, JBIG2, JPEG 2000 or raw CCITT from a file or memory; `-ReduceToEightBit`, `-DecodeToRaster`, margins |
 | `Add-VellumPdfPieChart` | Pie chart from slices or pipeline data, with palette, legend and alternate text |
-| `Add-VellumPdfBarcode` | QR, Micro QR, Data Matrix, Aztec, PDF417, Code 128/39, EAN/UPC, ITF-14; GS1; Structured Append; validated when added |
+| `Add-VellumPdfBarcode` | QR, Micro QR, Data Matrix, Aztec, PDF417, Code 128/39, EAN/UPC, ITF-14; GS1; Structured Append and Macro PDF417 (with metadata); validated when added |
+| `Get-VellumPdfBarcodeMatrix` | The module grid of a 2-D symbol as data (rows of `#` and `.`), without drawing it |
 | `Add-VellumPdfDrawing` | Reserve a block and draw into it with a script block that receives the canvas |
 | `Add-VellumPdfElement` | Add any custom `IRenderer` |
 | `Add-VellumPdfLineSeparator` | Horizontal rule |
@@ -105,9 +106,9 @@ Test-VellumPdfConformance ./report.pdf            # in-process PDF/A / PDF/UA pr
 
 | Function | Purpose |
 |---|---|
-| `New-VellumPdfPageDocument` | Create one: `-Conformance` (None, PdfA2b/2u), page size, `-Linearize`, `-DocumentId`/`-Timestamp` for reproducible output |
+| `New-VellumPdfPageDocument` | Create one: `-Conformance` (None, PdfA2b/2u/2a, PdfUA1), `-Tagged`, page size, `-Linearize`, `-DocumentId`/`-Timestamp` for reproducible output |
 | `Add-VellumPdfPage` | Add pages: size, `-Rotate`, `-Count` |
-| `Add-VellumPdfShape` / `-Text` / `-Gradient` / `-PageImage` / `-PageBarcode` | Draw at x/y (rectangle, ellipse, arc, line; RGB, CMYK or ICC colour, dashes, opacity, alignment) |
+| `Add-VellumPdfShape` / `-Text` / `-Gradient` / `-PageImage` / `-PageBarcode` | Draw at x/y: shapes (rectangle, ellipse, arc, line; RGB, CMYK or ICC colour, dashes, caps, joins, opacity) and text (alignment, character/word spacing, rise, scaling, heading roles) |
 | `Invoke-VellumPdfCanvas` | Full canvas access from a script block |
 | `Add-VellumPdfFormField` | Text, check box, choice, radio group and push button fields |
 | `Add-VellumPdfLink` | Link a rectangle to a URL or another page |
@@ -129,7 +130,8 @@ Test-VellumPdfConformance ./report.pdf            # in-process PDF/A / PDF/UA pr
 | Function | Purpose |
 |---|---|
 | `Test-VellumPdfConformance` | Validate any PDF against PDF/A-2b/2u/2a or PDF/UA-1, in-process; every finding with rule, clause and message |
-| `Get-VellumPdfInfo` | *(experimental)* Pages, encryption, signatures, claimed profiles, diagnostics |
+| `Get-VellumPdfConformanceCoverage` | Which checks that preflight performs, per clause (implemented / partial / out of scope) |
+| `Get-VellumPdfInfo` | *(experimental)* Pages, encryption, signatures, claimed profiles, catalog features (tagged, form, outline, ...), diagnostics; resource limits for untrusted files |
 | `Get-VellumPdfText` | *(experimental)* Text of a document or of chosen pages |
 | `Export-VellumPdfImage` | *(experimental)* Save embedded images (PNG, or the original JPEG/JPEG 2000/JBIG2/CCITT) |
 | `Unprotect-VellumPdfDocument` | *(experimental)* Write a decrypted copy of a password-protected PDF |
@@ -151,10 +153,15 @@ signing.
   not tagged (a PDF/UA document containing one is not fully conformant).
   Headings, lists and table cells have no link support (a link key in a table
   cell is refused rather than silently dropped).
-- Page documents write untagged content, so PDF/UA-1 and PDF/A-2a are flow-
-  document levels. Form fields use the non-embedded Helvetica font, so PDF/A
-  page documents cannot contain them.
-- CMYK colour is available in page documents and drawings; flow-layout
+- Page documents can be tagged (`-Tagged`, PDF/A-2a, PDF/UA-1): text becomes
+  paragraphs/headings, shapes artifacts, images and barcodes figures with alternate
+  text. Links and form fields cannot be tagged by VellumPdf (the cmdlets warn), so a
+  PDF/UA page document that contains them is not fully conformant. Form fields use
+  the non-embedded Helvetica font, so PDF/A page documents cannot contain them.
+- Not wrapped because they only make sense inside a script block, where the full
+  canvas is available (`Invoke-VellumPdfCanvas`, `Add-VellumPdfDrawing`): clipping
+  paths and the even-odd fill rule (none of the built-in shapes self-intersects).
+- CMYK and ICC colour are available in page documents and drawings; flow-layout
   elements take RGB. A PDF/A document using CMYK needs
   `Set-VellumPdfOutputIntent -Cmyk`.
 - `Test-VellumPdfConformance` covers the checks decidable in-process; it does

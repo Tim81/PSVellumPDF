@@ -20,7 +20,7 @@ function New-VellumPdfBarcodeSet {
 
     # Unpack the caller's parameters into variables (unbound ones are $null) so the
     # validation below reads exactly like it did inside the cmdlet.
-    foreach ($n in @('Type', 'Content', 'Bytes', 'SplitInto', 'FileId', 'ModuleSize', 'TargetWidth', 'Foreground', 'Background', 'NoQuietZone', 'Alignment', 'AltText', 'Decorative', 'BarHeight', 'ShowText', 'TextSize', 'TextFont', 'Caption', 'FontHandle', 'ErrorCorrection', 'QrVersion', 'QrMask', 'TextEncoding', 'QrGs1', 'Gs1', 'Shape', 'AztecFormat', 'AztecErrorCorrectionPercent', 'Columns', 'Rows', 'Compact', 'ErrorCorrectionLevel', 'CheckDigit', 'FullAscii', 'WideNarrowRatio', 'AddOn', 'BearerBars', 'MarginTop', 'MarginBottom', 'MarginLeft', 'MarginRight')) { Set-Variable -Name $n -Value $null }
+    foreach ($n in @('Type', 'Content', 'Bytes', 'SplitInto', 'FileId', 'ModuleSize', 'TargetWidth', 'Foreground', 'Background', 'NoQuietZone', 'Alignment', 'AltText', 'Decorative', 'BarHeight', 'ShowText', 'TextSize', 'TextFont', 'Caption', 'FontHandle', 'ErrorCorrection', 'QrVersion', 'QrMask', 'TextEncoding', 'QrGs1', 'Gs1', 'Shape', 'AztecFormat', 'AztecErrorCorrectionPercent', 'Columns', 'Rows', 'Compact', 'ErrorCorrectionLevel', 'PreferredAspectRatio', 'RowHeight', 'MacroFileName', 'MacroSender', 'MacroAddressee', 'MacroTimestamp', 'MacroFileSize', 'MacroChecksum', 'CheckDigit', 'FullAscii', 'WideNarrowRatio', 'AddOn', 'BearerBars', 'MarginTop', 'MarginBottom', 'MarginLeft', 'MarginRight')) { Set-Variable -Name $n -Value $null }
     $Alignment = 'Left'   # the only parameter with a default; $PSBoundParameters omits defaults
     foreach ($k in $Parameters.Keys) { Set-Variable -Name $k -Value $Parameters[$k] }
     $bound = $Parameters
@@ -44,6 +44,14 @@ function New-VellumPdfBarcodeSet {
             Rows                        = @('Pdf417')
             Compact                     = @('Pdf417')
             ErrorCorrectionLevel        = @('Pdf417')
+            PreferredAspectRatio        = @('Pdf417')
+            RowHeight                   = @('Pdf417')
+            MacroFileName               = @('Pdf417')
+            MacroSender                 = @('Pdf417')
+            MacroAddressee              = @('Pdf417')
+            MacroTimestamp              = @('Pdf417')
+            MacroFileSize               = @('Pdf417')
+            MacroChecksum               = @('Pdf417')
             CheckDigit                  = @('Code39')
             FullAscii                   = @('Code39')
             WideNarrowRatio             = @('Code39', 'Itf14')
@@ -70,6 +78,10 @@ function New-VellumPdfBarcodeSet {
         }
         if ($bound.ContainsKey('SplitInto') -and $bound.ContainsKey('Bytes')) {
             throw 'Add-VellumPdfBarcode: -SplitInto needs -Content text, not -Bytes.'
+        }
+        $macroKeys = 'MacroFileName', 'MacroSender', 'MacroAddressee', 'MacroTimestamp', 'MacroFileSize', 'MacroChecksum'
+        if (-not $bound.ContainsKey('SplitInto') -and ($macroKeys | Where-Object { $bound.ContainsKey($_) })) {
+            throw 'Add-VellumPdfBarcode: the -Macro* options describe a Macro PDF417 set and need -SplitInto.'
         }
         if ($bound.ContainsKey('ModuleSize') -and $bound.ContainsKey('TargetWidth')) {
             throw 'Add-VellumPdfBarcode: -ModuleSize and -TargetWidth cannot be combined; choose one.'
@@ -105,7 +117,14 @@ function New-VellumPdfBarcodeSet {
                 'Pdf417' {
                     if ($bound.ContainsKey('SplitInto')) {
                         $id = if ($bound.ContainsKey('FileId')) { $FileId } else { Get-Random -Minimum 0 -Maximum 900 }
-                        foreach ($b in [VellumPdf.Barcodes.Pdf417Barcode]::MacroSet($Content, $SplitInto, $id)) { $barcodes.Add($b) }
+                        $macro = [VellumPdf.Barcodes.MacroPdf417Options]::new()
+                        if ($bound.ContainsKey('MacroFileName')) { $macro.FileName = $MacroFileName }
+                        if ($bound.ContainsKey('MacroSender')) { $macro.Sender = $MacroSender }
+                        if ($bound.ContainsKey('MacroAddressee')) { $macro.Addressee = $MacroAddressee }
+                        if ($bound.ContainsKey('MacroTimestamp')) { $macro.Timestamp = $MacroTimestamp }
+                        if ($bound.ContainsKey('MacroFileSize')) { $macro.FileSize = $MacroFileSize }
+                        if ($bound.ContainsKey('MacroChecksum')) { $macro.Checksum = $MacroChecksum }
+                        foreach ($b in [VellumPdf.Barcodes.Pdf417Barcode]::MacroSet($Content, $SplitInto, $id, $macro)) { $barcodes.Add($b) }
                     }
                     else { $barcodes.Add([VellumPdf.Barcodes.Pdf417Barcode]::new($Content)) }
                 }
@@ -155,6 +174,8 @@ function New-VellumPdfBarcodeSet {
                     if ($bound.ContainsKey('Rows')) { $barcode.Rows = $Rows }
                     if ($Compact) { $barcode.Compact = $true }
                     if ($bound.ContainsKey('ErrorCorrectionLevel')) { $barcode.ErrorCorrectionLevel = $ErrorCorrectionLevel }
+                    if ($bound.ContainsKey('PreferredAspectRatio')) { $barcode.PreferredAspectRatio = $PreferredAspectRatio }
+                    if ($bound.ContainsKey('RowHeight')) { $barcode.RowHeight = $RowHeight }
                 }
                 if ($Type -eq 'Code39') {
                     if ($CheckDigit) { $barcode.CheckDigit = $true }

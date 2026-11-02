@@ -43,7 +43,9 @@ function Add-VellumPdfTable {
         instance is returned after the table is added, enabling chaining.
     .PARAMETER Header
         Optional column header entries: strings, or rich-cell hashtables with the
-        same keys as a data cell. When supplied, a header row is prepended to the
+        same keys as a data cell. For several header rows pass an array per row, e.g.
+        -Header @('Region', @{ Text = 'Sales'; ColSpan = 2 }), @('', 'Q1', 'Q2'); the
+        leading header rows repeat on every page. When supplied, a header row is prepended to the
         table via AddHeaderRow(). The count of header cells determines the
         expected column count for -ColumnWidth mismatch warnings.
     .PARAMETER Row
@@ -245,7 +247,20 @@ function Add-VellumPdfTable {
             }
         }
 
-        $headerSpecs = if ($null -ne $headerLabels) { @(foreach ($h in @($headerLabels)) { & $toSpec $h }) } else { @() }
+        # -Header is one row of entries, or several rows when its entries are themselves arrays.
+        $isHeaderRow = { param($e) $e -is [System.Collections.IEnumerable] -and $e -isnot [string] -and $e -isnot [System.Collections.IDictionary] }
+        $headerRowSpecs = [System.Collections.Generic.List[object]]::new()
+        if ($null -ne $headerLabels) {
+            $nested = @(@($headerLabels) | Where-Object { & $isHeaderRow $_ }).Count
+            if ($nested -gt 0 -and $nested -ne @($headerLabels).Count) {
+                throw 'Add-VellumPdfTable: -Header mixes plain entries and row arrays; give either one row of entries or several row arrays.'
+            }
+            if ($nested -gt 0) {
+                foreach ($hrow in $headerLabels) { $headerRowSpecs.Add(@(foreach ($h in @($hrow)) { & $toSpec $h })) }
+            }
+            else { $headerRowSpecs.Add(@(foreach ($h in @($headerLabels)) { & $toSpec $h })) }
+        }
+        $headerSpecs = if ($headerRowSpecs.Count) { @($headerRowSpecs | ForEach-Object { $_ }) } else { @() }   # every header cell, for text checks
 
         # Encoding warning over every header and data cell's text, skipping cells
         # that render in an embedded font (the table's, or the cell's own).
@@ -377,7 +392,7 @@ function Add-VellumPdfTable {
 
         # Apply column widths.
         if ($ColumnWidth) {
-            $columnCount = if ($headerSpecs) { $headerSpecs.Count } elseif ($specRows.Count) { $specRows[0].Count } else { 0 }
+            $columnCount = if ($headerRowSpecs.Count) { $headerRowSpecs[0].Count } elseif ($specRows.Count) { $specRows[0].Count } else { 0 }
             if ($ColumnWidth.Count -ne $columnCount) {
                 Write-Warning ("Add-VellumPdfTable: -ColumnWidth has $($ColumnWidth.Count) value(s) " +
                     "but the table has $columnCount column(s); extra widths are ignored and " +
@@ -387,11 +402,11 @@ function Add-VellumPdfTable {
         }
 
         # Add optional header row.
-        if ($headerLabels) {
+        foreach ($specsOfRow in $headerRowSpecs) {
             $headerRow = $table.AddHeaderRow()
             if ($headerBg) { $headerRow.Background = $headerBg }
             $hi = 0
-            foreach ($headerSpec in $headerSpecs) {
+            foreach ($headerSpec in $specsOfRow) {
                 [void]$headerRow.AddCell((& $buildCell $headerSpec $hi))
                 $hi++
             }

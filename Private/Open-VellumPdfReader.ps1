@@ -15,6 +15,7 @@ function Open-VellumPdfReader {
         [Parameter(Mandatory)] [byte[]]$Bytes,
         [string]$Password,
         [switch]$AllowReconstruction,
+        [hashtable]$Limit = @{},
         [Parameter(Mandatory)] [string]$CommandName,
         [string]$Source = '<bytes>'
     )
@@ -22,6 +23,7 @@ function Open-VellumPdfReader {
     $options = [VellumPdf.Reader.PdfReaderOptions]::new()
     if ($Password) { $options.Password = $Password }
     if ($AllowReconstruction) { $options.AllowReconstruction = $true }
+    foreach ($name in $Limit.Keys) { $options.$name = $Limit[$name] }   # MaxDecodedStreamBytes, MaxDiagnostics, ...
     try {
         [VellumPdf.Reader.PdfReader]::Open($Bytes, $options)
     }

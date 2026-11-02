@@ -116,6 +116,7 @@ function Add-VellumPdfFormField {
             throw ('Add-VellumPdfFormField: form fields draw with the non-embedded Helvetica font, which PDF/A forbids. ' +
                 'Create the page document without -Conformance to use forms.')
         }
+        Write-VellumPdfUntaggedWarning -Document $Document -CommandName 'Add-VellumPdfFormField' -What 'a form field'
         if (-not [double]::IsFinite($FontSize) -or $FontSize -le 0) {
             throw "Add-VellumPdfFormField: -FontSize must be a finite number greater than 0; got $FontSize."
         }

@@ -26,6 +26,9 @@ function Add-VellumPdfGradient {
         Second colour.
     .PARAMETER Type
         Axial (default) or Radial.
+    .PARAMETER AltText
+        Alternate text. In a tagged page document the gradient is then a Figure; without it
+        it is an artifact that assistive technology skips.
     .PARAMETER Direction
         Axial only: LeftToRight, BottomToTop or Diagonal.
     .EXAMPLE
@@ -53,7 +56,10 @@ function Add-VellumPdfGradient {
         [string]$Type = 'Axial',
 
         [ValidateSet('LeftToRight', 'BottomToTop', 'Diagonal')]
-        [string]$Direction = 'LeftToRight'
+        [string]$Direction = 'LeftToRight',
+
+        [ValidateNotNullOrEmpty()]
+        [string]$AltText
     )
 
     process {
@@ -70,6 +76,8 @@ function Add-VellumPdfGradient {
 
         [void]$canvas.SaveState()
         try {
+            $tagKind = if ($AltText) { 'Structure' } else { 'Artifact' }
+            Invoke-VellumPdfTagged -Document $Document -Canvas $canvas -PdfPage $Document.Pages[$Page - 1] -Kind $tagKind -StructType Figure -AltText $AltText -Draw {
             [void]$canvas.Rectangle($X, $Y, $Width, $Height).Clip().EndPath()
             if ($Type -eq 'Radial') {
                 $cx = $X + $Width / 2; $cy = $Y + $Height / 2
@@ -83,6 +91,7 @@ function Add-VellumPdfGradient {
                     'Diagonal' { $pts = @($X, $Y, ($X + $Width), ($Y + $Height)) }
                 }
                 [void]$canvas.PaintAxialGradient($pts[0], $pts[1], $pts[2], $pts[3], $c0, $c1)
+            }
             }
         }
         finally { [void]$canvas.RestoreState() }

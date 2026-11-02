@@ -16,12 +16,17 @@ function Invoke-VellumPdfCanvas {
         graphics state is saved before and restored after your script. Operators that
         take spans (dash patterns, raw colour components, glyph ids) cannot be called
         from PowerShell directly; use [PSVellumPDF.Interop.CanvasHelpers].
+
+        In a tagged page document the drawing is wrapped in an artifact (decorative
+        graphics) unless you pass -NoMarkedContent and mark the content yourself.
     .PARAMETER Document
         A document from New-VellumPdfPageDocument.
     .PARAMETER Page
         The 1-based page number. Default 1.
     .PARAMETER ScriptBlock
         The drawing code: param($canvas, $page, $document).
+    .PARAMETER NoMarkedContent
+        Do not wrap the drawing as an artifact in a tagged document.
     .EXAMPLE
         $doc | Invoke-VellumPdfCanvas -Page 1 -ScriptBlock {
             param($canvas)
@@ -40,7 +45,12 @@ function Invoke-VellumPdfCanvas {
         [int]$Page = 1,
 
         [Parameter(Mandatory, Position = 0)]
-        [scriptblock]$ScriptBlock
+        [scriptblock]$ScriptBlock,
+
+        # In a tagged document your drawing is wrapped as an artifact (decorative graphics).
+        # Pass this to take over: bracket real content yourself with BeginMarkedContent /
+        # RegisterStructElem, or the page will contain unmarked content.
+        [switch]$NoMarkedContent
     )
 
     process {
@@ -48,7 +58,14 @@ function Invoke-VellumPdfCanvas {
         $canvas = Get-VellumPdfPageCanvas -Document $Document -Page $Page -CommandName 'Invoke-VellumPdfCanvas'
         $pdfPage = $Document.Pages[$Page - 1]
         [void]$canvas.SaveState()
-        try { & $ScriptBlock $canvas $pdfPage $Document | Out-Null }
+        try {
+            if ($NoMarkedContent) { & $ScriptBlock $canvas $pdfPage $Document | Out-Null }
+            else {
+                Invoke-VellumPdfTagged -Document $Document -Canvas $canvas -PdfPage $pdfPage -Kind Artifact -Draw {
+                    & $ScriptBlock $canvas $pdfPage $Document | Out-Null
+                }
+            }
+        }
         finally { [void]$canvas.RestoreState() }
         $Document
     }

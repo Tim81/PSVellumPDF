@@ -25,6 +25,16 @@ function Unprotect-VellumPdfDocument {
         Decrypt even though existing digital signatures become invalid.
     .PARAMETER Force
         Overwrite an existing destination file.
+    .PARAMETER MaxDecodedStreamBytes
+        Refuse to decode any stream larger than this many bytes (1 MiB to 512 MiB, the
+        default ceiling). Lower it for untrusted files.
+    .PARAMETER MaxDiagnostics
+        Stop collecting reader diagnostics after this many (1 to 1000).
+    .PARAMETER MaxFormXObjectDepth
+        Deepest nesting of form XObjects followed while reading content (1 to 32).
+    .PARAMETER ReconstructionBudgetMultiplier
+        How many times the file size reconstruction may scan (1 to 8); used with
+        -AllowReconstruction.
     .EXAMPLE
         Unprotect-VellumPdfDocument ./locked.pdf -DestinationPath ./open.pdf -Password (Read-Host -AsSecureString)
     .OUTPUTS
@@ -48,10 +58,27 @@ function Unprotect-VellumPdfDocument {
 
         [switch]$AllowInvalidatingSignatures,
 
-        [switch]$Force
+        [switch]$Force,
+        # Resource limits for hostile or huge files. They can only tighten the reader's
+        # built-in ceilings (512 MiB decoded, 1000 diagnostics, 32 form levels, budget 8).
+        [ValidateRange(1MB, 512MB)]
+        [long]$MaxDecodedStreamBytes,
+
+        [ValidateRange(1, 1000)]
+        [int]$MaxDiagnostics,
+
+        [ValidateRange(1, 32)]
+        [int]$MaxFormXObjectDepth,
+
+        [ValidateRange(1, 8)]
+        [int]$ReconstructionBudgetMultiplier
     )
 
     process {
+        $limits = @{}
+        foreach ($n in 'MaxDecodedStreamBytes', 'MaxDiagnostics', 'MaxFormXObjectDepth', 'ReconstructionBudgetMultiplier') {
+            if ($PSBoundParameters.ContainsKey($n)) { $limits[$n] = $PSBoundParameters[$n] }
+        }
         $sources = @(Get-VellumPdfInput -Path $Path -LiteralPath $LiteralPath -CommandName 'Unprotect-VellumPdfDocument')
         if ($sources.Count -ne 1) {
             throw "Unprotect-VellumPdfDocument: the path matches $($sources.Count) files; decrypt one file at a time (each needs its own -DestinationPath)."
@@ -65,7 +92,7 @@ function Unprotect-VellumPdfDocument {
             throw "Unprotect-VellumPdfDocument: '$target' exists; use -Force to overwrite."
         }
         $plain = if ($Password) { [System.Net.NetworkCredential]::new('', $Password).Password }
-        $reader = Open-VellumPdfReader -Bytes $source.Data -Password $plain -CommandName 'Unprotect-VellumPdfDocument' -Source $source.Name
+        $reader = Open-VellumPdfReader -Limit $limits -Bytes $source.Data -Password $plain -CommandName 'Unprotect-VellumPdfDocument' -Source $source.Name
         try {
             if (-not $reader.Encryption) {
                 throw "Unprotect-VellumPdfDocument: '$($source.Name)' is not encrypted; nothing to remove."

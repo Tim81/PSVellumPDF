@@ -99,6 +99,55 @@ Describe 'Get-VellumPdfInfo' {
     }
 }
 
+Describe 'Reader limits and catalog details' {
+    It 'reports which catalog features a document has' {
+        $doc = New-VellumPdfPageDocument -Tagged -Language en | Add-VellumPdfPage -Count 2
+        $path = Join-Path $TestDrive 'features.pdf'
+        $doc | Set-VellumPdfDocumentInfo -Title 'f' | Add-VellumPdfText 'x' -X 72 -Y 700 |
+            Add-VellumPdfOutlineEntry 'One' -TargetPage 1 |
+            Add-VellumPdfFormField Text -Name t -X 72 -Y 600 -Width 100 -Height 20 -WarningAction SilentlyContinue |
+            Save-VellumPdfDocument -Path $path | Out-Null
+        $c = (Get-VellumPdfInfo -Path $path).Catalog
+        $c.IsTagged | Should -BeTrue
+        $c.HasLanguage | Should -BeTrue
+        $c.HasOutline | Should -BeTrue
+        $c.HasForm | Should -BeTrue
+        $c.HasMetadata | Should -BeTrue
+        $plain = (Get-VellumPdfInfo -Path $script:sample).Catalog
+        $plain.IsTagged | Should -BeFalse
+        $plain.HasForm | Should -BeFalse
+    }
+
+    It 'accepts tightened limits and rejects values above the engine ceilings' {
+        $i = Get-VellumPdfInfo -Path $script:sample -MaxDecodedStreamBytes 2MB -MaxDiagnostics 5 -MaxFormXObjectDepth 4 -ReconstructionBudgetMultiplier 2
+        $i.PageCount | Should -BeGreaterOrEqual 2
+        { Get-VellumPdfInfo -Path $script:sample -MaxDecodedStreamBytes 1GB } | Should -Throw
+        { Get-VellumPdfText -Path $script:sample -MaxFormXObjectDepth 99 } | Should -Throw
+        { Get-VellumPdfText -Path $script:sample -MaxDiagnostics 0 } | Should -Throw
+    }
+
+    It 'a tight decoded-size limit makes the reader skip oversized content and say so' {
+        # About 2 MiB of drawing operators once inflated, 300 KB on disk.
+        $big = Join-Path $TestDrive 'big.pdf'
+        New-VellumPdfPageDocument | Add-VellumPdfPage |
+            Invoke-VellumPdfCanvas -ScriptBlock { param($c) foreach ($i in 1..130000) { [void]$c.Rectangle($i % 500, $i % 700, 3, 3).Fill() } } |
+            Save-VellumPdfDocument -Path $big | Out-Null
+        Get-VellumPdfText -Path $big -WarningVariable fine -WarningAction SilentlyContinue | Out-Null
+        @($fine).Count | Should -Be 0
+        Get-VellumPdfText -Path $big -MaxDecodedStreamBytes 1MB -WarningVariable tight -WarningAction SilentlyContinue | Out-Null
+        @($tight | Where-Object Message -Like '*failed to decode; it was skipped*').Count | Should -Be 1
+    }
+
+    It 'diagnostics carry object numbers' {
+        $bytes = [System.IO.File]::ReadAllBytes($script:sample)
+        $broken = $bytes[0..($bytes.Length - 120)]
+        $i = Get-VellumPdfInfo -Bytes $broken -AllowReconstruction
+        $i.Diagnostics.Count | Should -BeGreaterThan 0
+        $i.Diagnostics[0].PSObject.Properties.Name | Should -Contain 'ObjectNumber'
+        $i.Diagnostics[0].PSObject.Properties.Name | Should -Contain 'Generation'
+    }
+}
+
 Describe 'Get-VellumPdfText' {
     It 'extracts the text of the whole document, one page, or per page' {
         $all = Get-VellumPdfText -Path $script:sample

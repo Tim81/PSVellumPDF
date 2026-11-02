@@ -8,7 +8,8 @@ function Add-VellumPdfPageBarcode {
         Code128, Code39, Ean13, Ean8, UpcA, UpcE, Itf14) and the same validation:
         content that cannot be encoded fails here. The symbol's lower-left corner,
         including its quiet zone, is placed at (-X, -Y). Size it with -ModuleSize or
-        -TargetWidth. The symbol carries no alternate text (untagged page content).
+        -TargetWidth. In a tagged page document the symbol is a Figure with -AltText
+        (default: the symbology and content), or an artifact with -Decorative.
 
         In a PDF/A page document the human-readable line of a 1-D barcode is off by
         default and -ShowText is refused, because it would need a non-embedded font.
@@ -70,6 +71,10 @@ function Add-VellumPdfPageBarcode {
         Pdf417 compact variant.
     .PARAMETER ErrorCorrectionLevel
         Pdf417 security level 0..8.
+    .PARAMETER PreferredAspectRatio
+        Pdf417: target width-to-height ratio used to choose the number of columns (default 3).
+    .PARAMETER RowHeight
+        Pdf417: height of one row in modules (default 3).
     .PARAMETER CheckDigit
         Code39 check character.
     .PARAMETER FullAscii
@@ -80,6 +85,10 @@ function Add-VellumPdfPageBarcode {
         EAN/UPC add-on digits.
     .PARAMETER BearerBars
         Itf14: Frame, Horizontal or None.
+    .PARAMETER AltText
+        Alternate text in a tagged document. Default: the symbology and its content.
+    .PARAMETER Decorative
+        Mark the symbol as an artifact in a tagged document.
     .EXAMPLE
         $doc | Add-VellumPdfPageBarcode QrCode 'https://example.com' -X 72 -Y 600 -TargetWidth 90
     .OUTPUTS
@@ -133,11 +142,15 @@ function Add-VellumPdfPageBarcode {
         [ValidateRange(3, 90)] [int]$Rows,
         [switch]$Compact,
         [ValidateRange(0, 8)] [int]$ErrorCorrectionLevel,
+        [ValidateRange(0.5, 20)] [double]$PreferredAspectRatio,
+        [ValidateRange(1, 20)] [double]$RowHeight,
         [switch]$CheckDigit,
         [switch]$FullAscii,
         [ValidateRange(2, 3)] [double]$WideNarrowRatio,
         [string]$AddOn,
-        [ValidateSet('Frame', 'Horizontal', 'None')] [string]$BearerBars
+        [ValidateSet('Frame', 'Horizontal', 'None')] [string]$BearerBars,
+        [ValidateNotNullOrEmpty()] [string]$AltText,
+        [switch]$Decorative
     )
 
     process {
@@ -158,8 +171,16 @@ function Add-VellumPdfPageBarcode {
 
         $canvas = Get-VellumPdfPageCanvas -Document $Document -Page $Page -CommandName 'Add-VellumPdfPageBarcode'
         $fontResource = if ($barcode -is [VellumPdf.Barcodes.Barcode1D] -and $barcode.ShowText) { $Document.UseFont($barcode.TextFont) }
+        if ($Decorative -and $AltText) { throw 'Add-VellumPdfPageBarcode: -AltText and -Decorative cannot be combined.' }
+        $kind = if ($Decorative) { 'Artifact' } else { 'Structure' }
+        # Tagged documents: a data-bearing symbol is a Figure; default alternate text names the symbology.
+        $alt = if ($AltText) { $AltText } elseif ($Content) { "$Type barcode: $Content" } else { "$Type barcode" }
         [void]$canvas.SaveState()
-        try { [void][VellumPdf.Barcodes.BarcodeCanvasExtensions]::DrawBarcode($canvas, $barcode, $X, $Y, $fontResource) }
+        try {
+            Invoke-VellumPdfTagged -Document $Document -Canvas $canvas -PdfPage $Document.Pages[$Page - 1] -Kind $kind -StructType Figure -AltText $alt -Draw {
+                [void][VellumPdf.Barcodes.BarcodeCanvasExtensions]::DrawBarcode($canvas, $barcode, $X, $Y, $fontResource)
+            }
+        }
         finally { [void]$canvas.RestoreState() }
         $Document
     }

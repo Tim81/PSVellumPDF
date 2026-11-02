@@ -92,6 +92,22 @@ function Add-VellumPdfBarcode {
         Pdf417: compact (truncated) variant.
     .PARAMETER ErrorCorrectionLevel
         Pdf417: security level 0..8 (default: chosen from the data size).
+    .PARAMETER PreferredAspectRatio
+        Pdf417: target width-to-height ratio used to choose the number of columns (default 3).
+    .PARAMETER RowHeight
+        Pdf417: height of one row in modules (default 3).
+    .PARAMETER MacroFileName
+        Pdf417 with -SplitInto: the file name recorded in every Macro PDF417 segment.
+    .PARAMETER MacroSender
+        Pdf417 with -SplitInto: sender recorded in the segments.
+    .PARAMETER MacroAddressee
+        Pdf417 with -SplitInto: addressee recorded in the segments.
+    .PARAMETER MacroTimestamp
+        Pdf417 with -SplitInto: timestamp recorded in the segments.
+    .PARAMETER MacroFileSize
+        Pdf417 with -SplitInto: total file size in bytes recorded in the segments.
+    .PARAMETER MacroChecksum
+        Pdf417 with -SplitInto: 16-bit checksum of the whole file recorded in the segments.
     .PARAMETER CheckDigit
         Code39: append a modulo-43 check character.
     .PARAMETER FullAscii
@@ -208,6 +224,21 @@ function Add-VellumPdfBarcode {
 
         [ValidateRange(0, 8)]
         [int]$ErrorCorrectionLevel,
+
+        [ValidateRange(0.5, 20)]
+        [double]$PreferredAspectRatio,
+
+        [ValidateRange(1, 20)]
+        [double]$RowHeight,
+
+        [string]$MacroFileName,
+        [string]$MacroSender,
+        [string]$MacroAddressee,
+        [System.DateTimeOffset]$MacroTimestamp,
+        [ValidateRange(0, [long]::MaxValue)]
+        [long]$MacroFileSize,
+        [ValidateRange(0, 65535)]
+        [int]$MacroChecksum,
 
         [switch]$CheckDigit,
         [switch]$FullAscii,

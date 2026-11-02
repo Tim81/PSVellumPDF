@@ -32,6 +32,16 @@ function Export-VellumPdfImage {
         Password for an encrypted PDF (a SecureString).
     .PARAMETER Force
         Overwrite existing files.
+    .PARAMETER MaxDecodedStreamBytes
+        Refuse to decode any stream larger than this many bytes (1 MiB to 512 MiB, the
+        default ceiling). Lower it for untrusted files.
+    .PARAMETER MaxDiagnostics
+        Stop collecting reader diagnostics after this many (1 to 1000).
+    .PARAMETER MaxFormXObjectDepth
+        Deepest nesting of form XObjects followed while reading content (1 to 32).
+    .PARAMETER ReconstructionBudgetMultiplier
+        How many times the file size reconstruction may scan (1 to 8); used with
+        -AllowReconstruction.
     .EXAMPLE
         Export-VellumPdfImage ./brochure.pdf -DestinationPath ./images
     .OUTPUTS
@@ -63,10 +73,27 @@ function Export-VellumPdfImage {
 
         [securestring]$Password,
 
-        [switch]$Force
+        [switch]$Force,
+        # Resource limits for hostile or huge files. They can only tighten the reader's
+        # built-in ceilings (512 MiB decoded, 1000 diagnostics, 32 form levels, budget 8).
+        [ValidateRange(1MB, 512MB)]
+        [long]$MaxDecodedStreamBytes,
+
+        [ValidateRange(1, 1000)]
+        [int]$MaxDiagnostics,
+
+        [ValidateRange(1, 32)]
+        [int]$MaxFormXObjectDepth,
+
+        [ValidateRange(1, 8)]
+        [int]$ReconstructionBudgetMultiplier
     )
 
     begin {
+        $limits = @{}
+        foreach ($n in 'MaxDecodedStreamBytes', 'MaxDiagnostics', 'MaxFormXObjectDepth', 'ReconstructionBudgetMultiplier') {
+            if ($PSBoundParameters.ContainsKey($n)) { $limits[$n] = $PSBoundParameters[$n] }
+        }
         $plain = if ($Password) { [System.Net.NetworkCredential]::new('', $Password).Password }
         $destination = $ExecutionContext.SessionState.Path.GetUnresolvedProviderPathFromPSPath($DestinationPath)
     }
@@ -77,7 +104,7 @@ function Export-VellumPdfImage {
                 elseif ($source.Name -eq '<bytes>') { 'pdf' }
                 else { [System.IO.Path]::GetFileNameWithoutExtension($source.Name) }
 
-            $reader = Open-VellumPdfReader -Bytes $source.Data -Password $plain -CommandName 'Export-VellumPdfImage' -Source $source.Name
+            $reader = Open-VellumPdfReader -Limit $limits -Bytes $source.Data -Password $plain -CommandName 'Export-VellumPdfImage' -Source $source.Name
             try {
                 $options = [VellumPdf.Reader.PdfImageExtractionOptions]::new()
                 if ($ExcludeInline) {

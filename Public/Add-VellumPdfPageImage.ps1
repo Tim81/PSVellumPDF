@@ -10,7 +10,8 @@ function Add-VellumPdfPageImage {
         one pixel per point. For load options (16-bit reduction, raster decoding) or
         CCITT fax data use the flow-layout Add-VellumPdfImage.
 
-        Images in a page document carry no alternate text (the content is untagged).
+        In a tagged page document (New-VellumPdfPageDocument -Tagged, PdfA2a or PdfUA1)
+        every image needs -AltText, or -Decorative to be treated as an artifact.
     .PARAMETER Document
         A document from New-VellumPdfPageDocument.
     .PARAMETER Path
@@ -29,6 +30,10 @@ function Add-VellumPdfPageImage {
         Drawn width in points.
     .PARAMETER Height
         Drawn height in points.
+    .PARAMETER AltText
+        Alternate text for the image in a tagged document.
+    .PARAMETER Decorative
+        Mark the image as an artifact (not read by assistive technology) in a tagged document.
     .EXAMPLE
         $doc | Add-VellumPdfPageImage ./logo.png -X 72 -Y 740 -Width 120
     .OUTPUTS
@@ -60,13 +65,24 @@ function Add-VellumPdfPageImage {
         [double]$Width,
 
         [ValidateRange(0.01, 1000000)]
-        [double]$Height
+        [double]$Height,
+
+        # Tagged documents: alternate text for the image, or -Decorative to mark it as an artifact.
+        [ValidateNotNullOrEmpty()]
+        [string]$AltText,
+
+        [switch]$Decorative
     )
 
     process {
         Assert-VellumPdfDocumentOpen -Document $Document -CommandName 'Add-VellumPdfPageImage'
         if (-not [double]::IsFinite($X) -or -not [double]::IsFinite($Y)) { throw 'Add-VellumPdfPageImage: -X and -Y must be finite.' }
         $pdfPage = Get-VellumPdfPage -Document $Document -Page $Page -CommandName 'Add-VellumPdfPageImage'
+        if ($Decorative -and $AltText) { throw 'Add-VellumPdfPageImage: -AltText and -Decorative cannot be combined.' }
+        if ($Document.Tagged -and -not $Decorative -and -not $AltText) {
+            throw ('Add-VellumPdfPageImage: this document is tagged, so every image needs -AltText (what it shows) ' +
+                'or -Decorative (assistive technology should skip it).')
+        }
 
         if ($PSCmdlet.ParameterSetName -eq 'Bytes') {
             $bytes = $ImageBytes; $key = $Format.ToLowerInvariant(); $source = 'the supplied image bytes'
@@ -94,7 +110,12 @@ function Add-VellumPdfPageImage {
 
         $canvas = Get-VellumPdfPageCanvas -Document $Document -Page $Page -CommandName 'Add-VellumPdfPageImage'
         [void]$canvas.SaveState()
-        try { [void]$canvas.Concat($w, 0, 0, $h, $X, $Y).DoXObject($name) }
+        try {
+            $kind = if ($Decorative) { 'Artifact' } else { 'Structure' }
+            Invoke-VellumPdfTagged -Document $Document -Canvas $canvas -PdfPage $pdfPage -Kind $kind -StructType Figure -AltText $AltText -Draw {
+                [void]$canvas.Concat($w, 0, 0, $h, $X, $Y).DoXObject($name)
+            }
+        }
         finally { [void]$canvas.RestoreState() }
         $Document
     }

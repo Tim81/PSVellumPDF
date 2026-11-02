@@ -21,10 +21,15 @@ function New-VellumPdfPageDocument {
         Set-VellumPdfOutputIntent, Register-VellumPdfFont, Protect-VellumPdfDocument
         and Set-VellumPdfSignature work on page documents too.
 
-        Limits: page documents write untagged content, so -Conformance PdfA2a and
-        PdfUA1 (which need a structure tree) are not available; use
-        New-VellumPdfDocument for those. PDF/A-2b/2u are, and base-14 text is then
-        embedded automatically with a metric-compatible substitute font.
+        Tagging: with -Tagged (implied by -Conformance PdfA2a and PdfUA1) the document
+        gets a structure tree. Text is tagged (P, H1-H6, Span, Caption via
+        Add-VellumPdfText -Role), shapes and gradients are artifacts unless given
+        -AltText, images and barcodes need alternate text (or -Decorative), and
+        Invoke-VellumPdfCanvas drawing is an artifact. Links and form fields cannot be
+        tagged by VellumPdf, so a PDF/UA document containing them is not fully
+        conformant (the cmdlets warn). PDF/A and PDF/UA need embedded fonts and, for
+        PDF/UA, a title (Set-VellumPdfDocumentInfo -Title) and -Language; base-14 text
+        is embedded automatically with a metric-compatible substitute font.
 
         -Linearize writes a "fast web view" file (first page readable while the rest
         downloads). It cannot be combined with -UseObjectStreams or encryption, and
@@ -32,7 +37,9 @@ function New-VellumPdfPageDocument {
         document ID and creation date, which makes the output byte-for-byte
         reproducible.
     .PARAMETER Conformance
-        None (default), PdfA2b or PdfA2u.
+        None (default), PdfA2b, PdfA2u, PdfA2a or PdfUA1.
+    .PARAMETER Tagged
+        Write a structure tree (tagged PDF). Implied by PdfA2a and PdfUA1.
     .PARAMETER PageSize
         The default size of added pages: A0-A6, Ledger, Legal, Letter. Default A4.
     .PARAMETER PageWidthMm
@@ -65,8 +72,11 @@ function New-VellumPdfPageDocument {
     [CmdletBinding(DefaultParameterSetName = 'NamedPage')]
     [OutputType([VellumPdf.Document.PdfDocument])]
     param(
-        [ValidateSet('None', 'PdfA2b', 'PdfA2u')]
+        [ValidateSet('None', 'PdfA2b', 'PdfA2u', 'PdfA2a', 'PdfUA1')]
         [string]$Conformance = 'None',
+
+        # Write a structure tree (tagged PDF). PdfA2a and PdfUA1 imply it.
+        [switch]$Tagged,
 
         [Parameter(ParameterSetName = 'NamedPage')]
         [ValidateSet('A0', 'A1', 'A2', 'A3', 'A4', 'A5', 'A6', 'Ledger', 'Legal', 'Letter')]
@@ -100,6 +110,7 @@ function New-VellumPdfPageDocument {
 
     $doc = [VellumPdf.Document.PdfDocument]::new()
     $doc.Conformance = [VellumPdf.Document.PdfConformance]::$Conformance
+    if ($Tagged -or $Conformance -in 'PdfA2a', 'PdfUA1') { $doc.Tagged = $true }
     $doc.DefaultPageSize = if ($PSCmdlet.ParameterSetName -eq 'CustomPage') {
         [VellumPdf.Document.PageSize]::Mm($PageWidthMm, $PageHeightMm)
     } else {

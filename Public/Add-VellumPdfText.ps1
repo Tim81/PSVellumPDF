@@ -32,6 +32,19 @@ function Add-VellumPdfText {
         Text colour: RGB triple in 0..1, hex or name. Default black.
     .PARAMETER Align
         Left (default), Center or Right, about -X.
+    .PARAMETER CharSpacing
+        Extra space after every character, in points; negative tightens. Alignment accounts for it.
+    .PARAMETER WordSpacing
+        Extra space after every space character, in points.
+    .PARAMETER Rise
+        Baseline shift in points: positive for superscript, negative for subscript.
+    .PARAMETER HorizontalScale
+        Horizontal scaling in percent (100 is normal, 50 half width).
+    .PARAMETER Role
+        In a tagged document (New-VellumPdfPageDocument -Tagged, PdfA2a or PdfUA1): the
+        structure role of this text - P (default), H1..H6, Span or Caption.
+    .PARAMETER Language
+        BCP 47 language tag of this text, written on its structure element (tagged documents).
     .EXAMPLE
         $doc | Add-VellumPdfText 'Invoice 2026-001' -X 72 -Y 760 -FontSize 18 -Font HelveticaBold
     .OUTPUTS
@@ -65,7 +78,31 @@ function Add-VellumPdfText {
         [object]$Color,
 
         [ValidateSet('Left', 'Center', 'Right')]
-        [string]$Align = 'Left'
+        [string]$Align = 'Left',
+
+        # Extra space after every character, in points (negative tightens).
+        [ValidateRange(-100, 100)]
+        [double]$CharSpacing,
+
+        # Extra space after every space character, in points.
+        [ValidateRange(-100, 100)]
+        [double]$WordSpacing,
+
+        # Baseline shift in points: positive raises (superscript), negative lowers.
+        [ValidateRange(-1000, 1000)]
+        [double]$Rise,
+
+        # Horizontal scaling in percent (100 = normal).
+        [ValidateRange(1, 1000)]
+        [double]$HorizontalScale,
+
+        # Structure role in a tagged document: P (default), H1-H6, Span or Caption.
+        [ValidateSet('P', 'H1', 'H2', 'H3', 'H4', 'H5', 'H6', 'Span', 'Caption')]
+        [string]$Role = 'P',
+
+        # BCP 47 language of this text, for a tagged document.
+        [ValidateNotNullOrEmpty()]
+        [string]$Language
     )
 
     process {
@@ -78,25 +115,49 @@ function Add-VellumPdfText {
             Write-VellumPdfEncodingWarning -Text $Text -CommandName 'Add-VellumPdfText'
         }
         $canvas = Get-VellumPdfPageCanvas -Document $Document -Page $Page -CommandName 'Add-VellumPdfText'
-        $alignment = [VellumPdf.Canvas.TextAlignment]::$Align
+        $pdfPage = $Document.Pages[$Page - 1]
+        $bound = $PSBoundParameters
+        if (-not $Document.Tagged -and ($bound.ContainsKey('Role') -or $bound.ContainsKey('Language'))) {
+            Write-Verbose 'Add-VellumPdfText: -Role/-Language only matter in a tagged document (New-VellumPdfPageDocument -Tagged).'
+        }
+
+        # Alignment shifts the start by the text's width. The engine measures without
+        # character/word spacing and scaling, so when those are set the width is computed
+        # here and the text is placed left-aligned at the adjusted x.
+        $hasSpacing = $bound.ContainsKey('CharSpacing') -or $bound.ContainsKey('WordSpacing') -or $bound.ContainsKey('HorizontalScale')
+        $startX = $X
+        $showAlignment = [VellumPdf.Canvas.TextAlignment]::$Align
+        if ($hasSpacing -and $Align -ne 'Left') {
+            $base = if ($resolved.Handle) { $resolved.Handle.MeasureString($Text, $FontSize) } else { $resolved.Resource.MeasureString($Text, $FontSize) }
+            $spaces = ($Text.ToCharArray() | Where-Object { $_ -eq ' ' } | Measure-Object).Count
+            $width = ($base + $CharSpacing * $Text.Length + $WordSpacing * $spaces) * $(if ($bound.ContainsKey('HorizontalScale')) { $HorizontalScale / 100 } else { 1 })
+            $startX = if ($Align -eq 'Center') { $X - $width / 2 } else { $X - $width }
+            $showAlignment = [VellumPdf.Canvas.TextAlignment]::Left
+        }
 
         [void]$canvas.SaveState()
         try {
-            if ($PSBoundParameters.ContainsKey('Color')) {
+            if ($bound.ContainsKey('Color')) {
                 $c = ConvertTo-VellumColor $Color
                 [void]$canvas.SetFillColorRgb($c[0], $c[1], $c[2])
             }
-            [void]$canvas.BeginText()
-            if ($resolved.Handle) {
-                $Document.RegisterEmbeddedFontUsage($Document.Pages[$Page - 1], $resolved.Handle)
-                [void]$canvas.SetFontByName($resolved.Handle.ResourceName, $FontSize)
-                [void][PSVellumPDF.Interop.CanvasHelpers]::ShowEmbeddedText($canvas, $resolved.Handle, $Text, $FontSize, $X, $Y, $alignment)
+            Invoke-VellumPdfTagged -Document $Document -Canvas $canvas -PdfPage $pdfPage -Kind Structure -StructType $Role -Language $Language -Draw {
+                [void]$canvas.BeginText()
+                if ($bound.ContainsKey('CharSpacing')) { [void]$canvas.SetCharSpacing($CharSpacing) }
+                if ($bound.ContainsKey('WordSpacing')) { [void]$canvas.SetWordSpacing($WordSpacing) }
+                if ($bound.ContainsKey('Rise')) { [void]$canvas.SetTextRise($Rise) }
+                if ($bound.ContainsKey('HorizontalScale')) { [void]$canvas.SetHorizScaling($HorizontalScale) }
+                if ($resolved.Handle) {
+                    $Document.RegisterEmbeddedFontUsage($pdfPage, $resolved.Handle)
+                    [void]$canvas.SetFontByName($resolved.Handle.ResourceName, $FontSize)
+                    [void][PSVellumPDF.Interop.CanvasHelpers]::ShowEmbeddedText($canvas, $resolved.Handle, $Text, $FontSize, $startX, $Y, $showAlignment)
+                }
+                else {
+                    [void]$canvas.SetFont($resolved.Resource, $FontSize)
+                    [void]$canvas.ShowTextAligned($Text, $startX, $Y, $showAlignment)
+                }
+                [void]$canvas.EndText()
             }
-            else {
-                [void]$canvas.SetFont($resolved.Resource, $FontSize)
-                [void]$canvas.ShowTextAligned($Text, $X, $Y, $alignment)
-            }
-            [void]$canvas.EndText()
         }
         finally { [void]$canvas.RestoreState() }
         $Document

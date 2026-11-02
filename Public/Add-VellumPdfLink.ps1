@@ -75,6 +75,7 @@ function Add-VellumPdfLink {
             throw 'Add-VellumPdfLink: -DestLeft/-DestTop apply to -TargetPage only.'
         }
         $pdfPage = Get-VellumPdfPage -Document $Document -Page $Page -CommandName 'Add-VellumPdfLink'
+        Write-VellumPdfUntaggedWarning -Document $Document -CommandName 'Add-VellumPdfLink' -What 'a link annotation'
 
         $link = [VellumPdf.Annotations.PdfLinkAnnotation]::new()
         $link.Rect = [VellumPdf.Document.PdfRectangle]::new($X, $Y, $X + $Width, $Y + $Height)

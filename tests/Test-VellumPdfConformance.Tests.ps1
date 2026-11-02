@@ -137,3 +137,31 @@ Describe 'Module output against the preflight' {
         $ids | Should -Contain 'ISO14289-1:7.21.4.1-1'
     }
 }
+
+Describe 'Get-VellumPdfConformanceCoverage' {
+    It 'summarises every profile' {
+        $s = @(Get-VellumPdfConformanceCoverage -Summary)
+        $s.Profile | Should -Be @('PdfA2b', 'PdfA2u', 'PdfA2a', 'PdfUA1')
+        foreach ($p in $s) {
+            $p.Total | Should -BeGreaterThan 50
+            $p.Total | Should -Be ($p.Implemented + $p.Partial + $p.Deferred + $p.OutOfScope)
+            $p.PercentImplemented | Should -BeGreaterThan 90
+        }
+    }
+
+    It 'lists checks, filters by profile and status, and names the known gaps' {
+        $ua = @(Get-VellumPdfConformanceCoverage -Profile PdfUA1)
+        $ua.Count | Should -BeGreaterThan 50
+        $ua.Profiles | ForEach-Object { $_ } | Should -Contain 'PdfUA1'
+        $gaps = @(Get-VellumPdfConformanceCoverage -Status Partial, OutOfScope)
+        $gaps.Count | Should -BeGreaterThan 0
+        $gaps | ForEach-Object { $_.Status | Should -BeIn 'Partial', 'OutOfScope' }
+        $gaps[0].PSObject.TypeNames | Should -Contain 'PSVellumPDF.ConformanceCheck'
+        $gaps[0].Note | Should -Not -BeNullOrEmpty
+    }
+
+    It 'lists a check shared by several profiles once' {
+        $all = @(Get-VellumPdfConformanceCoverage)
+        ($all.TestId | Sort-Object -Unique).Count | Should -Be $all.Count
+    }
+}

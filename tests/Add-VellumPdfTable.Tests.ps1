@@ -306,3 +306,39 @@ Describe 'Add-VellumPdfTable without a header' {
         finally { $doc.Dispose() }
     }
 }
+
+Describe 'Add-VellumPdfTable with several header rows' {
+    BeforeAll { . (Join-Path $PSScriptRoot 'TestHelpers.ps1') }
+
+    It 'draws every header row, including a spanning cell, above the data' {
+        $out = Join-Path $TestDrive 'multihead.pdf'
+        New-VellumPdfDocument |
+            Add-VellumPdfTable -Header @('Region', @{ Text = 'Sales'; ColSpan = 2; Alignment = 'Center' }), @('', 'Q1', 'Q2') `
+                -Row @(, @('North', '10', '20')) -HeaderBackground '#dddddd' |
+            Save-VellumPdfDocument -Path $out | Out-Null
+        $c = Get-PdfContentText $out
+        foreach ($t in 'Region', 'Sales', 'Q1', 'Q2', 'North') { $c | Should -Match "\($t\) Tj" }
+        # Header rows come before the data row in drawing order.
+        $c.IndexOf('(Q2) Tj') | Should -BeLessThan $c.IndexOf('(North) Tj')
+    }
+
+    It 'repeats all leading header rows on the next page' {
+        $out = Join-Path $TestDrive 'repeat.pdf'
+        $rows = 1..120 | ForEach-Object { , @("row$_", "$_") }
+        New-VellumPdfDocument |
+            Add-VellumPdfTable -Header @('NameHead', 'ValHead'), @('sub1', 'sub2') -Row $rows |
+            Save-VellumPdfDocument -Path $out | Out-Null
+        $c = Get-PdfContentText $out
+        ([regex]::Matches($c, '\(NameHead\) Tj')).Count | Should -BeGreaterOrEqual 2
+        ([regex]::Matches($c, '\(sub2\) Tj')).Count | Should -BeGreaterOrEqual 2
+    }
+
+    It 'still takes a single flat header row, and refuses a mix of entries and rows' {
+        $doc = New-VellumPdfDocument
+        try {
+            { $doc | Add-VellumPdfTable -Header 'A', 'B' -Row @(, @('1', '2')) } | Should -Not -Throw
+            { $doc | Add-VellumPdfTable -Header 'A', @('B', 'C') -Row @(, @('1', '2')) } | Should -Throw '*mixes plain entries and row arrays*'
+        }
+        finally { $doc.Dispose() }
+    }
+}

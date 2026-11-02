@@ -173,3 +173,67 @@ Describe 'Add-VellumPdfBarcode in PDF/A documents' {
         finally { $doc.Dispose() }
     }
 }
+
+Describe 'PDF417 shape options and Macro PDF417 metadata' {
+    It 'row height changes the symbol height, and both options are accepted when drawing' {
+        $base = [VellumPdf.Barcodes.Pdf417Barcode]::new('x' * 40); $base.ModuleSize = 1
+        $tall = [VellumPdf.Barcodes.Pdf417Barcode]::new('x' * 40); $tall.ModuleSize = 1; $tall.RowHeight = 8
+        $tall.Measure().Height | Should -BeGreaterThan $base.Measure().Height
+
+        $viaCmdlet = New-VellumPdfDocument | Add-VellumPdfBarcode Pdf417 ('x' * 40) -ModuleSize 1 -RowHeight 8 -PreferredAspectRatio 5
+        $viaCmdlet | Should -BeOfType ([VellumPdf.Layout.Document])
+        $viaCmdlet.Dispose()
+        $page = New-VellumPdfPageDocument | Add-VellumPdfPage
+        { $page | Add-VellumPdfPageBarcode Pdf417 ('x' * 40) -X 10 -Y 10 -ModuleSize 1 -RowHeight 8 -PreferredAspectRatio 5 } | Should -Not -Throw
+        $page.Dispose()
+    }
+
+    It 'accepts Macro PDF417 metadata with -SplitInto and refuses it without' {
+        $doc = New-VellumPdfDocument
+        try {
+            { $doc | Add-VellumPdfBarcode Pdf417 'abcdefghijkl' -SplitInto 2 -FileId 7 -ModuleSize 1 `
+                    -MacroFileName 'doc.txt' -MacroSender 'me' -MacroAddressee 'you' -MacroTimestamp ([DateTimeOffset]'2026-01-01T00:00:00Z') `
+                    -MacroFileSize 12 -MacroChecksum 1234 } | Should -Not -Throw
+            { $doc | Add-VellumPdfBarcode Pdf417 'abc' -MacroFileName 'x' } | Should -Throw '*need -SplitInto*'
+            { $doc | Add-VellumPdfBarcode QrCode 'abc' -SplitInto 2 -MacroSender 's' } | Should -Throw '*does not apply to -Type QrCode*'
+        }
+        finally { $doc.Dispose() }
+    }
+
+    It 'the Macro metadata reaches the symbols (the set differs from one without metadata)' {
+        $with = Join-Path $TestDrive 'macro1.pdf'
+        $without = Join-Path $TestDrive 'macro0.pdf'
+        New-VellumPdfDocument | Add-VellumPdfBarcode Pdf417 'abcdefghijkl' -SplitInto 2 -FileId 7 -ModuleSize 1 -MacroFileName 'a-long-file-name.txt' |
+            Save-VellumPdfDocument -Path $with | Out-Null
+        New-VellumPdfDocument | Add-VellumPdfBarcode Pdf417 'abcdefghijkl' -SplitInto 2 -FileId 7 -ModuleSize 1 |
+            Save-VellumPdfDocument -Path $without | Out-Null
+        (Get-Item $with).Length | Should -Not -Be (Get-Item $without).Length
+    }
+}
+
+Describe 'Get-VellumPdfBarcodeMatrix' {
+    It 'returns the module grid of a QR code' {
+        $m = Get-VellumPdfBarcodeMatrix QrCode 'hello' -ErrorCorrection H
+        $m.PSObject.TypeNames | Should -Contain 'PSVellumPDF.BarcodeMatrix'
+        $m.Width | Should -Be 21
+        $m.Height | Should -Be 21
+        $m.Rows.Count | Should -Be 21
+        $m.Rows[0].Substring(0, 7) | Should -Be '#######'      # finder pattern
+        $m.IsDark(0, 0) | Should -BeTrue
+        $m.IsDark(7, 0) | Should -BeFalse                       # separator
+    }
+
+    It 'handles every 2-D symbology and the same options as the drawing cmdlet' {
+        foreach ($t in 'MicroQrCode', 'DataMatrix', 'Aztec', 'Pdf417') {
+            $m = Get-VellumPdfBarcodeMatrix $t 'HELLO'
+            $m.Width | Should -BeGreaterThan 5
+            $m.Rows.Count | Should -Be $m.Height
+        }
+        (Get-VellumPdfBarcodeMatrix DataMatrix 'HELLO' -Shape Rectangular).Width | Should -BeGreaterThan (Get-VellumPdfBarcodeMatrix DataMatrix 'HELLO' -Shape Rectangular).Height
+        { Get-VellumPdfBarcodeMatrix QrCode 'x' -Bytes ([byte[]](1, 2)) } | Should -Throw
+    }
+
+    It 'reports problems with its own name' {
+        { Get-VellumPdfBarcodeMatrix QrCode ('y' * 500) -QrVersion 1 -ErrorCorrection H } | Should -Throw 'Get-VellumPdfBarcodeMatrix:*'
+    }
+}
