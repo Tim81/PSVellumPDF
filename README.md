@@ -109,6 +109,9 @@ Test-VellumPdfConformance ./report.pdf            # in-process PDF/A / PDF/UA pr
 | `New-VellumPdfPageDocument` | Create one: `-Conformance` (None, PdfA2b/2u/2a, PdfUA1), `-Tagged`, page size, `-Linearize`, `-DocumentId`/`-Timestamp` for reproducible output |
 | `Add-VellumPdfPage` | Add pages: size, `-Rotate`, `-Count` |
 | `Add-VellumPdfShape` / `-Text` / `-Gradient` / `-PageImage` / `-PageBarcode` | Draw at x/y: shapes (rectangle, ellipse, arc, line; RGB, CMYK or ICC colour, dashes, caps, joins, opacity) and text (alignment, character/word spacing, rise, scaling, heading roles) |
+| `Add-VellumPdfPath` / `Use-VellumPdfClip` | Free-form paths (`M`/`L`/`C`/`Z` path data or points; nonzero or even-odd fill) and clipping of any drawing to a rectangle, ellipse or path |
+| `Add-VellumPdfTextBox` | Wrapped text in a column: left, centre, right or justified, leading, `-MaxHeight`, one tagged paragraph |
+| `Set-VellumPdfPageBand` | Repeated header/footer on every page, with `{page}`/`{pages}` numbering, `-SkipFirstPage`, `-StartNumber` |
 | `Invoke-VellumPdfCanvas` | Full canvas access from a script block |
 | `Add-VellumPdfFormField` | Text, check box, choice, radio group and push button fields |
 | `Add-VellumPdfLink` | Link a rectangle to a URL or another page |
@@ -140,8 +143,8 @@ Test-VellumPdfConformance ./report.pdf            # in-process PDF/A / PDF/UA pr
 lives in [docs/PSVellumPDF](docs/PSVellumPDF), and runnable demo scripts in
 [examples/](examples): a report with tables and page numbers, PDF/A archival,
 rich text and encryption, digital signing, an accessible PDF/UA report, charts
-and barcodes and drawing, a form with links and pages, and preflight/reader/
-signing.
+and barcodes and drawing, a form with links and pages, preflight/reader/
+signing, a KMS-signed PDF, and paths with clipping, text boxes and page numbers.
 
 ### Scope and limitations
 
@@ -155,12 +158,14 @@ signing.
   cell is refused rather than silently dropped).
 - Page documents can be tagged (`-Tagged`, PDF/A-2a, PDF/UA-1): text becomes
   paragraphs/headings, shapes artifacts, images and barcodes figures with alternate
-  text. Links and form fields cannot be tagged by VellumPdf (the cmdlets warn), so a
+  text. Links and form fields cannot be tagged by VellumPdf yet (the cmdlets warn; tracked as
+  [Tim81/VellumPDF#569](https://github.com/Tim81/VellumPDF/issues/569)), so a
   PDF/UA page document that contains them is not fully conformant. Form fields use
   the non-embedded Helvetica font, so PDF/A page documents cannot contain them.
-- Not wrapped because they only make sense inside a script block, where the full
-  canvas is available (`Invoke-VellumPdfCanvas`, `Add-VellumPdfDrawing`): clipping
-  paths and the even-odd fill rule (none of the built-in shapes self-intersects).
+- An external signer (`Set-VellumPdfSignature -ExternalSigner`) must be a compiled
+  `IExternalSigner`, not a script block: the engine calls it on thread-pool threads
+  (see `examples/09-kms-signing.ps1`). Justified text boxes draw word by word, so
+  text extraction returns those lines without spaces.
 - CMYK and ICC colour are available in page documents and drawings; flow-layout
   elements take RGB. A PDF/A document using CMYK needs
   `Set-VellumPdfOutputIntent -Cmyk`.

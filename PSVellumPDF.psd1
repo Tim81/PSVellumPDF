@@ -61,6 +61,7 @@ Experimental reading (VellumPdf.Reader preview): Get-VellumPdfInfo, Get-VellumPd
         'Set-VellumPdfFooter'
         'Set-VellumPdfHeader'
         'Set-VellumPdfOutputIntent'
+        'Set-VellumPdfPageBand'
         'Set-VellumPdfSignature'
         'Test-VellumPdfConformance'
         'Unprotect-VellumPdfDocument'

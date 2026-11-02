@@ -57,8 +57,12 @@ in ways that change output. Upgrade notes are in the README.
 - **Page-based documents**: `New-VellumPdfPageDocument`, `Add-VellumPdfPage`,
   `Add-VellumPdfShape`, `Add-VellumPdfText`, `Add-VellumPdfGradient`,
   `Add-VellumPdfPageImage`, `Add-VellumPdfPageBarcode`, `Invoke-VellumPdfCanvas`,
-  `Add-VellumPdfFormField`, `Add-VellumPdfLink`, `Add-VellumPdfOutlineEntry`.
-  Includes AcroForm fields, links to other pages, collapsible bookmarks, page
+  `Add-VellumPdfFormField`, `Add-VellumPdfLink`, `Add-VellumPdfOutlineEntry`,
+  `Add-VellumPdfPath` (lines and curves from path data or points, nonzero or even-odd
+  fill), `Use-VellumPdfClip` (clip any drawing to a rectangle, ellipse or path),
+  `Add-VellumPdfTextBox` (wrapped, centred, right-aligned or justified text in a
+  column) and `Set-VellumPdfPageBand` (repeated header/footer, `Page {page} of
+  {pages}`). Includes AcroForm fields, links to other pages, collapsible bookmarks, page
   rotation, linearized ("fast web view") output and byte-for-byte reproducible
   files (`-DocumentId`, `-Timestamp`). `Set-VellumPdfDocumentInfo`,
   `Set-VellumPdfOutputIntent`, `Register-VellumPdfFont`, `Protect-VellumPdfDocument`,
@@ -69,7 +73,9 @@ in ways that change output. Upgrade notes are in the README.
 - **Signing**: `Set-VellumPdfSignature -Level B-B|B-T|B-LT|B-LTA`, `-TimestampClient`,
   `-RevocationClient`/`-RevocationTimeout`, `-SignaturePage`, `-SubFilter`,
   `-EstimatedSignatureSize`, `-ExternalPrivateKey` and `-ExternalSigner` (cloud
-  KMS / HSM).
+  KMS / HSM); `examples/09-kms-signing.ps1` shows a compiled signer with ECDSA
+  signature conversion. Script-block signers are not offered: the engine calls the
+  signer on thread-pool threads, where a script block cannot run.
 - **Experimental readers** (VellumPdf.Reader is a preview package): `Get-VellumPdfInfo`,
   `Get-VellumPdfText`, `Export-VellumPdfImage`, `Unprotect-VellumPdfDocument`.
 - **Embedded fonts everywhere**: `-FontHandle` on `Add-VellumPdfTable`,

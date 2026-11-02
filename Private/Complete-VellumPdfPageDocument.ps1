@@ -10,6 +10,7 @@ function Complete-VellumPdfPageDocument {
     [CmdletBinding()]
     param([Parameter(Mandatory)] [VellumPdf.Document.PdfDocument]$Document)
 
+    Write-VellumPdfPageBands -Document $Document
     $prop = $Document.PSObject.Properties['PSVellumCanvases']
     if (-not $prop) { return }
     $warnings = [System.Collections.Generic.List[object]]::new()
