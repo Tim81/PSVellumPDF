@@ -1,5 +1,7 @@
 using System.Management.Automation;
 using System.Management.Automation.Runspaces;
+using System.Reflection;
+using VellumPdf.Canvas;
 using VellumPdf.Document;
 using VellumPdf.Layout.Core;
 
@@ -27,10 +29,17 @@ public sealed class ScriptBlockRenderer : IRenderer
     private readonly bool _decorative;
     private readonly double _marginTop;
     private readonly double _marginBottom;
+    private readonly List<PSVariable>? _variables;
     private LayoutBox _occupied;
 
+    // PdfCanvas keeps its operators in a private MemoryStream. Reading what the script block appended lets
+    // Draw check that it saved and restored the graphics state evenly (the public API exposes no depth).
+    // When a future VellumPdf version renames the field the check is skipped rather than failing.
+    private static readonly FieldInfo? OperatorStream =
+        typeof(PdfCanvas).GetField("_ops", BindingFlags.Instance | BindingFlags.NonPublic);
+
     public ScriptBlockRenderer(double height, ScriptBlock script, string? altText = null, bool decorative = false,
-        double marginTop = 0, double marginBottom = 0)
+        double marginTop = 0, double marginBottom = 0, IEnumerable<PSVariable>? variables = null)
     {
         if (!double.IsFinite(height) || height <= 0)
             throw new ArgumentOutOfRangeException(nameof(height), height, "Height must be a positive, finite number of points.");
@@ -45,6 +54,21 @@ public sealed class ScriptBlockRenderer : IRenderer
         _script = script;
         _altText = altText;
         _decorative = decorative;
+        _variables = variables is null ? null : new List<PSVariable>(variables);
+    }
+
+    private static void CheckBalanced(MemoryStream? operators, long startOffset)
+    {
+        if (operators is null || !operators.TryGetBuffer(out var buffer) || buffer.Array is null) return;
+        var length = operators.Length - startOffset;
+        if (length <= 0) return;
+        var written = buffer.Array.AsSpan(buffer.Offset + (int)startOffset, (int)length).ToArray();
+        var balance = ContentStreamBalance.Scan(written);
+        if (balance.MinDepth < 0 || balance.FinalDepth != 0)
+            throw new InvalidOperationException(
+                "Add-VellumPdfDrawing: the script block saved and restored the graphics state unevenly " +
+                $"(lowest depth {balance.MinDepth}, final depth {balance.FinalDepth}). " +
+                "Every SaveState needs a RestoreState inside the same block.");
     }
 
     public LayoutResult Layout(LayoutContext ctx)
@@ -74,9 +98,17 @@ public sealed class ScriptBlockRenderer : IRenderer
         }
 
         canvas.SaveState();
+        var operators = OperatorStream?.GetValue(canvas) as MemoryStream;
+        var startOffset = operators?.Length ?? 0;
         try
         {
-            _script.Invoke(canvas, new PdfBox(x, y, w, h), ctx);
+            // The captured variables (a loop variable, a function's locals) shadow whatever the caller's scope
+            // holds by now; the block itself stays bound to its own session state ($script:, $global:, functions).
+            if (_variables is { Count: > 0 })
+                _script.InvokeWithContext(null, _variables, canvas, new PdfBox(x, y, w, h), ctx);
+            else
+                _script.Invoke(canvas, new PdfBox(x, y, w, h), ctx);
+            CheckBalanced(operators, startOffset);
         }
         catch (RuntimeException e) when (e.InnerException is null)
         {

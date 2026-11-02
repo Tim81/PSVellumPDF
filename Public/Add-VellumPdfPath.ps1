@@ -201,10 +201,10 @@ function Add-VellumPdfPath {
             try {
                 $tagKind = if ($AltText) { 'Structure' } else { 'Artifact' }
                 Invoke-VellumPdfTagged -Document $Document -Canvas $canvas -PdfPage $Document.Pages[$Page - 1] -Kind $tagKind -StructType Figure -AltText $AltText -Draw {
-                    if ($bound.ContainsKey('FillColor')) { $c = ConvertTo-VellumColor $FillColor; [void]$canvas.SetFillColorRgb($c[0], $c[1], $c[2]) }
+                    if ($bound.ContainsKey('FillColor')) { $c = ConvertTo-VellumColor $FillColor -Document $Document -CommandName 'Add-VellumPdfPath'; [void]$canvas.SetFillColorRgb($c[0], $c[1], $c[2]) }
                     if ($bound.ContainsKey('FillGray')) { [void]$canvas.SetFillColorGray($FillGray) }
                 if ($bound.ContainsKey('FillCmyk')) { [void]$canvas.SetFillColorCmyk($FillCmyk[0], $FillCmyk[1], $FillCmyk[2], $FillCmyk[3]) }
-                    if ($bound.ContainsKey('StrokeColor')) { $c = ConvertTo-VellumColor $StrokeColor; [void]$canvas.SetStrokeColorRgb($c[0], $c[1], $c[2]) }
+                    if ($bound.ContainsKey('StrokeColor')) { $c = ConvertTo-VellumColor $StrokeColor -Document $Document -CommandName 'Add-VellumPdfPath'; [void]$canvas.SetStrokeColorRgb($c[0], $c[1], $c[2]) }
                     if ($bound.ContainsKey('StrokeGray')) { [void]$canvas.SetStrokeColorGray($StrokeGray) }
                 if ($bound.ContainsKey('StrokeCmyk')) { [void]$canvas.SetStrokeColorCmyk($StrokeCmyk[0], $StrokeCmyk[1], $StrokeCmyk[2], $StrokeCmyk[3]) }
                     if ($bound.ContainsKey('FillIcc')) {

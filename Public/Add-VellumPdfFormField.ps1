@@ -49,7 +49,10 @@ function Add-VellumPdfFormField {
     .PARAMETER Option
         Choice: the list of entries.
     .PARAMETER Selected
-        Choice: the initially selected entry. Radio: the initially selected export value.
+        Choice: the initially selected entry. Radio: the initially selected export value. Matching ignores
+        case, and the field stores the entry's own spelling ('large' selects the option 'Large' and writes
+        Large). If two entries differ only in case and -Selected is not an exact match for one of them, the
+        choice is ambiguous and an error is raised.
     .PARAMETER List
         Choice: a list box instead of a drop-down combo box.
     .PARAMETER RadioOption
@@ -148,6 +151,22 @@ function Add-VellumPdfFormField {
                 }
             }
 
+            # -Selected matches case-insensitively but the field must hold the entry's own spelling, otherwise the
+            # stored value names no option (and no radio button is switched on). An exact-case match wins; entries
+            # that differ only in case make any other spelling ambiguous.
+            $resolveSelected = {
+                param([string[]]$Candidates, [string]$Description)
+                $exact = @($Candidates | Where-Object { $_ -ceq $Selected })
+                if ($exact.Count -gt 0) { return $exact[0] }
+                $loose = @($Candidates | Where-Object { $_ -eq $Selected } | Select-Object -Unique)
+                if ($loose.Count -eq 0) { throw "Add-VellumPdfFormField: -Selected '$Selected' is not $Description." }
+                if ($loose.Count -gt 1) {
+                    throw ("Add-VellumPdfFormField: -Selected '$Selected' matches several entries that differ only in case " +
+                        "($($loose -join ', ')); give the exact spelling.")
+                }
+                $loose[0]
+            }
+
             $fieldOptions = [VellumPdf.Forms.FormFieldOptions]::new()
             $fieldOptions.FontSize = $FontSize
             if ($ReadOnly) { $fieldOptions.ReadOnly = $true }
@@ -187,10 +206,7 @@ function Add-VellumPdfFormField {
                 'Choice' {
                     if (-not $Option -or $Option.Count -eq 0) { throw 'Add-VellumPdfFormField: -Type Choice needs -Option.' }
                     foreach ($o in $Option) { & $assertDrawable "option '$o'" $o }
-                    if ($bound.ContainsKey('Selected') -and $Selected -notin $Option) {
-                        throw "Add-VellumPdfFormField: -Selected '$Selected' is not one of the -Option entries."
-                    }
-                    $sel = if ($bound.ContainsKey('Selected')) { $Selected } else { $null }
+                    $sel = if ($bound.ContainsKey('Selected')) { & $resolveSelected $Option 'one of the -Option entries' } else { $null }
                     $Document.AddChoiceField($pdfPage, $Name, $box, [string[]]$Option, $sel, (-not $List), $fieldOptions)
                 }
                 'PushButton' {
@@ -211,10 +227,7 @@ function Add-VellumPdfFormField {
                         $roBox = & $rect $ro['X'] $ro['Y'] $ro['Width'] $ro['Height'] "radio button $i"
                         $buttons.Add([VellumPdf.Forms.RadioOption]::new($roPage, $roBox, [string]$ro['ExportValue']))
                     }
-                    if ($bound.ContainsKey('Selected') -and $Selected -notin $buttons.ExportValue) {
-                        throw "Add-VellumPdfFormField: -Selected '$Selected' is not an ExportValue of any radio button."
-                    }
-                    $sel = if ($bound.ContainsKey('Selected')) { $Selected } else { $null }
+                    $sel = if ($bound.ContainsKey('Selected')) { & $resolveSelected @($buttons | ForEach-Object { $_.ExportValue }) 'an ExportValue of any radio button' } else { $null }
                     $Document.AddRadioButtonGroup($Name, $buttons, $sel, $fieldOptions)
                 }
             }

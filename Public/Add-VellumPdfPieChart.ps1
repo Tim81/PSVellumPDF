@@ -161,7 +161,7 @@ function Add-VellumPdfPieChart {
                         $value = if ($null -ne $raw) { $raw -as [double] }
                         if ($null -eq $value) { throw "Add-VellumPdfPieChart: slice $($i + 1) has no numeric Value (got '$raw')." }
                         $colorSpec = & $get 'Color'
-                        $rgb = if ($null -ne $colorSpec) { ConvertTo-VellumColor $colorSpec } else { ConvertTo-VellumColor $palette[$i % $palette.Count] }
+                        $rgb = if ($null -ne $colorSpec) { ConvertTo-VellumColor $colorSpec -Document $Document -CommandName 'Add-VellumPdfPieChart' } else { ConvertTo-VellumColor $palette[$i % $palette.Count] -Document $Document -CommandName 'Add-VellumPdfPieChart' }
                         $label = & $get 'Label'
                     }
                     else {
@@ -193,7 +193,7 @@ function Add-VellumPdfPieChart {
                 $chart.Diameter = $Diameter
                 $chart.StrokeWidth = $StrokeWidth
                 if ($boundParameters.ContainsKey('StrokeColor')) {
-                    $sc = ConvertTo-VellumColor $StrokeColor
+                    $sc = ConvertTo-VellumColor $StrokeColor -Document $Document -CommandName 'Add-VellumPdfPieChart'
                     $chart.StrokeColor = [VellumPdf.Layout.Core.ColorRgb]::new($sc[0], $sc[1], $sc[2])
                 }
                 $chart.Alignment = [VellumPdf.Layout.Core.HorizontalAlignment]::$Alignment

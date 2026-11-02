@@ -10,8 +10,11 @@ function Add-VellumPdfTable {
 
         -Row accepts two shapes (the first row decides which):
           - Records: PSCustomObject rows straight from Import-Csv or Select-Object,
-            or one hashtable per row. Columns are the property/key names and a
-            header is derived from them when -Header is omitted.
+            or one [ordered] dictionary per row. Columns are the property/key names,
+            in the first row's order, and a header is derived from them when -Header
+            is omitted. A plain @{} hashtable with more than one key is refused: it
+            has no fixed key order, so the columns would come out shuffled. Write
+            [ordered]@{ ... } or [pscustomobject]@{ ... } (a one-key hashtable is fine).
           - Cell arrays: one array per row. Each element is a scalar (added as
             text) or a rich-cell hashtable for that one cell:
               @{ Text = 'Total'; ColSpan = 2; Alignment = 'Right';
@@ -49,11 +52,15 @@ function Add-VellumPdfTable {
         table via AddHeaderRow(). The count of header cells determines the
         expected column count for -ColumnWidth mismatch warnings.
     .PARAMETER Row
-        The table rows. Either PSCustomObject/hashtable records (columns are the
+        The table rows. Either PSCustomObject/[ordered] records (columns are the
         property/key names; header derived when -Header is omitted), or one array
         per row whose elements are scalars or rich-cell hashtables (see the
         description). For a single cell-array row, use the unary comma operator to
         prevent PowerShell from flattening the outer array: -Row @(,@('a','b')).
+        May be empty (or $null) when -Header is given: the result is a header-only
+        table (drawn as ordinary rows, because the engine cannot lay out a table
+        of header rows alone, so a tagged document does not mark them as header
+        cells). An empty -Row without -Header is an error.
     .PARAMETER ColumnWidth
         Column widths in points, each between 0 and 100000. A width of 0 means
         "auto": the column shares the remaining space. The count should
@@ -126,6 +133,8 @@ function Add-VellumPdfTable {
         [object[]]$Header,
 
         [Parameter(Mandatory)]
+        [AllowNull()]
+        [AllowEmptyCollection()]
         [object[]]$Row,
 
         [ValidateRange(0.0, 100000.0)]
@@ -183,6 +192,11 @@ function Add-VellumPdfTable {
             if ($FontHandle) {
                 Assert-VellumPdfFontHandle -FontHandle $FontHandle -Document $Document -CommandName 'Add-VellumPdfTable'
             }
+            # An empty -Row is a header-only table; without a -Header there would be nothing to draw.
+            if ($null -eq $Row) { $Row = @() }
+            if ($Row.Count -eq 0 -and ($null -eq $Header -or $Header.Count -eq 0)) {
+                throw 'Add-VellumPdfTable: -Row is empty and no -Header was given; supply at least one row, or a -Header for a header-only table.'
+            }
             $tablePadding = if ($PSBoundParameters.ContainsKey('CellPadding')) {
                 ConvertTo-VellumInsets -Value $CellPadding -What 'Add-VellumPdfTable: -CellPadding'
             }
@@ -226,6 +240,12 @@ function Add-VellumPdfTable {
             $headerLabels = $Header
             $specRows = [System.Collections.Generic.List[object]]::new()
             if ($recordMode) {
+                # A plain hashtable enumerates its keys in no fixed order, so the columns would come out shuffled.
+                if ($Row[0] -is [hashtable] -and $Row[0].Count -gt 1) {
+                    throw ('Add-VellumPdfTable: a plain @{} hashtable row has no fixed key order, so its columns would come ' +
+                        'out in an arbitrary order. Write each row as [ordered]@{ ... } or [pscustomobject]@{ ... }, or pass ' +
+                        'cell-array rows (one array per row) together with -Header.')
+                }
                 $columns = if ($Row[0] -is [System.Collections.IDictionary]) {
                     @($Row[0].Keys)
                 }
@@ -263,6 +283,17 @@ function Add-VellumPdfTable {
             }
             $headerSpecs = if ($headerRowSpecs.Count) { @($headerRowSpecs | ForEach-Object { $_ }) } else { @() }   # every header cell, for text checks
 
+            # Spans are read while the grid is laid out, before any cell is built: check them first.
+            foreach ($spec in @($headerSpecs) + @($specRows | ForEach-Object { $_ })) {
+                foreach ($spanKey in 'ColSpan', 'RowSpan') {
+                    if ($null -eq $spec[$spanKey]) { continue }
+                    $spanValue = $spec[$spanKey] -as [double]
+                    if ($null -eq $spanValue -or -not [double]::IsFinite($spanValue) -or $spanValue -ne [Math]::Floor($spanValue) -or $spanValue -lt 1 -or $spanValue -gt 1000) {
+                        throw "Add-VellumPdfTable: rich-cell $spanKey must be a whole number from 1 to 1000; got '$($spec[$spanKey])'."
+                    }
+                }
+            }
+
             # Encoding warning over every header and data cell's text, skipping cells
             # that render in an embedded font (the table's, or the cell's own).
             $cellText = @(
@@ -282,10 +313,10 @@ function Add-VellumPdfTable {
             $effFont = if ($Font) { $Font } else { $default.Font }
             $effSize = if ($PSBoundParameters.ContainsKey('FontSize')) { $FontSize } else { $default.FontSize }
             if ($FontHandle) {
-                $table.DefaultCellStyle = New-VellumTextStyle -FontHandle $FontHandle -FontSize $effSize
+                $table.DefaultCellStyle = New-VellumTextStyle -FontHandle $FontHandle -FontSize $effSize -Document $Document -CommandName 'Add-VellumPdfTable'
             }
             else {
-                $table.DefaultCellStyle = New-VellumTextStyle -Font $effFont -FontSize $effSize
+                $table.DefaultCellStyle = New-VellumTextStyle -Font $effFont -FontSize $effSize -Document $Document -CommandName 'Add-VellumPdfTable'
             }
 
             # The base-14 font names a rich cell's Font key may use (same set as the
@@ -302,7 +333,7 @@ function Add-VellumPdfTable {
             # Resolve flexible colours once (RGB triple / hex / name -> ColorRgb).
             $toRgb = {
                 param($value)
-                $c = ConvertTo-VellumColor $value
+                $c = ConvertTo-VellumColor $value -Document $Document -CommandName 'Add-VellumPdfTable'
                 [VellumPdf.Layout.Core.ColorRgb]::new($c[0], $c[1], $c[2])
             }
             if ($PSBoundParameters.ContainsKey('BorderColor')) { $table.BorderColor = & $toRgb $BorderColor }
@@ -326,11 +357,7 @@ function Add-VellumPdfTable {
 
                 foreach ($spanKey in 'ColSpan', 'RowSpan') {
                     if ($null -ne $spec[$spanKey]) {
-                        $span = $spec[$spanKey] -as [int]
-                        if ($null -eq $span -or $span -lt 1) {
-                            throw "Add-VellumPdfTable: rich-cell $spanKey must be a positive integer; got '$($spec[$spanKey])'."
-                        }
-                        $cell.$spanKey = $span
+                        $cell.$spanKey = [int]$spec[$spanKey]   # validated up front
                     }
                 }
 
@@ -353,7 +380,7 @@ function Add-VellumPdfTable {
 
                 if ($null -ne $spec['Leading']) {
                     $lead = $spec['Leading'] -as [double]
-                    if ($null -eq $lead -or $lead -lt 0 -or $lead -gt 1000) {
+                    if ($null -eq $lead -or -not [double]::IsFinite($lead) -or $lead -lt 0 -or $lead -gt 1000) {
                         throw "Add-VellumPdfTable: rich-cell Leading must be between 0 and 1000; got '$($spec['Leading'])'."
                     }
                 }
@@ -365,7 +392,7 @@ function Add-VellumPdfTable {
                     }
                     if ($null -ne $spec['FontSize']) {
                         $size = $spec['FontSize'] -as [double]
-                        if ($null -eq $size -or $size -lt 1 -or $size -gt 1000) {
+                        if ($null -eq $size -or -not [double]::IsFinite($size) -or $size -lt 1 -or $size -gt 1000) {
                             throw "Add-VellumPdfTable: rich-cell FontSize must be between 1 and 1000; got '$($spec['FontSize'])'."
                         }
                     }
@@ -377,9 +404,9 @@ function Add-VellumPdfTable {
                     }
                     if ($effHandle -and -not $spec['Font']) { $cellStyle['FontHandle'] = $effHandle }
                     else { $cellStyle['Font'] = if ($spec['Font']) { [string]$spec['Font'] } else { $effFont } }
-                    if ($spec['Color']) { $cellStyle['Color'] = ConvertTo-VellumColor $spec['Color'] }
+                    if ($spec['Color']) { $cellStyle['Color'] = ConvertTo-VellumColor $spec['Color'] -Document $Document -CommandName 'Add-VellumPdfTable' }
                     if ($null -ne $spec['Leading']) { $cellStyle['Leading'] = [double]$spec['Leading'] }
-                    $cell.Style = New-VellumTextStyle @cellStyle
+                    $cell.Style = New-VellumTextStyle @cellStyle -Document $Document -CommandName 'Add-VellumPdfTable'
                 }
 
                 if ($null -ne $spec['Padding']) {
@@ -429,7 +456,9 @@ function Add-VellumPdfTable {
 
             # Add optional header row.
             foreach ($specsOfRow in $headerRowSpecs) {
-                $headerRow = $table.AddHeaderRow()
+                # The engine cannot lay out a table made only of header rows, so a header-only table draws its
+                # header as ordinary rows (same look and background, but not marked as header cells).
+                $headerRow = if ($specRows.Count -eq 0) { $table.AddRow($false) } else { $table.AddHeaderRow() }
                 if ($headerBg) { $headerRow.Background = $headerBg }
                 $gridColumns = & $placeRow $specsOfRow
                 $hi = 0

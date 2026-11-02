@@ -229,7 +229,7 @@ function Save-VellumPdfDocument {
                                 throw "Save-VellumPdfDocument: failed to sign '$resolved': $reason $hint"
                             }
                             # Messages the module raised itself (balance check) already say what is wrong.
-                            if ($reason -like 'Invoke-VellumPdfCanvas:*') { throw "Save-VellumPdfDocument: failed to render '$resolved': $reason" }
+                            if ($reason -like 'Invoke-VellumPdfCanvas:*' -or $reason -like 'Add-VellumPdfDrawing:*') { throw "Save-VellumPdfDocument: failed to render '$resolved': $reason" }
                             throw ("Save-VellumPdfDocument: failed to render '$resolved': $reason " +
                                 'Check for extreme margin values or elements taller than the page.')
                         }

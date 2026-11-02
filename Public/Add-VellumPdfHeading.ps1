@@ -114,9 +114,9 @@ function Add-VellumPdfHeading {
             } else {
                 @{ Font = $Font; FontSize = $FontSize }
             }
-            if ($PSBoundParameters.ContainsKey('Color'))   { $styleParams['Color'] = ConvertTo-VellumColor $Color }
+            if ($PSBoundParameters.ContainsKey('Color'))   { $styleParams['Color'] = ConvertTo-VellumColor $Color -Document $Document -CommandName 'Add-VellumPdfHeading' }
             if ($PSBoundParameters.ContainsKey('Leading')) { $styleParams['Leading'] = $Leading }
-            $style = New-VellumTextStyle @styleParams
+            $style = New-VellumTextStyle @styleParams -Document $Document -CommandName 'Add-VellumPdfHeading'
             $heading = [VellumPdf.Layout.Elements.Heading]::new($Text, $style)
             # VellumPdf.Layout counts heading levels from 0 (0 = H1); the cmdlet takes 1..6.
             $heading.Level = $Level - 1

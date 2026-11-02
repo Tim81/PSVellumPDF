@@ -73,7 +73,7 @@ function Add-VellumPdfLineSeparator {
             }
 
             if ($PSBoundParameters.ContainsKey('Color')) {
-                $rgb = ConvertTo-VellumColor $Color
+                $rgb = ConvertTo-VellumColor $Color -Document $Document -CommandName 'Add-VellumPdfLineSeparator'
                 $sep.Color = [VellumPdf.Layout.Core.ColorRgb]::new($rgb[0], $rgb[1], $rgb[2])
             }
 

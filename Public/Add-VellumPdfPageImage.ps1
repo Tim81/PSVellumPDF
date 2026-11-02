@@ -106,6 +106,7 @@ function Add-VellumPdfPageImage {
             }
             $image = Import-VellumPdfImage -Bytes $bytes -Format $key -CommandName 'Add-VellumPdfPageImage' -Source $source
 
+            Write-VellumPdfRgbIntentWarning -Document $Document -CommandName 'Add-VellumPdfPageImage' -Image $image
             $w = if ($PSBoundParameters.ContainsKey('Width')) { $Width } elseif ($PSBoundParameters.ContainsKey('Height')) { $Height * $image.Width / $image.Height } else { [double]$image.Width }
             $h = if ($PSBoundParameters.ContainsKey('Height')) { $Height } elseif ($PSBoundParameters.ContainsKey('Width')) { $Width * $image.Height / $image.Width } else { [double]$image.Height }
 

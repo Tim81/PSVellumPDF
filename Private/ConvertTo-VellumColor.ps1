@@ -23,10 +23,21 @@ function ConvertTo-VellumColor {
     param(
         [Parameter(Mandatory)]
         [AllowNull()]
-        [object]$Color
+        [object]$Color,
+
+        # The document the colour is for and the cmdlet resolving it: a PDF/A document whose output intent
+        # is CMYK then gets a one-time warning that RGB colour fails validation (Write-VellumPdfRgbIntentWarning).
+        [object]$Document,
+
+        [string]$CommandName
     )
 
     if ($null -eq $Color) { return $null }
+    if ($Document) {
+        $resolved = ConvertTo-VellumColor -Color $Color
+        Write-VellumPdfRgbIntentWarning -Document $Document -CommandName $CommandName
+        return , $resolved
+    }
 
     # Already an array of components.
     if ($Color -is [System.Array]) {
@@ -41,8 +52,9 @@ function ConvertTo-VellumColor {
             # thousands separator.
             try { $d = [double]$v }
             catch { throw "ConvertTo-VellumColor: RGB component '$v' is not a number." }
-            if ($d -lt 0 -or $d -gt 1) {
-                throw "ConvertTo-VellumColor: RGB components must be between 0 and 1; got $d."
+            # IsFinite first: NaN fails both comparisons and would otherwise be written as 'NaN 0 0 rg'.
+            if (-not [double]::IsFinite($d) -or $d -lt 0 -or $d -gt 1) {
+                throw "ConvertTo-VellumColor: RGB components must be finite numbers between 0 and 1; got $d."
             }
             $d
         }

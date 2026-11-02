@@ -36,7 +36,8 @@ Describe 'Test-VellumPdfConformance' {
 
     It 'reports the finding for a base-14 (non-embedded) font under PDF/A' {
         $path = Join-Path $TestDrive 'bad.pdf'
-        New-VellumPdfDocument -Conformance PdfA2b -Language en | Add-VellumPdfParagraph -Text 'x' |
+        # Flow text is embedded automatically now; a drawing that asks the context for a base-14 font still is not.
+        New-VellumPdfDocument -Conformance PdfA2b -Language en | Add-VellumPdfDrawing -Height 20 -Decorative -ScriptBlock { param($c, $b, $ctx) $f = $ctx.GetFont([VellumPdf.Fonts.Standard14]::Helvetica); $c.BeginText().SetFont($f, 12).MoveTextPosition($b.X, $b.Y).ShowText('x').EndText() | Out-Null } |
             Save-VellumPdfDocument -Path $path | Out-Null
         $r = Test-VellumPdfConformance -Path $path
         $r.IsCompliant | Should -BeFalse
@@ -130,7 +131,7 @@ Describe 'Module output against the preflight' {
 
     It 'PROOF: PDF/UA-1 also needs a document title and embedded fonts' {
         $path = Join-Path $TestDrive 'ua-bad.pdf'
-        New-VellumPdfDocument -Conformance PdfUA1 -Language en | Add-VellumPdfParagraph -Text 'x' |
+        New-VellumPdfDocument -Conformance PdfUA1 -Language en | Add-VellumPdfDrawing -Height 20 -Decorative -ScriptBlock { param($c, $b, $ctx) $f = $ctx.GetFont([VellumPdf.Fonts.Standard14]::Helvetica); $c.BeginText().SetFont($f, 12).MoveTextPosition($b.X, $b.Y).ShowText('x').EndText() | Out-Null } |
             Save-VellumPdfDocument -Path $path | Out-Null
         $ids = (Test-VellumPdfConformance -Path $path -Profile PdfUA1).Assertions | Where-Object Severity -EQ 'Error' | ForEach-Object RuleId
         $ids | Should -Contain 'ISO14289-1:7.1-title'

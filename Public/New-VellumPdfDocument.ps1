@@ -24,9 +24,17 @@ function New-VellumPdfDocument {
         conformance requirements. PDF/UA-1 forces a tagged document. To pass the
         preflight (Test-VellumPdfConformance, or Save-VellumPdfDocument -Validate)
         also set -Language, give the document a title with Set-VellumPdfDocumentInfo
-        -Title, embed a TrueType font (Register-VellumPdfFont + -FontHandle on
-        every text element; base-14 fonts are not embedded), and give images,
-        charts and barcodes alternate text. PDF/A likewise requires embedded fonts. Hyperlinks (-LinkUri) are not tagged by
+        -Title, and give images, charts and barcodes alternate text. Both levels
+        require embedded fonts: a conformant document therefore draws every base-14
+        font name it uses (the document default, -Font on paragraphs, headings,
+        tables, lists, text runs, headers and footers) in the metric-compatible
+        Liberation font (Helvetica -> Liberation Sans, Times -> Serif, Courier ->
+        Mono, with bold and italic variants), embedded once per document; layout is
+        unchanged. Symbol and ZapfDingbats have no substitute: use -FontHandle
+        (Register-VellumPdfFont) for those and for text outside Windows-1252. Text
+        in embedded fonts is not extracted by Get-VellumPdfText (its reader decodes
+        simple fonts only). A document without -Conformance keeps the plain base-14
+        fonts. Hyperlinks (-LinkUri) are not tagged by
         VellumPdf, so a PDF/UA document containing them is not fully conformant.
         Note that PDF/A forbids encryption, so PDF/A is incompatible with
         Protect-VellumPdfDocument; PDF/UA-1 may be encrypted if Extract is kept.
@@ -154,7 +162,7 @@ function New-VellumPdfDocument {
             if ($Language) { $doc.Language = $Language }
         if ($UseObjectStreams) { $doc.UseObjectStreams = $true }
 
-        $style = New-VellumTextStyle -Font $DefaultFont -FontSize $DefaultFontSize
+        $style = New-VellumTextStyle -Font $DefaultFont -FontSize $DefaultFontSize -Document $doc -CommandName 'New-VellumPdfDocument'
         [void]$doc.SetDefaultFont($style)
 
         # VellumPdf has no getter for the default style, and a TextStyle without a

@@ -25,8 +25,19 @@ function New-VellumTextStyle {
 
         # Line leading (extra vertical space between lines), in points.
         [ValidateRange(0, 1000)]
-        [double]$Leading
+        [double]$Leading,
+
+        # The flow document the style is for. In a conformant document (PDF/A, PDF/UA-1) a base-14
+        # -Font is replaced by the embedded Liberation substitute (see Get-VellumPdfEmbeddedStandard14).
+        [VellumPdf.Layout.Document]$Document,
+
+        # Names the cmdlet in the error raised when a base-14 font has no embeddable substitute.
+        [string]$CommandName = 'New-VellumTextStyle'
     )
+
+    if ($Font -and -not $FontHandle -and $Document -and (Get-VellumPdfConformanceRequirement -Document $Document).NeedsEmbeddedFonts) {
+        $FontHandle = Get-VellumPdfEmbeddedStandard14 -Document $Document -Font $Font -CommandName $CommandName
+    }
 
     $wantsColor   = $PSBoundParameters.ContainsKey('Color')
     $wantsLeading = $PSBoundParameters.ContainsKey('Leading')

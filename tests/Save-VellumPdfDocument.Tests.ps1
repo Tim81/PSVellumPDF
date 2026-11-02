@@ -155,12 +155,13 @@ Describe 'Save-VellumPdfDocument -Validate' {
 
     It 'refuses a non-compliant document and writes nothing, in every output mode' {
         $out = Join-Path $TestDrive 'invalid.pdf'
-        $doc = New-VellumPdfDocument -Conformance PdfA2b -Language en | Add-VellumPdfParagraph -Text 'base-14 text'
+        # Flow text is embedded automatically now; a drawing that asks the context for a base-14 font still is not.
+        $doc = New-VellumPdfDocument -Conformance PdfA2b -Language en | Add-VellumPdfDrawing -Height 20 -Decorative -ScriptBlock { param($c, $b, $ctx) $f = $ctx.GetFont([VellumPdf.Fonts.Standard14]::Helvetica); $c.BeginText().SetFont($f, 12).MoveTextPosition($b.X, $b.Y).ShowText('x').EndText() | Out-Null }
         { $doc | Save-VellumPdfDocument -Path $out -Validate } | Should -Throw '*not PdfA2b compliant*font-embedding*'
         Test-Path $out | Should -BeFalse
 
         $ms = [System.IO.MemoryStream]::new()
-        $doc2 = New-VellumPdfDocument -Conformance PdfA2b -Language en | Add-VellumPdfParagraph -Text 'base-14 text'
+        $doc2 = New-VellumPdfDocument -Conformance PdfA2b -Language en | Add-VellumPdfDrawing -Height 20 -Decorative -ScriptBlock { param($c, $b, $ctx) $f = $ctx.GetFont([VellumPdf.Fonts.Standard14]::Helvetica); $c.BeginText().SetFont($f, 12).MoveTextPosition($b.X, $b.Y).ShowText('x').EndText() | Out-Null }
         { $doc2 | Save-VellumPdfDocument -Stream $ms -Validate } | Should -Throw '*nothing was written*'
         $ms.Length | Should -Be 0
         $ms.Dispose()

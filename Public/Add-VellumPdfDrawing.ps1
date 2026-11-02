@@ -25,7 +25,15 @@ function Add-VellumPdfDrawing {
         SetStrokeColor, ShowGlyphs) instead.
 
         The script block runs while the document is saved, on the PowerShell
-        thread. It therefore works with Save-VellumPdfDocument but not with an
+        thread. The variables it reads (such as a loop variable or a function's
+        locals) are captured when Add-VellumPdfDrawing is called, so the block
+        draws with the values they had then; $script: and $global: variables and
+        functions stay live, and assignments to a captured variable stay inside
+        the block. SaveState/RestoreState must balance inside the block: an
+        uneven block makes the save fail with an error naming Add-VellumPdfDrawing.
+        In a PDF/A or PDF/UA document draw text with an embedded font
+        ($ctx.UseEmbeddedFont), since $ctx.GetFont uses a non-embedded base-14 font.
+        Because it runs at save time it works with Save-VellumPdfDocument but not with an
         asynchronous save or an external asynchronous signer. In a tagged document
         the drawing is a Figure with -AltText (or the text 'Drawing'); pass
         -Decorative for purely decorative graphics.
@@ -98,7 +106,11 @@ function Add-VellumPdfDrawing {
                 $pending.Value = 0.0
             }
 
-            $renderer = [PSVellumPDF.Interop.ScriptBlockRenderer]::new($Height, $ScriptBlock, $AltText, [bool]$Decorative, $top, $MarginBottom)
+            # The block runs at save time: hand it the values its variables have now (a loop variable, a
+            # function's locals), not whatever they hold when the document is saved.
+            $captured = [System.Collections.Generic.List[System.Management.Automation.PSVariable]]::new()
+            foreach ($variable in @(Get-VellumPdfBlockVariable -ScriptBlock $ScriptBlock)) { $captured.Add($variable) }
+            $renderer = [PSVellumPDF.Interop.ScriptBlockRenderer]::new($Height, $ScriptBlock, $AltText, [bool]$Decorative, $top, $MarginBottom, $captured)
             [void]$Document.Add($renderer)
             # Remember that the document holds script-block content: a signature
             # produced asynchronously (external signer) cannot run it.

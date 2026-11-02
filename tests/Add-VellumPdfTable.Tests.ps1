@@ -166,7 +166,7 @@ Describe 'Add-VellumPdfTable' {
             { $doc | Add-VellumPdfTable -Row @(, @(@{ Text = 'x'; Font = 'Bogus' })) } |
                 Should -Throw '*not a base-14 font*'
             { $doc | Add-VellumPdfTable -Row @(, @(@{ Text = 'x'; ColSpan = 0 })) } |
-                Should -Throw '*ColSpan must be a positive*'
+                Should -Throw '*ColSpan must be a whole number*'
         }
         finally { $doc.Dispose() }
     }

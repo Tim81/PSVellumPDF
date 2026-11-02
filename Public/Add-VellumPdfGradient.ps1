@@ -70,8 +70,8 @@ function Add-VellumPdfGradient {
             if ($Type -eq 'Radial' -and $PSBoundParameters.ContainsKey('Direction')) {
                 throw 'Add-VellumPdfGradient: -Direction applies to an Axial gradient only.'
             }
-            $a = ConvertTo-VellumColor $StartColor
-            $b = ConvertTo-VellumColor $EndColor
+            $a = ConvertTo-VellumColor $StartColor -Document $Document -CommandName 'Add-VellumPdfGradient'
+            $b = ConvertTo-VellumColor $EndColor -Document $Document -CommandName 'Add-VellumPdfGradient'
             $c0 = [VellumPdf.Graphics.KernelColor]::new($a[0], $a[1], $a[2])
             $c1 = [VellumPdf.Graphics.KernelColor]::new($b[0], $b[1], $b[2])
             $canvas = Get-VellumPdfPageCanvas -Document $Document -Page $Page -CommandName 'Add-VellumPdfGradient'

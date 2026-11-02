@@ -14,6 +14,14 @@ function Set-VellumPdfOutputIntent {
         the document's Conformance is None - create the document with
         New-VellumPdfDocument -Conformance PdfA2b (or another PDF/A level).
 
+        The profile of an -IccProfilePath intent must be a printer, display, scanner or
+        colour-space-conversion profile ('prtr', 'mntr', 'scnr', 'spac') of ICC major
+        version 4 or lower; an abstract profile or a version 5 profile fails PDF/A
+        (ISO 19005-2, 6.2.3) and is refused.
+
+        RGB content drawn into a document whose output intent is CMYK fails the
+        same validation (6.2.4.3), so the drawing cmdlets warn once per intent.
+
         CMYK CAVEAT: the layout engine renders text and table fills in DeviceRGB.
         A CMYK output intent is intended for documents that also carry CMYK
         content produced at the kernel level (not exposed by this module); strict
@@ -108,6 +116,7 @@ function Set-VellumPdfOutputIntent {
                 }
                 $bytes = [System.IO.File]::ReadAllBytes($resolved)
                 $profileCount = Get-VellumPdfIccComponentCount -Bytes $bytes -CommandName 'Set-VellumPdfOutputIntent'
+                Assert-VellumPdfIccOutputIntent -Bytes $bytes -CommandName 'Set-VellumPdfOutputIntent'
                 if ($PSBoundParameters.ContainsKey('ComponentCount') -and $ComponentCount -ne $profileCount) {
                     throw ("Set-VellumPdfOutputIntent: -ComponentCount $ComponentCount does not match the profile, which has " +
                         "$profileCount colour component(s). Omit -ComponentCount to use the profile's own.")
@@ -116,11 +125,17 @@ function Set-VellumPdfOutputIntent {
                 $infoValue = if ($PSBoundParameters.ContainsKey('Info')) { $Info } else { $null }
                 $Document.SetPdfAOutputIntent($bytes, $ComponentCount, $OutputConditionIdentifier, $infoValue)
             }
-            # Remember a CMYK-capable intent: PDF/A allows DeviceCMYK drawing only with one
-            # (Add-VellumPdfShape -FillCmyk warns when it is missing).
-            if (($PSCmdlet.ParameterSetName -eq 'Cmyk' -or $ComponentCount -eq 4) -and -not $Document.PSObject.Properties['PSVellumCmykIntent']) {
+            # Remember whether the (now final) intent is CMYK: PDF/A allows DeviceCMYK drawing only with one
+            # (Add-VellumPdfShape -FillCmyk warns when it is missing) and DeviceRGB only without one
+            # (RGB content then warns once). A later RGB profile clears the flag again.
+            $isCmykIntent = $PSCmdlet.ParameterSetName -eq 'Cmyk' -or $ComponentCount -eq 4
+            if ($isCmykIntent -and -not $Document.PSObject.Properties['PSVellumCmykIntent']) {
                 $Document.PSObject.Properties.Add([psnoteproperty]::new('PSVellumCmykIntent', $true))
             }
+            elseif (-not $isCmykIntent -and $Document.PSObject.Properties['PSVellumCmykIntent']) {
+                $Document.PSObject.Properties.Remove('PSVellumCmykIntent')
+            }
+            if ($Document.PSObject.Properties['PSVellumRgbIntentWarned']) { $Document.PSObject.Properties.Remove('PSVellumRgbIntentWarned') }
             $Document
         }
         catch {

@@ -44,8 +44,8 @@ function Set-VellumPdfBand {
         if ($FontHandle) { $styleArgs['FontHandle'] = $FontHandle }
         else { $styleArgs['Font'] = if ($Font) { $Font } else { $default.Font } }
         # The band colour is honoured by VellumPdf 2.x (1.x inherited whatever the page content left set).
-        if ($wantsColor) { $styleArgs['Color'] = ConvertTo-VellumColor $Color }
-        $style = New-VellumTextStyle @styleArgs
+        if ($wantsColor) { $styleArgs['Color'] = ConvertTo-VellumColor $Color -Document $Document -CommandName $command }
+        $style = New-VellumTextStyle @styleArgs -Document $Document -CommandName $command
     }
 
     $halign = [VellumPdf.Layout.Core.HorizontalAlignment]::$Alignment

@@ -248,7 +248,7 @@ function Set-VellumPdfSignature {
                 throw 'Set-VellumPdfSignature: -TimestampUrl and -TimestampClient cannot be combined; choose one.'
             }
             $hasTimestamp = $TimestampClient -or $PSBoundParameters.ContainsKey('TimestampUrl')
-            $levelName = if ($Level) { $Level } elseif ($hasTimestamp) { 'B-T' } else { 'B-B' }
+            $levelName = if ($Level) { $Level.ToUpperInvariant() } elseif ($hasTimestamp) { 'B-T' } else { 'B-B' }
             if ($levelName -ne 'B-B' -and -not $hasTimestamp) {
                 throw "Set-VellumPdfSignature: -Level $levelName needs a signature timestamp; add -TimestampUrl (or -TimestampClient)."
             }
@@ -263,7 +263,7 @@ function Set-VellumPdfSignature {
             if ($RevocationClient -and $PSBoundParameters.ContainsKey('RevocationTimeout')) {
                 throw 'Set-VellumPdfSignature: -RevocationTimeout configures the default client; it cannot be combined with -RevocationClient.'
             }
-            $settings.Level = [System.Enum]::Parse([VellumPdf.Signing.PadesLevel], ($levelName -replace '-', '_'))
+            $settings.Level = [System.Enum]::Parse([VellumPdf.Signing.PadesLevel], ($levelName -replace '-', '_'), $true)
             if ($PSBoundParameters.ContainsKey('EstimatedSignatureSize')) {
                 $settings.EstimatedSignatureSizeBytes = $EstimatedSignatureSize
             }

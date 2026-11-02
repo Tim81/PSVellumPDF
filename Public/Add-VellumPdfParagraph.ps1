@@ -144,6 +144,7 @@ function Add-VellumPdfParagraph {
                 # (otherwise the engine would draw it in Helvetica 12).
                 $default = Resolve-VellumPdfDefault -Document $Document
                 $filled = [System.Collections.Generic.List[VellumPdf.Layout.Elements.TextRun]]::new()
+                $needsEmbedded = (Get-VellumPdfConformanceRequirement -Document $Document).NeedsEmbeddedFonts
                 foreach ($r in $Run) {
                     $stamp = $r.PSObject.Properties['PSVellumRunBound']
                     if ($stamp -and ((-not ($stamp.Value -contains 'Font' -or $stamp.Value -contains 'FontHandle')) -or $stamp.Value -notcontains 'FontSize')) {
@@ -154,12 +155,24 @@ function Add-VellumPdfParagraph {
                         $merged.FontSize = $r.Style.FontSize
                         $merged.Leading = $r.Style.Leading
                         $merged.Color = $r.Style.Color
-                        $merged.LinkUri = $r.Style.LinkUri
+                        if ($r.Style.LinkUri) { $merged.LinkUri = $r.Style.LinkUri }   # assigning $null would store '' and write an empty link
                         if (-not ($stamp.Value -contains 'Font' -or $stamp.Value -contains 'FontHandle')) {
                             $merged.Font = [VellumPdf.Fonts.Standard14]::($default.Font)
                         }
                         if ($stamp.Value -notcontains 'FontSize') { $merged.FontSize = $default.FontSize }
                         $r = [VellumPdf.Layout.Elements.TextRun]::new($r.Text, $merged)
+                    }
+                    # A conformant document cannot use a base-14 font (a bare style draws Helvetica): swap in the
+                    # embedded Liberation substitute on a copy, so the caller's run stays reusable elsewhere.
+                    if ($needsEmbedded -and -not $r.Style.FontRef.IsEmbedded) {
+                        $handle = Get-VellumPdfEmbeddedStandard14 -Document $Document -Font ([string]$r.Style.Font) -CommandName 'Add-VellumPdfParagraph'
+                        $copy = [VellumPdf.Layout.Core.TextStyle]::new()
+                        $copy.FontRef = [VellumPdf.Layout.Core.FontReference]::new($handle)
+                        $copy.FontSize = $r.Style.FontSize
+                        $copy.Leading = $r.Style.Leading
+                        $copy.Color = $r.Style.Color
+                        if ($r.Style.LinkUri) { $copy.LinkUri = $r.Style.LinkUri }
+                        $r = [VellumPdf.Layout.Elements.TextRun]::new($r.Text, $copy)
                     }
                     $filled.Add($r)
                 }
@@ -180,7 +193,7 @@ function Add-VellumPdfParagraph {
                 Write-VellumPdfEncodingWarning -Text $Text -CommandName 'Add-VellumPdfParagraph'
             }
             $wantsColor   = $PSBoundParameters.ContainsKey('Color')
-            if ($wantsColor) { $Color = ConvertTo-VellumColor $Color }
+            if ($wantsColor) { $Color = ConvertTo-VellumColor $Color -Document $Document -CommandName 'Add-VellumPdfParagraph' }
             $wantsLink    = $PSBoundParameters.ContainsKey('LinkUri') -and ($LinkUri -ne '')
             $wantsLeading = $PSBoundParameters.ContainsKey('Leading')
             $wantsFont    = [bool]$Font -or $PSBoundParameters.ContainsKey('FontSize') -or $FontHandle
@@ -205,14 +218,14 @@ function Add-VellumPdfParagraph {
                 if ($wantsColor)   { $sp['Color']   = $Color }
                 if ($wantsLink)    { $sp['LinkUri'] = $LinkUri }
                 if ($wantsLeading) { $sp['Leading'] = $Leading }
-                $style = New-VellumTextStyle @sp
+                $style = New-VellumTextStyle @sp -Document $Document -CommandName 'Add-VellumPdfParagraph'
             } else {
                 $effFont = if ($Font) { $Font } else { $default.Font }
                 $sp = @{ Font = $effFont; FontSize = $effSize }
                 if ($wantsColor)   { $sp['Color']   = $Color }
                 if ($wantsLink)    { $sp['LinkUri'] = $LinkUri }
                 if ($wantsLeading) { $sp['Leading'] = $Leading }
-                $style = New-VellumTextStyle @sp
+                $style = New-VellumTextStyle @sp -Document $Document -CommandName 'Add-VellumPdfParagraph'
             }
 
             $paragraph = [VellumPdf.Layout.Elements.Paragraph]::new($Text, $style)

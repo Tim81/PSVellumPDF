@@ -229,6 +229,7 @@ function Add-VellumPdfImage {
             $xObject = Import-VellumPdfImage -Bytes $bytes -Format $formatKey -LoadOptions $loadOptions -Columns $Columns -Rows $Rows `
                 -CcittOptions $ccitt -CommandName 'Add-VellumPdfImage' -Source $source
 
+            Write-VellumPdfRgbIntentWarning -Document $Document -CommandName 'Add-VellumPdfImage' -Image $xObject
             $layoutImage = [VellumPdf.Layout.Elements.LayoutImage]::new($xObject)
 
             if ($PSBoundParameters.ContainsKey('Width')) {

@@ -135,23 +135,26 @@ function Add-VellumPdfList {
             # would otherwise recurse into an uncatchable StackOverflow.
             $maxDepth = 1
 
+            $depthError = {
+                "Add-VellumPdfList: nested -Item exceeds the maximum depth of $maxDepth child level " +
+                    '(VellumPdf.Layout draws one nesting level only; flatten the list or split it, ' +
+                    'and check for cyclic input).'
+            }
+
             # Gather every label (recursing into nested children) for the encoding
             # warning, which scans for characters the base-14 fonts cannot render.
             $collectAllText = {
-                param($spec)
+                param($spec, $depth = 0)
+                if ($depth -gt $maxDepth) { throw (& $depthError) }
                 if ($spec -is [System.Collections.IDictionary]) {
                     if ($spec.Contains('Text')) { [string]$spec['Text'] }
-                    if ($spec['Children']) { foreach ($c in @($spec['Children'])) { & $collectAllText $c } }
+                    if ($spec['Children']) { foreach ($c in @($spec['Children'])) { & $collectAllText $c ($depth + 1) } }
                 }
                 else { [string]$spec }
             }
             $collectText = {
                 param($spec, $depth = 0)
-                if ($depth -gt $maxDepth) {
-                    throw ("Add-VellumPdfList: nested -Item exceeds the maximum depth of $maxDepth child level " +
-                        '(VellumPdf.Layout draws one nesting level only; flatten the list or split it, ' +
-                        'and check for cyclic input).')
-                }
+                if ($depth -gt $maxDepth) { throw (& $depthError) }
                 if ($spec -is [System.Collections.IDictionary]) {
                     if (-not $spec.Contains('Text')) {
                         throw "Add-VellumPdfList: a nested-item hashtable must include a 'Text' key."
@@ -185,7 +188,7 @@ function Add-VellumPdfList {
             # document default. A $null style lets an item fall back to the engine's
             # list default.
             $default = Resolve-VellumPdfDefault -Document $Document
-            $listColor = if ($PSBoundParameters.ContainsKey('Color')) { ConvertTo-VellumColor $Color }
+            $listColor = if ($PSBoundParameters.ContainsKey('Color')) { ConvertTo-VellumColor $Color -Document $Document -CommandName 'Add-VellumPdfList' }
             $base = @{
                 Font       = if ($Font) { $Font } else { $default.Font }
                 FontSize   = if ($PSBoundParameters.ContainsKey('FontSize')) { $FontSize } else { $default.FontSize }
@@ -220,24 +223,24 @@ function Add-VellumPdfList {
                 $size = $base.FontSize
                 if ($spec -is [System.Collections.IDictionary] -and $null -ne $spec['FontSize']) {
                     $size = $spec['FontSize'] -as [double]
-                    if ($null -eq $size -or $size -lt 1 -or $size -gt 1000) {
+                    if ($null -eq $size -or -not [double]::IsFinite($size) -or $size -lt 1 -or $size -gt 1000) {
                         throw "Add-VellumPdfList: item FontSize must be between 1 and 1000; got '$($spec['FontSize'])'."
                     }
                 }
                 $args2 = @{ FontSize = $size }
                 if ($handle) { $args2['FontHandle'] = $handle } else { $args2['Font'] = $itemFont }
                 $colorValue = $base.Color
-                if ($spec -is [System.Collections.IDictionary] -and $spec['Color']) { $colorValue = ConvertTo-VellumColor $spec['Color'] }
+                if ($spec -is [System.Collections.IDictionary] -and $spec['Color']) { $colorValue = ConvertTo-VellumColor $spec['Color'] -Document $Document -CommandName 'Add-VellumPdfList' }
                 if ($colorValue) { $args2['Color'] = $colorValue }
                 $lead = $base.Leading
                 if ($spec -is [System.Collections.IDictionary] -and $null -ne $spec['Leading']) {
                     $lead = $spec['Leading'] -as [double]
-                    if ($null -eq $lead -or $lead -lt 0 -or $lead -gt 1000) {
+                    if ($null -eq $lead -or -not [double]::IsFinite($lead) -or $lead -lt 0 -or $lead -gt 1000) {
                         throw "Add-VellumPdfList: item Leading must be between 0 and 1000; got '$($spec['Leading'])'."
                     }
                 }
                 if ($null -ne $lead) { $args2['Leading'] = $lead }
-                New-VellumTextStyle @args2
+                New-VellumTextStyle @args2 -Document $Document -CommandName 'Add-VellumPdfList'
             }
 
             # Build each item (recursing into Children via ListItem.AddChild).
