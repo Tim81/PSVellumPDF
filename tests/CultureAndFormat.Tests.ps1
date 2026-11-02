@@ -86,6 +86,8 @@ BeforeDiscovery {
         @{ Text = '0.123.456'; Expected = $null }
         @{ Text = '12345678901234567890123456789012345'; Expected = $null }
     )
+    # Every case carries every key, so the name template and body also work under Set-StrictMode (build.ps1 Test).
+    foreach ($case in $script:numberCases) { foreach ($key in 'Hint', 'InputCulture') { if (-not $case.ContainsKey($key)) { $case[$key] = $null } } }
 }
 
 BeforeAll {
@@ -111,8 +113,8 @@ Describe 'ConvertFrom-VellumPdfNumberText' {
     It 'reads <Text> (hint <Hint>, input culture <InputCulture>) as <Expected>' -ForEach $script:numberCases {
         InModuleScope PSVellumPDF -Parameters @{ Case = $_ } {
             $splat = @{ Text = $Case.Text }
-            if ($Case.ContainsKey('Hint')) { $splat['Hint'] = $Case.Hint }
-            if ($Case.ContainsKey('InputCulture')) { $splat['InputCulture'] = [cultureinfo]::GetCultureInfo($Case.InputCulture) }
+            if ($null -ne $Case.Hint) { $splat['Hint'] = $Case.Hint }
+            if ($null -ne $Case.InputCulture) { $splat['InputCulture'] = [cultureinfo]::GetCultureInfo($Case.InputCulture) }
             $value = ConvertFrom-VellumPdfNumberText @splat
             if ($null -eq $Case.Expected) { $value | Should -BeNullOrEmpty }
             else {

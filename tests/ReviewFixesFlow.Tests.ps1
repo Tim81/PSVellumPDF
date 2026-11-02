@@ -88,7 +88,7 @@ Describe 'Conformant flow documents embed Liberation substitutes for base-14 fon
             Add-VellumPdfParagraph -Text 'Hello' | Add-VellumPdfHeading -Text 'Head' -Level 1 |
             Save-VellumPdfDocument -Path $path | Out-Null
         $check = Test-VellumPdfConformance -Path $path -Profile $Profile
-        $check.Errors | Should -BeNullOrEmpty
+        $check.ErrorCount | Should -Be 0
         $check.IsCompliant | Should -BeTrue
         $text = Get-PdfText $path
         $text | Should -Match '/BaseFont\s*/[A-Z]{6}\+LiberationSans-Bold'

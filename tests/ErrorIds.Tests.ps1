@@ -112,7 +112,7 @@ Describe 'Terminating errors carry a stable id, a typed exception and a category
     }
 }
 
-Describe 'Every other message-only error gets PSVellumPDF.<Cmdlet> and the category InvalidOperation' {
+Describe 'Every other message-only error gets PSVellumPDF.(cmdlet name) and the category InvalidOperation' {
     It '<Name>' -ForEach @(
         @{ Name = 'Add-VellumPdfTable'; Message = '*Add-VellumPdfTable: -Row mixes record rows*'
             Run = { New-VellumPdfDocument | Add-VellumPdfTable -Row @([pscustomobject]@{ A = 1 }, @('x')) } }
@@ -208,7 +208,7 @@ Describe 'Reader cmdlets report per-file failures as non-terminating errors with
         if ($Name -eq 'Test-VellumPdfConformance') { $arguments['Profile'] = 'PdfA2b' }
         if ($Name -eq 'Export-VellumPdfImage') { $arguments['DestinationPath'] = Join-Path $TestDrive "img-$([guid]::NewGuid().ToString('N'))" }
         if ($Name -eq 'Unprotect-VellumPdfDocument') { $arguments['DestinationPath'] = Join-Path $TestDrive "plain-$([guid]::NewGuid().ToString('N')).pdf" }
-        $errors = Get-ReaderError $Name $arguments
+        $errors = @(Get-ReaderError $Name $arguments)
         $errors.Count | Should -Be 1
         $kind = $script:ExpectedKinds[$Id]
         $errors[0].FullyQualifiedErrorId | Should -BeLike "PSVellumPDF.$Id*"
@@ -232,14 +232,14 @@ Describe 'Reader cmdlets report per-file failures as non-terminating errors with
     }
 
     It 'a wildcard that matches nothing is PSVellumPDF.FileNotFound' {
-        $errors = Get-ReaderError 'Get-VellumPdfInfo' @{ Path = (Join-Path $TestDrive 'nothing-*.pdf') }
+        $errors = @(Get-ReaderError 'Get-VellumPdfInfo' @{ Path = (Join-Path $TestDrive 'nothing-*.pdf') })
         $errors[0].FullyQualifiedErrorId | Should -BeLike 'PSVellumPDF.FileNotFound*'
         $errors[0].Exception.Message | Should -BeLike '*no file matches*'
     }
 
     It 'a wrong password is PSVellumPDF.PasswordRequired' {
         $wrong = ConvertTo-SecureString 'wrong' -AsPlainText -Force
-        $errors = Get-ReaderError 'Get-VellumPdfInfo' @{ LiteralPath = $script:locked; Password = $wrong }
+        $errors = @(Get-ReaderError 'Get-VellumPdfInfo' @{ LiteralPath = $script:locked; Password = $wrong })
         $errors[0].FullyQualifiedErrorId | Should -BeLike 'PSVellumPDF.PasswordRequired*'
         $errors[0].Exception | Should -BeOfType ([System.UnauthorizedAccessException])
     }

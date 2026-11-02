@@ -204,7 +204,7 @@ function Export-VellumPdfImage {
                                 # WriteError (not Write-Error -ErrorAction Continue) so the caller's -ErrorAction applies.
                                 $PSCmdlet.WriteError([System.Management.Automation.ErrorRecord]::new(
                                         [System.IO.IOException]::new("Export-VellumPdfImage: '$target' exists; use -Force to overwrite."),
-                                        'ImageFileExists', [System.Management.Automation.ErrorCategory]::ResourceExists, $target))
+                                        'PSVellumPDF.FileExists', [System.Management.Automation.ErrorCategory]::ResourceExists, $target))
                                 continue
                             }
                             if ($PSCmdlet.ShouldProcess($target, 'Write image')) {
