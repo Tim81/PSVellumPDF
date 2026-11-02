@@ -10,6 +10,8 @@ function Get-VellumPdfPageCanvas {
     #>
     [CmdletBinding()]
     [OutputType([VellumPdf.Canvas.PdfCanvas])]
+    [System.Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSUseSingularNouns', '',
+        Justification = 'Canvas is a singular noun (the PDF drawing surface); the rule mistakes the trailing s.')]
     param(
         [Parameter(Mandatory)] [VellumPdf.Document.PdfDocument]$Document,
         [Parameter(Mandatory)] [int]$Page,

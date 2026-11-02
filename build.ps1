@@ -113,7 +113,8 @@ function Invoke-Lint {
     }
 
     if ($findings) {
-        $findings | Format-Table Severity, RuleName, ScriptName, Line, Message -AutoSize | Out-Host
+        # One line per finding with file:line; Format-Table truncates columns on narrow CI consoles.
+        $findings | ForEach-Object { '{0} {1} {2}:{3} {4}' -f $_.Severity, $_.RuleName, $_.ScriptPath, $_.Line, $_.Message } | Sort-Object -Unique | Out-Host
         throw "PSScriptAnalyzer reported $($findings.Count) issue(s)."
     }
     Write-Host '==> Lint clean.' -ForegroundColor Green

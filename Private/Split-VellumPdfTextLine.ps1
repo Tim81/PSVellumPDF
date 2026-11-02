@@ -17,7 +17,9 @@ function Split-VellumPdfTextLine {
         [Parameter(Mandatory)] $Resolved,
         [Parameter(Mandatory)] [double]$FontSize
     )
-    $measure = { param($s) Measure-VellumPdfTextWidth -Resolved $Resolved -Text $s -FontSize $FontSize }
+    $fontResolved = $Resolved
+    $size = $FontSize
+    $measure = { param($s) Measure-VellumPdfTextWidth -Resolved $fontResolved -Text $s -FontSize $size }
     $lines = [System.Collections.Generic.List[object]]::new()
     foreach ($paragraph in ($Text -split '\r?\n')) {
         $words = @($paragraph -split '[ \t]+' | Where-Object { $_ -ne '' })

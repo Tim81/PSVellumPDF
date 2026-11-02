@@ -102,7 +102,7 @@ Describe 'Page drawing cmdlets' {
     It 'Invoke-VellumPdfCanvas draws on one shared canvas per page, in order' {
         $path = Save-Page {
             param($d)
-            $d | Invoke-VellumPdfCanvas -Page 1 -ScriptBlock { param($c, $p, $doc) $c.SetFillColorRgb(1, 0, 0).Rectangle(10, 10, 20, 20).Fill() | Out-Null } |
+            $d | Invoke-VellumPdfCanvas -Page 1 -ScriptBlock { param($c) $c.SetFillColorRgb(1, 0, 0).Rectangle(10, 10, 20, 20).Fill() | Out-Null } |
                 Add-VellumPdfShape Rectangle -X 40 -Y 10 -Width 20 -Height 20 -FillColor '#00ff00' |
                 Invoke-VellumPdfCanvas -Page 1 -ScriptBlock { param($c) $c.SetFillColorGray(0.5).Rectangle(70, 10, 20, 20).Fill() | Out-Null }
         } 'canvas'
@@ -532,6 +532,7 @@ Describe 'Text spacing and line options' {
     It 'accounts for spacing when centring' {
         $x = {
             param($extra, $name)
+            $null = $extra   # used through the splat inside the nested script block
             $p = Save-Page { param($d) $d | Add-VellumPdfText 'centre' -X 300 -Y 700 -Align Center @extra } $name
             [double][regex]::Match((Get-PdfContentText $p), '1 0 0 1 ([\d.]+) 700 Tm').Groups[1].Value
         }

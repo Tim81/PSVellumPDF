@@ -37,6 +37,8 @@ function Invoke-VellumPdfCanvas {
     #>
     [CmdletBinding()]
     [OutputType([VellumPdf.Document.PdfDocument])]
+    [System.Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSUseSingularNouns', '',
+        Justification = 'Canvas is a singular noun (the PDF drawing surface); the rule mistakes the trailing s.')]
     param(
         [Parameter(Mandatory, ValueFromPipeline)]
         [VellumPdf.Document.PdfDocument]$Document,

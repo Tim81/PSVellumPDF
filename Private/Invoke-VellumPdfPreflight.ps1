@@ -10,14 +10,16 @@ function Invoke-VellumPdfPreflight {
     #>
     [CmdletBinding()]
     [OutputType([pscustomobject])]
+    [System.Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSAvoidUsingPlainTextForPassword', 'Password',
+        Justification = 'Internal helper: the public cmdlets take SecureString and convert at the boundary; the engine API needs the plain string.')]
     param(
         [Parameter(Mandatory)] [byte[]]$Bytes,
-        [Parameter(Mandatory)] [ValidateSet('PdfA2b', 'PdfA2u', 'PdfA2a', 'PdfUA1')] [string]$Profile,
+        [Parameter(Mandatory)] [ValidateSet('PdfA2b', 'PdfA2u', 'PdfA2a', 'PdfUA1')] [string]$Level,
         [string]$Password,
         [string]$Source = '<bytes>'
     )
 
-    $engineProfile = switch ($Profile) {
+    $engineProfile = switch ($Level) {
         'PdfA2b' { [VellumPdf.Conformance.PdfConformance]::PdfA2B }
         'PdfA2u' { [VellumPdf.Conformance.PdfConformance]::PdfA2U }
         'PdfA2a' { [VellumPdf.Conformance.PdfConformance]::PdfA2A }
@@ -51,7 +53,7 @@ function Invoke-VellumPdfPreflight {
     [pscustomobject]@{
         PSTypeName   = 'PSVellumPDF.PreflightResult'
         Path         = $Source
-        Profile      = $Profile
+        Profile      = $Level
         IsCompliant  = $result.IsCompliant
         ErrorCount   = @($assertions | Where-Object Severity -EQ 'Error').Count
         WarningCount = @($assertions | Where-Object Severity -EQ 'Warning').Count

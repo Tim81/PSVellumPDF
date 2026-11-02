@@ -18,7 +18,7 @@ BeforeAll {
     $script:fontPath = Join-Path $PSScriptRoot 'assets' 'DejaVuSans.ttf'
     $script:gray16 = Join-Path $PSScriptRoot 'assets' 'gray16.png'
     $script:render = [bool]((Get-Command pdftoppm -ErrorAction SilentlyContinue) -and (Get-Command convert -ErrorAction SilentlyContinue) -and ((& convert -version 2>&1 | Out-String) -match 'ImageMagick'))   # Windows has its own unrelated convert.exe
-    function script:New-Pages([int]$Count = 2, [hashtable]$DocParams = @{ Language = 'en' }) { New-VellumPdfPageDocument @DocParams | Add-VellumPdfPage -Count $Count }
+    function script:New-PageList([int]$Count = 2, [hashtable]$DocParams = @{ Language = 'en' }) { New-VellumPdfPageDocument @DocParams | Add-VellumPdfPage -Count $Count }
 }
 
 AfterAll {
@@ -33,7 +33,7 @@ Describe 'Drawing on a page other than the first' {
         @{ Name = 'a table'; Draw = { $_ | Add-VellumPdfPageTable -X 10 -Y 150 -Width 100 -Row @(, @('cell')) -Page 2 }; Marker = '\(cell\) Tj' }
         @{ Name = 'a list'; Draw = { $_ | Add-VellumPdfPageList -X 10 -Y 150 -Width 100 -Item 'entry' -Page 2 }; Marker = '\(entry\) Tj' }
     ) {
-        $doc = New-Pages 2
+        $doc = New-PageList 2
         $null = $doc | ForEach-Object -Process $Draw
         (Get-PageContent $doc 1) | Should -Not -Match $Marker
         (Get-PageContent $doc 2) | Should -Match $Marker
@@ -43,7 +43,7 @@ Describe 'Drawing on a page other than the first' {
 
 Describe 'Roles, languages and alternate text reach the structure tree' -Skip:(-not $script:haveQpdf) {
     It 'writes -Role, -Language and -AltText on the elements' {
-        $doc = New-Pages 1 @{ Conformance = 'PdfUA1'; Language = 'en-US' }
+        $doc = New-PageList 1 @{ Conformance = 'PdfUA1'; Language = 'en-US' }
         $pdf = Join-Path $TestDrive 'tree.pdf'
         $doc | Set-VellumPdfDocumentInfo -Title 'Tree' |
             Add-VellumPdfText 'Section title' -X 72 -Y 760 -FontSize 16 -Role H1 -Language de-DE |
@@ -66,7 +66,7 @@ Describe 'Colours and stroke options are written' {
     It 'writes the text colour of a text box, and the opacity, miter limit and ICC stroke of a path' {
         $srgb = Join-Path $TestDrive 'srgb.icc'
         [System.IO.File]::WriteAllBytes($srgb, [VellumPdf.Document.IccProfiles]::Srgb)
-        $doc = New-Pages 1
+        $doc = New-PageList 1
         $null = $doc | Add-VellumPdfTextBox 'Coloured' -X 10 -Y 90 -Width 80 -Color '#336699' |
             Add-VellumPdfPath 'M 10 10 L 50 50 L 90 10' -StrokeIcc 0.1, 0.2, 0.3 -IccProfilePath $srgb -MiterLimit 4 -Opacity 0.5 -StrokeOpacity 0.25 -FillColor red
         $content = Get-PageContent $doc 1
@@ -96,7 +96,7 @@ Describe 'A clip really clips' -Skip:(-not $script:render) {
 
 Describe 'Page bands draw what they say' {
     It 'draws the band text inside an artifact, and in the embedded font that was asked for' {
-        $doc = New-Pages 1 @{ Conformance = 'PdfUA1'; Language = 'en' }
+        $doc = New-PageList 1 @{ Conformance = 'PdfUA1'; Language = 'en' }
         $font = Register-VellumPdfFont -Document $doc -Path $script:fontPath
         $null = $doc | Set-VellumPdfDocumentInfo -Title 'Band' | Add-VellumPdfText 'Body' -X 72 -Y 700 |
             Set-VellumPdfPageBand Footer 'Zażółć {page}' -FontHandle $font -FontSize 8
@@ -109,7 +109,7 @@ Describe 'Page bands draw what they say' {
 
 Describe 'Embedded fonts are the ones drawn' {
     It 'uses the registered font in the text box and not Helvetica' {
-        $doc = New-Pages 1
+        $doc = New-PageList 1
         $font = Register-VellumPdfFont -Document $doc -Path $script:fontPath
         $null = $doc | Add-VellumPdfTextBox 'Zażółć' -X 10 -Y 90 -Width 80 -FontHandle $font
         $content = Get-PageContent $doc 1

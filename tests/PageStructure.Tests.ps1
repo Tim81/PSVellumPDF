@@ -17,14 +17,14 @@ BeforeAll {
     function script:New-Tagged([string]$Conformance = 'PdfUA1') {
         New-VellumPdfPageDocument -Conformance $Conformance -Language en-US | Add-VellumPdfPage | Set-VellumPdfDocumentInfo -Title 'Structure'
     }
-    function script:Save-Valid($Doc, [string]$Name, [string]$Profile = 'PdfUA1') {
+    function script:Save-Valid($Doc, [string]$Name, [string]$Level = 'PdfUA1') {
         $p = Join-Path $TestDrive "$Name.pdf"
         $Doc | Save-VellumPdfDocument -Path $p -Validate | Out-Null
-        (Test-VellumPdfConformance -Path $p -Profile $Profile).IsCompliant | Should -BeTrue
+        (Test-VellumPdfConformance -Path $p -Profile $Level).IsCompliant | Should -BeTrue
         $p
     }
     # Flattens a tree to "Type" strings in document order.
-    function script:Get-Types($Nodes) { foreach ($n in $Nodes) { $n.Type; Get-Types $n.Children } }
+    function script:Get-TypeName($Nodes) { foreach ($n in $Nodes) { $n.Type; Get-TypeName $n.Children } }
 }
 
 AfterAll {
@@ -213,7 +213,7 @@ Describe 'Table and list inside a structure group' -Skip:(-not $script:haveQpdf)
         $tree = Get-PdfStructureTree $path
         $tree.Count | Should -Be 1
         @($tree[0].Children.Type) | Should -Be 'H1', 'Table', 'L'
-        $mcids = @(Get-Types $tree | Out-Null; function Get-Mcid($n) { foreach ($x in $n) { if ($null -ne $x.Mcid) { $x.Mcid }; Get-Mcid $x.Children } }; Get-Mcid $tree)
+        $mcids = @(Get-TypeName $tree | Out-Null; function Get-Mcid($n) { foreach ($x in $n) { if ($null -ne $x.Mcid) { $x.Mcid }; Get-Mcid $x.Children } }; Get-Mcid $tree)
         $mcids | Should -Be ($mcids | Sort-Object) -Because 'content is tagged in reading order'
         ($mcids | Select-Object -Unique).Count | Should -Be $mcids.Count
     }

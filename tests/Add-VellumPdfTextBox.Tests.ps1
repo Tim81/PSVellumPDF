@@ -10,7 +10,7 @@ BeforeAll {
     $script:fontPath = Join-Path $PSScriptRoot 'assets' 'DejaVuSans.ttf'
 
     # Page content split into the text lines the cmdlet drew: one entry per BT..ET block.
-    function script:Get-DrawnLines([string]$Path) {
+    function script:Get-DrawnLine([string]$Path) {
         $content = Get-PdfContentText $Path
         foreach ($m in [regex]::Matches($content, '(?s)BT\r?\n(.*?)ET')) {
             $parts = [regex]::Matches($m.Groups[1].Value, '1 0 0 1 (-?[\d.]+) (-?[\d.]+) Tm\r?\n\((.*?)\) Tj')
@@ -39,7 +39,7 @@ AfterAll {
 Describe 'Add-VellumPdfTextBox' {
     It 'wraps text so that no line is wider than the column and keeps every word in order' {
         $path = Save-Box { param($d) $d | Add-VellumPdfTextBox $script:lorem -X 72 -Y 700 -Width 150 }
-        $lines = @(Get-DrawnLines $path)
+        $lines = @(Get-DrawnLine $path)
         $lines.Count | Should -BeGreaterThan 3
         ($lines.Text -join ' ') | Should -Be $script:lorem
         $probe = New-VellumPdfPageDocument
@@ -55,7 +55,7 @@ Describe 'Add-VellumPdfTextBox' {
 
     It 'honours -Leading, paragraph breaks and blank lines' {
         $path = Save-Box { param($d) $d | Add-VellumPdfTextBox "one`ntwo`n`nfour" -X 10 -Y 500 -Width 300 -Leading 20 }
-        $lines = @(Get-DrawnLines $path)
+        $lines = @(Get-DrawnLine $path)
         $lines.Text | Should -Be 'one', 'two', 'four'
         $lines.Y | Should -Be 488, 468, 428    # the empty third line still takes its space
     }
@@ -80,15 +80,15 @@ Describe 'Add-VellumPdfTextBox' {
         $probe = New-VellumPdfPageDocument
         try {
             $helv = $probe.UseFont([VellumPdf.Fonts.Standard14]::Helvetica)
-            [Math]::Round((Get-DrawnLines $pathR).X, 2) | Should -Be ([Math]::Round(300 - $helv.MeasureString('right', 12), 2))
-            [Math]::Round((Get-DrawnLines $pathC).X, 2) | Should -Be ([Math]::Round(200 - $helv.MeasureString('mid', 12) / 2, 2))
+            [Math]::Round((Get-DrawnLine $pathR).X, 2) | Should -Be ([Math]::Round(300 - $helv.MeasureString('right', 12), 2))
+            [Math]::Round((Get-DrawnLine $pathC).X, 2) | Should -Be ([Math]::Round(200 - $helv.MeasureString('mid', 12) / 2, 2))
         }
         finally { $probe.Dispose() }
     }
 
     It 'justifies every line but the last of a paragraph to the full column width' {
         $path = Save-Box { param($d) $d | Add-VellumPdfTextBox $script:lorem -X 72 -Y 700 -Width 150 -Align Justify }
-        $lines = @(Get-DrawnLines $path)
+        $lines = @(Get-DrawnLine $path)
         $probe = New-VellumPdfPageDocument
         try {
             $helv = $probe.UseFont([VellumPdf.Fonts.Standard14]::Helvetica)
@@ -128,7 +128,7 @@ Describe 'Add-VellumPdfTextBox' {
 
     It 'splits a word that is wider than the column' {
         $path = Save-Box { param($d) $d | Add-VellumPdfTextBox ('W' * 40) -X 10 -Y 300 -Width 100 }
-        $lines = @(Get-DrawnLines $path)
+        $lines = @(Get-DrawnLine $path)
         $lines.Count | Should -BeGreaterThan 3
         ($lines.Text -join '') | Should -Be ('W' * 40)
     }

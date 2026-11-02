@@ -107,7 +107,7 @@ function Set-VellumPdfOutputIntent {
                     throw "Set-VellumPdfOutputIntent: ICC profile not found: '$resolved'."
                 }
                 $bytes = [System.IO.File]::ReadAllBytes($resolved)
-                $profileCount = Get-VellumPdfIccComponentCount -Profile $bytes -CommandName 'Set-VellumPdfOutputIntent'
+                $profileCount = Get-VellumPdfIccComponentCount -Bytes $bytes -CommandName 'Set-VellumPdfOutputIntent'
                 if ($PSBoundParameters.ContainsKey('ComponentCount') -and $ComponentCount -ne $profileCount) {
                     throw ("Set-VellumPdfOutputIntent: -ComponentCount $ComponentCount does not match the profile, which has " +
                         "$profileCount colour component(s). Omit -ComponentCount to use the profile's own.")

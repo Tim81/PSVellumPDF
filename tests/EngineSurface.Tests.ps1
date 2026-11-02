@@ -41,13 +41,13 @@ AfterAll {
 
 Describe 'Engine surface used by the module' {
     It 'type [<Name>] exists' -ForEach $typeCases {
-        $resolved = ("[$Name]" | Invoke-Expression -ErrorAction SilentlyContinue 2>$null)
+        $resolved = $Name -as [type]
         $resolved | Should -Not -BeNullOrEmpty -Because "the module refers to [$Name]"
     }
 
     It 'static member <Spec> exists' -ForEach $memberCases {
         $typeName, $memberName = $Spec -split '::'
-        $type = ("[$typeName]" | Invoke-Expression)
+        $type = $typeName -as [type]
         $found = if ($memberName -eq 'new') { @($type.GetConstructors()).Count }
         else { @($type.GetMember($memberName, [System.Reflection.BindingFlags]'Public,Static,FlattenHierarchy')).Count }
         $found | Should -BeGreaterThan 0 -Because "[$typeName]::$memberName is used by the module"

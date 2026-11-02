@@ -18,7 +18,7 @@ function Register-VellumPdfIccSpace {
     $iccPath = $ExecutionContext.SessionState.Path.GetUnresolvedProviderPathFromPSPath($IccProfilePath)
     if (-not [System.IO.File]::Exists($iccPath)) { throw "${CommandName}: ICC profile not found: '$iccPath'." }
     $iccBytes = [System.IO.File]::ReadAllBytes($iccPath)
-    $count = Get-VellumPdfIccComponentCount -Profile $iccBytes -CommandName $CommandName
+    $count = Get-VellumPdfIccComponentCount -Bytes $iccBytes -CommandName $CommandName
     $cacheProp = $Document.PSObject.Properties['PSVellumIccSpaces']
     if (-not $cacheProp) {
         $Document.PSObject.Properties.Add([psnoteproperty]::new('PSVellumIccSpaces', @{}))

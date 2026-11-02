@@ -263,7 +263,7 @@ function Set-VellumPdfSignature {
             if ($RevocationClient -and $PSBoundParameters.ContainsKey('RevocationTimeout')) {
                 throw 'Set-VellumPdfSignature: -RevocationTimeout configures the default client; it cannot be combined with -RevocationClient.'
             }
-            $settings.Level = [VellumPdf.Signing.PadesLevel]::($levelName -replace '-', '_')
+            $settings.Level = [System.Enum]::Parse([VellumPdf.Signing.PadesLevel], ($levelName -replace '-', '_'))
             if ($PSBoundParameters.ContainsKey('EstimatedSignatureSize')) {
                 $settings.EstimatedSignatureSizeBytes = $EstimatedSignatureSize
             }

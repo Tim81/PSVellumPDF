@@ -76,6 +76,8 @@ function Save-VellumPdfDocument {
     [CmdletBinding(SupportsShouldProcess, DefaultParameterSetName = 'Path')]
     [OutputType([System.IO.FileInfo], ParameterSetName = 'Path')]
     [OutputType([byte[]], ParameterSetName = 'Bytes')]
+    [System.Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSReviewUnusedParameter', 'AsByteArray',
+        Justification = 'Parameter-set selector: its presence picks the Bytes set; the value is never read.')]
     [OutputType([VellumPdf.Layout.Document], [VellumPdf.Document.PdfDocument])]
     param(
         [Parameter(Mandatory, ValueFromPipeline)]
@@ -235,7 +237,7 @@ function Save-VellumPdfDocument {
                     $validateBytes = {
                         param([byte[]]$Data)
                         if (-not $validateProfile) { return }
-                        $check = Invoke-VellumPdfPreflight -Bytes $Data -Profile $validateProfile -Source $resolved
+                        $check = Invoke-VellumPdfPreflight -Bytes $Data -Level $validateProfile -Source $resolved
                         if (-not $check.IsCompliant) {
                             $Document.PSObject.Properties.Add([psnoteproperty]::new('PSVellumFailed', $true))
                             $top = @($check.Assertions | Where-Object Severity -EQ 'Error' | Select-Object -First 5 |

@@ -26,6 +26,8 @@ function Get-VellumPdfConformanceCoverage {
     [CmdletBinding()]
     [OutputType('PSVellumPDF.ConformanceCheck')]
     [OutputType('PSVellumPDF.ConformanceCoverage')]
+    [System.Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSAvoidAssignmentToAutomaticVariable', '',
+        Justification = '-Profile names the PDF conformance profile (documented API); inside this function it only shadows the host-profile variable.')]
     param(
         [ValidateSet('PdfA2b', 'PdfA2u', 'PdfA2a', 'PdfUA1')]
         [string[]]$Profile,

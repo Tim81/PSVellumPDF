@@ -10,6 +10,8 @@ function ConvertTo-VellumInsets {
     #>
     [CmdletBinding()]
     [OutputType([VellumPdf.Layout.Core.EdgeInsets])]
+    [System.Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSUseSingularNouns', '',
+        Justification = 'Insets is the engine term (EdgeInsets): one value holding four edges, not a collection.')]
     param(
         [Parameter(Mandatory)]
         [AllowNull()]

@@ -19,8 +19,8 @@ BeforeAll {
     $script:fontPath = Join-Path $script:assets 'DejaVuSans.ttf'
     $script:lone = [string][char]0xD800
     function script:New-Tagged { New-VellumPdfPageDocument -Conformance PdfUA1 -Language en-US | Add-VellumPdfPage | Set-VellumPdfDocumentInfo -Title 'Second pass' }
-    function script:Get-Mcids([string]$Content) { @([regex]::Matches($Content, '/MCID (\d+)') | ForEach-Object { [int]$_.Groups[1].Value }) }
-    function script:Get-TreeMcids($Nodes) { foreach ($n in $Nodes) { if ($null -ne $n.Mcid) { $n.Mcid }; Get-TreeMcids $n.Children } }
+    function script:Get-Mcid([string]$Content) { @([regex]::Matches($Content, '/MCID (\d+)') | ForEach-Object { [int]$_.Groups[1].Value }) }
+    function script:Get-TreeMcid($Nodes) { foreach ($n in $Nodes) { if ($null -ne $n.Mcid) { $n.Mcid }; Get-TreeMcid $n.Children } }
 }
 
 AfterAll {
@@ -35,7 +35,7 @@ Describe 'A failure after some content was tagged keeps the structure tree consi
         $doc | Add-VellumPdfText 'after' -X 72 -Y 600 | Save-VellumPdfDocument -Path $pdf -Validate | Out-Null
         $tree = Get-PdfStructureTree $pdf
         @($tree.Type) | Should -Be 'Art', 'P'
-        @(Get-TreeMcids $tree | Sort-Object) | Should -Be @(Get-Mcids (Get-PdfContentText $pdf) | Sort-Object) -Because 'every MCID in the page is owned by a structure element'
+        @(Get-TreeMcid $tree | Sort-Object) | Should -Be @(Get-Mcid (Get-PdfContentText $pdf) | Sort-Object) -Because 'every MCID in the page is owned by a structure element'
     }
 
     It 'refuses a bad cell colour before anything is drawn' {
@@ -56,7 +56,7 @@ Describe 'Text the engine cannot handle is refused before any text object starts
         @{ Name = 'Add-VellumPdfPageTable'; Run = { param($d) $d | Add-VellumPdfPageTable -X 1 -Y 100 -Width 50 -Row @(, @("a$($script:lone)")) } }
         @{ Name = 'Add-VellumPdfPageList'; Run = { param($d) $d | Add-VellumPdfPageList -X 1 -Y 100 -Width 100 -Item "a$($script:lone)" } }
         @{ Name = 'Set-VellumPdfPageBand'; Run = { param($d) $d | Set-VellumPdfPageBand Footer "a$($script:lone)" } }
-        @{ Name = 'Measure-VellumPdfText'; Run = { param($d) Measure-VellumPdfText "a$($script:lone)" } }
+        @{ Name = 'Measure-VellumPdfText'; Run = { Measure-VellumPdfText "a$($script:lone)" } }
     ) {
         $doc = New-VellumPdfPageDocument -Conformance PdfA2b -Language en | Add-VellumPdfPage
         { & $Run $doc } | Should -Throw "*$Name*unpaired UTF-16 surrogate*"

@@ -45,6 +45,8 @@ function Test-VellumPdfConformance {
     [CmdletBinding(DefaultParameterSetName = 'Path')]
     [OutputType('PSVellumPDF.PreflightResult')]
     [OutputType([bool])]
+    [System.Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSAvoidAssignmentToAutomaticVariable', '',
+        Justification = '-Profile names the PDF conformance profile (documented API); inside this function it only shadows the host-profile variable.')]
     param(
         [Parameter(Mandatory, Position = 0, ValueFromPipeline, ParameterSetName = 'Path')]
         [string[]]$Path,
@@ -109,7 +111,7 @@ function Test-VellumPdfConformance {
                 }
 
                 foreach ($p in $profiles) {
-                    $result = Invoke-VellumPdfPreflight -Bytes $data -Profile $p -Password $plain -Source $name
+                    $result = Invoke-VellumPdfPreflight -Bytes $data -Level $p -Password $plain -Source $name
                     if (-not $result.IsCompliant) { $allOk = $false }
                     if (-not $Quiet) { $result }
                 }

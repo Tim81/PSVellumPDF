@@ -34,7 +34,7 @@ BeforeAll {
         [double]$m.Groups[1].Value
     }
 
-    function Save-TwoBlocks {
+    function Save-TwoBlock {
         param([scriptblock]$First, [string]$Name)
         $path = Join-Path $TestDrive "$Name.pdf"
         $doc = New-VellumPdfDocument
@@ -50,24 +50,24 @@ AfterAll {
 
 Describe '-MarginBottom adds space before the next element' {
     It 'paragraph: 40pt of bottom margin moves the next paragraph down 40pt' {
-        $base = Save-TwoBlocks -Name p0 -First { param($d) $d | Add-VellumPdfParagraph -Text 'First' -MarginBottom 0 }
-        $spaced = Save-TwoBlocks -Name p40 -First { param($d) $d | Add-VellumPdfParagraph -Text 'First' -MarginBottom 40 }
+        $base = Save-TwoBlock -Name p0 -First { param($d) $d | Add-VellumPdfParagraph -Text 'First' -MarginBottom 0 }
+        $spaced = Save-TwoBlock -Name p40 -First { param($d) $d | Add-VellumPdfParagraph -Text 'First' -MarginBottom 40 }
         (Get-TextY $base 'Second') - (Get-TextY $spaced 'Second') | Should -BeExactly 40
     }
 
     It 'heading: bottom margin is honoured by the following element' {
-        $base = Save-TwoBlocks -Name h0 -First { param($d) $d | Add-VellumPdfHeading -Text 'First' -MarginBottom 0 }
-        $spaced = Save-TwoBlocks -Name h25 -First { param($d) $d | Add-VellumPdfHeading -Text 'First' -MarginBottom 25 }
+        $base = Save-TwoBlock -Name h0 -First { param($d) $d | Add-VellumPdfHeading -Text 'First' -MarginBottom 0 }
+        $spaced = Save-TwoBlock -Name h25 -First { param($d) $d | Add-VellumPdfHeading -Text 'First' -MarginBottom 25 }
         (Get-TextY $base 'Second') - (Get-TextY $spaced 'Second') | Should -BeExactly 25
     }
 
     It 'list and table: bottom margin is honoured by the following element' {
-        $base = Save-TwoBlocks -Name l0 -First { param($d) $d | Add-VellumPdfList -Item 'x' -MarginBottom 0 }
-        $spaced = Save-TwoBlocks -Name l30 -First { param($d) $d | Add-VellumPdfList -Item 'x' -MarginBottom 30 }
+        $base = Save-TwoBlock -Name l0 -First { param($d) $d | Add-VellumPdfList -Item 'x' -MarginBottom 0 }
+        $spaced = Save-TwoBlock -Name l30 -First { param($d) $d | Add-VellumPdfList -Item 'x' -MarginBottom 30 }
         (Get-TextY $base 'Second') - (Get-TextY $spaced 'Second') | Should -BeExactly 30
 
-        $baseT = Save-TwoBlocks -Name t0 -First { param($d) $d | Add-VellumPdfTable -Row @(, @('c')) -MarginBottom 0 }
-        $spacedT = Save-TwoBlocks -Name t20 -First { param($d) $d | Add-VellumPdfTable -Row @(, @('c')) -MarginBottom 20 }
+        $baseT = Save-TwoBlock -Name t0 -First { param($d) $d | Add-VellumPdfTable -Row @(, @('c')) -MarginBottom 0 }
+        $spacedT = Save-TwoBlock -Name t20 -First { param($d) $d | Add-VellumPdfTable -Row @(, @('c')) -MarginBottom 20 }
         (Get-TextY $baseT 'Second') - (Get-TextY $spacedT 'Second') | Should -BeExactly 20
     }
 

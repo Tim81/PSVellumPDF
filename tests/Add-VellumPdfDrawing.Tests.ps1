@@ -80,7 +80,7 @@ Describe 'Add-VellumPdfDrawing' {
         $doc = New-VellumPdfDocument
         try {
             $doc | Add-VellumPdfParagraph -Text 'x' -MarginBottom 25 | Out-Null
-            $doc | Add-VellumPdfDrawing -Height 10 -MarginTop 5 -MarginBottom 7 -ScriptBlock { param($canvas, $box) $script:boxY = $box.Y } | Out-Null
+            $doc | Add-VellumPdfDrawing -Height 10 -MarginTop 5 -MarginBottom 7 -ScriptBlock { param($canvas, $box) $null = $canvas; $script:boxY = $box.Y } | Out-Null
             $doc.PSVellumPendingSpace | Should -Be 0
             $doc.PSVellumHasDrawing | Should -BeTrue
         }

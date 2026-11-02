@@ -11,6 +11,8 @@ function Open-VellumPdfReader {
     #>
     [CmdletBinding()]
     [OutputType([VellumPdf.Reader.PdfDocumentReader])]
+    [System.Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSAvoidUsingPlainTextForPassword', 'Password',
+        Justification = 'Internal helper: the public cmdlets take SecureString and convert at the boundary; the engine API needs the plain string.')]
     param(
         [Parameter(Mandatory)] [byte[]]$Bytes,
         [string]$Password,
