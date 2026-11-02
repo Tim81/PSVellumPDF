@@ -12,6 +12,28 @@ function Add-VellumPdfList {
         -MarginTop and -MarginBottom apply spacing above and below the list
         without affecting the left/right margins already set on the element.
 
+        Items become text with a culture and an optional format. A string item is drawn as given unless it
+        consists only of a number; any other value (a number, a date, ...) is converted with -Culture (the
+        document's -Culture, invariant unless set) and -Format (a .NET format string such as 'N2' or
+        'yyyy-MM-dd'); an item hashtable may carry its own Format key, and Parse = $false to draw its string
+        as given.
+
+        Numbers in strings are always recognised (switch it off with -NoNumberParsing): a string item that is
+        only a number is read as [decimal], keeping its decimals, and then drawn like any other number, so
+        with the invariant default '1.444,50' becomes 1444.50, '1,976.08' becomes 1976.08 and '55433.34'
+        stays 55433.34. The separators are detected from the text:
+          1. With both '.' and ',' the LAST one is the decimal mark (1.444,50 and 1,976.08).
+          2. A separator that appears more than once is grouping (1.234.567).
+          3. A separator that appears once is a decimal mark (55433.34, 66443,85), except that exactly three
+             digits after it with at most three digits before it is ambiguous (1,234 and 1.234; with more
+             than three digits before it, as in 12345,678, it is a decimal mark).
+          4. Grouping must be regular: 1-3 digits, then groups of exactly 3 (1.2.3 and 10.0.0.1 stay text).
+          5. Not a number, so left as is: a leading zero in a multi-digit integer part (007, 01234), spaces,
+             currency symbols, '%', exponents, an empty string.
+          6. An ambiguous number takes the convention of the other items of the same call; without such
+             evidence it is left unchanged and ONE warning per call names the values.
+        -InputCulture switches detection off: every string is read strictly with that culture's separators.
+
         The document flows through the pipeline for chaining with other
         Add-VellumPdf* functions.
     .PARAMETER Document
@@ -53,6 +75,22 @@ function Add-VellumPdfList {
     .PARAMETER FontSize
         Font size in points for list items, between 1 and 1000. When omitted
         the document default size is used.
+    .PARAMETER Format
+        A .NET format string for items that are not text ('N2', 'yyyy-MM-dd'), applied with -Culture; also to
+        numbers read from strings. An item's own Format key wins. A format the value's type rejects is an
+        error naming the item.
+    .PARAMETER Culture
+        The culture used to turn numbers and dates into text: a name ('de-DE') or a [cultureinfo]
+        (-Culture (Get-Culture) matches the console). Default: the document's -Culture, which is the
+        invariant culture unless New-VellumPdfDocument/New-VellumPdfPageDocument set one. An unknown name is
+        an error.
+    .PARAMETER InputCulture
+        Read number strings strictly with this culture (name or [cultureinfo]) instead of detecting the
+        separators. Default: the document's -InputCulture, else detection. Pass $null to switch the
+        document's -InputCulture off for this call.
+    .PARAMETER NoNumberParsing
+        Draw every string exactly as given instead of reading numbers from it. A single item can do the same
+        with the key Parse = $false.
     .PARAMETER MarginTop
         Extra spacing in points above the list element. Does not affect the
         left/right page margins.
@@ -72,6 +110,11 @@ function Add-VellumPdfList {
             'Fruit',
             @{ Text = 'Vegetables'; Children = @('Carrot', 'Potato') }
         )
+    .EXAMPLE
+        # Numbers and dates with a culture and a format
+        New-VellumPdfDocument |
+            Add-VellumPdfList -Item 1234.5, '1.444,5', 99 -Format 'N2' -Culture de-DE |
+            Save-VellumPdfDocument -Path ./amounts.pdf
     .OUTPUTS
         VellumPdf.Layout.Document (the same instance, for chaining)
     #>
@@ -114,6 +157,23 @@ function Add-VellumPdfList {
         [ValidateNotNullOrEmpty()]
         [string]$Language,
 
+        # .NET format string for items that are not text ('N2', 'yyyy-MM-dd'); an item hashtable may carry its own Format key.
+        [AllowNull()]
+        [AllowEmptyString()]
+        [string]$Format,
+
+        # Culture used to turn dates and numbers into text; a name or a [cultureinfo].
+        # Default: the document's -Culture (invariant unless set).
+        [object]$Culture,
+
+        # Culture used to read numbers given as strings (strict, no detection); $null switches the
+        # document's -InputCulture off for this call. Default: the document's -InputCulture, else detection.
+        [AllowNull()]
+        [object]$InputCulture,
+
+        # Draw strings exactly as given instead of reading numbers from them.
+        [switch]$NoNumberParsing,
+
         [ValidateRange(0.0, 10000.0)]
         [double]$MarginTop,
 
@@ -125,6 +185,8 @@ function Add-VellumPdfList {
         try {
             Assert-VellumPdfDocumentOpen -Document $Document -CommandName 'Add-VellumPdfList'
             Assert-VellumPdfLanguageTag -Value $Language -CommandName 'Add-VellumPdfList'
+            $cultures = Resolve-VellumPdfCulture -Document $Document -Culture $Culture -CultureBound:$PSBoundParameters.ContainsKey('Culture') `
+                -InputCulture $InputCulture -InputCultureBound:$PSBoundParameters.ContainsKey('InputCulture') -CommandName 'Add-VellumPdfList'
             if ($FontHandle) {
                 Assert-VellumPdfFontHandle -FontHandle $FontHandle -Document $Document -CommandName 'Add-VellumPdfList'
             }
@@ -140,6 +202,44 @@ function Add-VellumPdfList {
                     '(VellumPdf.Layout draws one nesting level only; flatten the list or split it, ' +
                     'and check for cyclic input).'
             }
+
+            # Values become text: number detection, -Format / an item's Format key, and the culture. Every item and child
+            # of the call is evidence for the others about the decimal mark. The tree is rebuilt (hashtables copied, the
+            # caller's input is not changed) with the converted text.
+            $slotList = [System.Collections.Generic.List[object]]::new()
+            $prepare = {
+                param($spec, $depth, $label)
+                if ($depth -gt $maxDepth) { throw (& $depthError) }
+                $isMap = $spec -is [System.Collections.IDictionary]
+                if ($isMap -and -not $spec.Contains('Text')) {
+                    throw "Add-VellumPdfList: a nested-item hashtable must include a 'Text' key."
+                }
+                $itemFormat = if ($isMap -and $null -ne $spec['Format']) { [string]$spec['Format'] } else { $Format }
+                $itemParse = -not ($isMap -and $null -ne $spec['Parse'] -and -not [bool]$spec['Parse'])
+                $slot = New-VellumPdfTextSlot -Value $(if ($isMap) { $spec['Text'] } else { $spec }) -Format $itemFormat -Parse $itemParse -Group 0 -What $label
+                $slotList.Add($slot)
+                $childNodes = [System.Collections.Generic.List[object]]::new()
+                if ($isMap -and $spec['Children']) {
+                    $k = 0
+                    foreach ($child in @($spec['Children'])) { $k++; $childNodes.Add((& $prepare $child ($depth + 1) "child $k of $label")) }
+                }
+                [pscustomobject]@{ Spec = $spec; Slot = $slot; Children = $childNodes }
+            }
+            $nodes = [System.Collections.Generic.List[object]]::new()
+            $n = 0
+            foreach ($spec in $Item) { $n++; $nodes.Add((& $prepare $spec 0 "item $n")) }
+            Convert-VellumPdfSlotText -Slot $slotList.ToArray() -Culture $cultures.Culture -InputCulture $cultures.InputCulture `
+                -NoNumberParsing:$NoNumberParsing -CommandName 'Add-VellumPdfList'
+            $rebuild = {
+                param($node)
+                if ($node.Spec -isnot [System.Collections.IDictionary]) { return $node.Slot.Text }
+                $copy = @{}
+                foreach ($key in $node.Spec.Keys) { $copy[$key] = $node.Spec[$key] }
+                $copy['Text'] = $node.Slot.Text
+                if ($node.Children.Count -gt 0) { $copy['Children'] = @(foreach ($childNode in $node.Children) { & $rebuild $childNode }) }
+                $copy
+            }
+            $convertedItem = @(foreach ($node in $nodes) { & $rebuild $node })
 
             # Gather every label (recursing into nested children) for the encoding
             # warning, which scans for characters the base-14 fonts cannot render.
@@ -167,10 +267,10 @@ function Add-VellumPdfList {
                 }
             }
             if ($FontHandle) {
-                $itemTexts = @(foreach ($spec in $Item) { & $collectAllText $spec })
+                $itemTexts = @(foreach ($spec in $convertedItem) { & $collectAllText $spec })
                 Write-VellumPdfMissingGlyphWarning -Handle $FontHandle -Text $itemTexts -CommandName 'Add-VellumPdfList'
             }
-            Write-VellumPdfEncodingWarning -Text @(foreach ($spec in $Item) { & $collectText $spec }) `
+            Write-VellumPdfEncodingWarning -Text @(foreach ($spec in $convertedItem) { & $collectText $spec }) `
                 -CommandName 'Add-VellumPdfList'
             $listStyle = [VellumPdf.Layout.Elements.ListStyle]::$Style
 
@@ -258,7 +358,7 @@ function Add-VellumPdfList {
                 }
                 $li
             }
-            foreach ($spec in $Item) {
+            foreach ($spec in $convertedItem) {
                 [void]$list.Add((& $buildItem $spec))
             }
 

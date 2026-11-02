@@ -13,12 +13,40 @@ function Add-VellumPdfPageTable {
         its columns; it is drawn as the extension of those cells and keeps an empty TR element (PDF/UA counts rows by TR). -Row may be an
         empty array when -Header is given (a header-only table); a table with neither is an error.
         A cell is text, or a hashtable with Text and optionally ColSpan,
-        RowSpan, Alignment (Left, Center, Right, Justify), Background (colour) and Color (text colour):
+        RowSpan, Alignment (Left, Center, Right, Justify), Background (colour), Color (text colour),
+        Format (a .NET format string) and Parse ($false draws a string as given):
 
             -Row @(
                 @('Widget', '2', '10.00'),
                 @(@{ Text = 'Shipping'; ColSpan = 2 }, '5.00')
             )
+
+        Values become text with a culture and an optional format. A string cell is drawn as given unless it
+        consists only of a number; any other value (a number, a date, ...) is converted with -Culture (the
+        document's -Culture, invariant unless set) and the column's -ColumnFormat or the cell's own Format
+        key (a .NET format string such as 'N2' or 'yyyy-MM-dd'). A cell hashtable may carry a Format key, which
+        wins over -ColumnFormat, and Parse = $false to draw its string exactly as given.
+
+        Numbers in strings are always recognised (switch it off with -NoNumberParsing): a string cell (never
+        a header cell) that is only a number is read as [decimal], keeping its decimals, and then drawn like
+        any other number, so with the invariant default
+        '1.444,50' becomes 1444.50, '1,976.08' becomes 1976.08 and '55433.34' stays 55433.34. The
+        separators are detected from the text:
+          1. With both '.' and ',' the LAST one is the decimal mark (1.444,50 and 1,976.08).
+          2. A separator that appears more than once is grouping (1.234.567).
+          3. A separator that appears once is a decimal mark (55433.34, 66443,85, 777544434,7755), except
+             that exactly three digits after it with at most three digits before it is ambiguous (1,234
+             and 1.234: with more than three digits before it, as in 12345,678, it is a decimal mark).
+          4. Grouping must be regular: 1-3 digits, then groups of exactly 3 (1.2.3 and the IP-like 10.0.0.1
+             stay text).
+          5. Not a number, so left as is: a leading zero in a multi-digit integer part (007, 01234),
+             spaces, currency symbols, '%', exponents, an empty string.
+          6. An ambiguous number takes the convention of the other values in the same column
+             ('1.444,50' above shows that '.' groups); without such evidence it is left unchanged and
+             ONE warning per call names the values.
+        -InputCulture switches detection off: every string is read strictly with that culture's separators
+        (de-DE: '1.234' is 1234 and '55433.34' is text). -NoNumberParsing draws every string as given
+        (codes, ids, phone numbers).
 
         A single row is written @(,@('a','b')). -Header takes one row of cells (-Header 'Item','Qty')
         or several (an array of arrays).
@@ -49,6 +77,23 @@ function Add-VellumPdfPageTable {
         One width per grid column, in points. Give this or -Width.
     .PARAMETER ColumnAlignment
         Left, Center, Right or Justify per grid column. A cell's own Alignment wins.
+    .PARAMETER ColumnFormat
+        A .NET format string per column, parallel to -ColumnAlignment (by grid column index, a $null or ''
+        entry leaves a column on the type's default): -ColumnFormat '', 'N2', 'yyyy-MM-dd'. Applied to numbers
+        and dates (and to numbers read from strings) with -Culture; text is never changed. A cell's own
+        Format key wins. A format the value's type rejects is an error naming the column.
+    .PARAMETER Culture
+        The culture used to turn numbers and dates into text: a name ('de-DE') or a [cultureinfo]
+        (-Culture (Get-Culture) matches the console). Default: the document's -Culture, which is the
+        invariant culture unless New-VellumPdfDocument/New-VellumPdfPageDocument set one, so the output is
+        the same on every machine. An unknown name is an error.
+    .PARAMETER InputCulture
+        Read number strings strictly with this culture (name or [cultureinfo]) instead of detecting the
+        separators. Default: the document's -InputCulture, else detection. Pass $null to switch the
+        document's -InputCulture off for this call.
+    .PARAMETER NoNumberParsing
+        Draw every string exactly as given instead of reading numbers from it. A single cell can do the same
+        with the rich-cell key Parse = $false.
     .PARAMETER FontSize
         Size in points (default 10).
     .PARAMETER Font
@@ -84,6 +129,11 @@ function Add-VellumPdfPageTable {
                 @('Widget', '2', '10.00'),
                 @('Gadget', '1', '24.50'),
                 @(@{ Text = 'Total'; ColSpan = 2 }, '44.50'))
+    .EXAMPLE
+        # Numbers in strings are read; the document culture and the column formats decide how they look
+        $page = New-VellumPdfPageDocument -Culture de-DE | Add-VellumPdfPage
+        $page | Add-VellumPdfPageTable -X 72 -Y 700 -Width 300 -Header 'Item', 'Amount' -ColumnFormat '', 'N2' `
+            -ColumnAlignment Left, Right -Row @(@('Widget', '1.444,5'), @('Gadget', 55433.34))
     .OUTPUTS
         VellumPdf.Document.PdfDocument (the same instance, for chaining), or with -PassThru a summary object.
     #>
@@ -116,6 +166,24 @@ function Add-VellumPdfPageTable {
 
         [ValidateSet('Left', 'Center', 'Right', 'Justify')]
         [string[]]$ColumnAlignment,
+
+        # Per-column .NET format string for values that are not text ('N2', 'yyyy-MM-dd'), by grid column,
+        # parallel to -ColumnAlignment; $null or '' leaves a column on the type's default.
+        [AllowNull()]
+        [AllowEmptyString()]
+        [string[]]$ColumnFormat,
+
+        # Culture used to turn dates and numbers into text; a name or a [cultureinfo].
+        # Default: the document's -Culture (invariant unless set).
+        [object]$Culture,
+
+        # Culture used to read numbers given as strings (strict, no detection); $null switches the
+        # document's -InputCulture off for this call. Default: the document's -InputCulture, else detection.
+        [AllowNull()]
+        [object]$InputCulture,
+
+        # Draw strings exactly as given instead of reading numbers from them.
+        [switch]$NoNumberParsing,
 
         [ValidateRange(1.0, 1000.0)]
         [double]$FontSize = 10,
@@ -161,6 +229,8 @@ function Add-VellumPdfPageTable {
             $Page = Resolve-VellumPdfPageNumber -Document $Document -Page $(if ($PSBoundParameters.ContainsKey('Page')) { $PSBoundParameters['Page'] } else { 1 }) -Bound $PSBoundParameters.ContainsKey('Page') -CommandName 'Add-VellumPdfPageTable'
             [void](Get-VellumPdfPage -Document $Document -Page $Page -CommandName 'Add-VellumPdfPageTable')
             Assert-VellumPdfLanguageTag -Value $Language -CommandName 'Add-VellumPdfPageTable'
+            $cultures = Resolve-VellumPdfCulture -Document $Document -Culture $Culture -CultureBound:$PSBoundParameters.ContainsKey('Culture') `
+                -InputCulture $InputCulture -InputCultureBound:$PSBoundParameters.ContainsKey('InputCulture') -CommandName 'Add-VellumPdfPageTable'
             if (-not $FontHandle) {
                 Assert-VellumPdfMeasurableFont -Font $Font -CommandName 'Add-VellumPdfPageTable' -Reason 'it wraps cell text'
                 if ($HeaderFont) { Assert-VellumPdfMeasurableFont -Font $HeaderFont -CommandName 'Add-VellumPdfPageTable' -Reason 'it wraps cell text' }
@@ -188,8 +258,10 @@ function Add-VellumPdfPageTable {
                         'Rows are arrays of cells; a single row is written -Row @(,@(''a'', ''b'')) and records are not supported (use Add-VellumPdfTable for objects).')
                 }
                 if ($isMap -and -not $spec.Contains('Text')) { throw 'Add-VellumPdfPageTable: a cell hashtable needs a Text key (rows are arrays of cells, not records).' }
-                $text = if ($isMap) { [string](Get-VellumPdfPropertyValue -InputObject $spec -Name 'Text') } else { [string]$spec }
-                Assert-VellumPdfValidText -Text $text -CommandName 'Add-VellumPdfPageTable'
+                # The raw value: it becomes text (number detection, format, culture) once the grid is placed.
+                $value = if ($isMap) { Get-VellumPdfPropertyValue -InputObject $spec -Name 'Text' } else { $spec }
+                $cellFormatKey = if ($isMap) { Get-VellumPdfPropertyValue -InputObject $spec -Name 'Format' }
+                $cellParseKey = if ($isMap) { Get-VellumPdfPropertyValue -InputObject $spec -Name 'Parse' }
                 $span = {
                     param($key)
                     $v = if ($isMap) { Get-VellumPdfPropertyValue -InputObject $spec -Name $key }
@@ -203,7 +275,8 @@ function Add-VellumPdfPageTable {
                 $align = if ($isMap) { Get-VellumPdfPropertyValue -InputObject $spec -Name 'Alignment' }
                 if ($align -and [string]$align -notin 'Left', 'Center', 'Right', 'Justify') { throw "Add-VellumPdfPageTable: cell Alignment '$align' is invalid; use Left, Center, Right or Justify." }
                 [pscustomobject]@{
-                    Text = $text; ColSpan = (& $span 'ColSpan'); RowSpan = (& $span 'RowSpan'); Align = [string]$align
+                    Value = $value; Format = $(if ($null -ne $cellFormatKey) { [string]$cellFormatKey }); Parse = ($null -eq $cellParseKey -or [bool]$cellParseKey); Text = ''
+                    ColSpan = (& $span 'ColSpan'); RowSpan = (& $span 'RowSpan'); Align = [string]$align
                     # Colours are resolved here, before anything is drawn, so a bad value cannot leave half a table behind.
                     Background = $(if ($isMap -and $null -ne (Get-VellumPdfPropertyValue -InputObject $spec -Name 'Background')) { ConvertTo-VellumColor (Get-VellumPdfPropertyValue -InputObject $spec -Name 'Background') -Document $Document -CommandName 'Add-VellumPdfPageTable' })
                     Color = $(if ($isMap -and $null -ne (Get-VellumPdfPropertyValue -InputObject $spec -Name 'Color')) { ConvertTo-VellumColor (Get-VellumPdfPropertyValue -InputObject $spec -Name 'Color') -Document $Document -CommandName 'Add-VellumPdfPageTable' })
@@ -241,6 +314,20 @@ function Add-VellumPdfPageTable {
             $columnCount = ($cells | ForEach-Object { $_.Col + $_.ColSpan } | Measure-Object -Maximum).Maximum
             $lastRowUsed = ($cells | ForEach-Object { $_.Row + $_.RowSpan } | Measure-Object -Maximum).Maximum
             if ($lastRowUsed -gt $rowCount) { throw "Add-VellumPdfPageTable: a RowSpan runs past the last row (the table has $rowCount row(s))." }
+
+            # Values become text: number detection, -ColumnFormat / a cell's Format key, and the culture. Header
+            # cells (and row headers) are labels and are never read as numbers.
+            $slots = foreach ($cell in $cells) {
+                $format = if ($null -ne $cell.Format) { $cell.Format }
+                elseif (-not $cell.IsHeader -and $ColumnFormat -and $cell.Col -lt $ColumnFormat.Count) { $ColumnFormat[$cell.Col] }
+                New-VellumPdfTextSlot -Value $cell.Value -Format $format -Parse ($cell.Parse -and -not $cell.IsHeader) `
+                    -Group $(if ($cell.IsHeader) { "header$($cell.Row)" } else { $cell.Col }) -What $(if ($cell.IsHeader) { "header cell in column $($cell.Col + 1)" } else { "column $($cell.Col + 1)" })
+            }
+            $slots = @($slots)
+            Convert-VellumPdfSlotText -Slot $slots -Culture $cultures.Culture -InputCulture $cultures.InputCulture `
+                -NoNumberParsing:$NoNumberParsing -CommandName 'Add-VellumPdfPageTable'
+            for ($si = 0; $si -lt $cells.Count; $si++) { $cells[$si].Text = $slots[$si].Text }
+            Assert-VellumPdfValidText -Text @($cells | ForEach-Object { $_.Text }) -CommandName 'Add-VellumPdfPageTable'
 
             # A row that does not fill every grid column makes a table PDF/UA validators reject (7.2-41/42/43).
             $irregular = @(0..($rowCount - 1) | Where-Object {

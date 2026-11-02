@@ -79,6 +79,20 @@ function New-VellumPdfDocument {
     .PARAMETER MarginLeft
         Left page margin in points. When supplied, overrides the -Margin
         baseline (or the library default) for the left side only.
+    .PARAMETER Culture
+        The culture used to turn non-string values into text: table cells, list items and pie-chart
+        percentage labels (dates, numbers, and numbers read from strings). A culture name ('de-DE') or a
+        [cultureinfo] (-Culture (Get-Culture) matches the console); an unknown name is an error. Default:
+        the invariant culture, so the output is the same on every machine. Each of Add-VellumPdfTable,
+        Add-VellumPdfList, Add-VellumPdfPieChart (and the page-document counterparts) has its own -Culture
+        that overrides this default for one call. It is deliberately not derived from -Language: a language
+        tag says nothing about how dates and numbers look.
+    .PARAMETER InputCulture
+        A culture name or [cultureinfo] used to READ numbers that are given as strings in table cells and
+        list items (the document default; the table and list cmdlets have a per-call -InputCulture). With it,
+        a string that consists only of a number is parsed strictly with that culture's decimal and grouping
+        separators ('de-DE': '1.234,5' is 1234.5, '1.5' is not a number). Without it (the default) the
+        separators are detected from the text. See Add-VellumPdfTable for the detection rules.
     .PARAMETER UseObjectStreams
         When specified, enables PDF cross-reference object streams in the output
         file. Object streams reduce file size for documents with many objects by
@@ -146,10 +160,19 @@ function New-VellumPdfDocument {
         [ValidateRange(0.0, 10000.0)]
         [double]$MarginLeft,
 
-        [switch]$UseObjectStreams
+        [switch]$UseObjectStreams,
+
+        # Culture for turning values into text (tables, lists, pie labels); a name or a [cultureinfo]. Default: invariant.
+        [object]$Culture,
+
+        # Culture used to read numbers given as strings. Default: detect the separators from the text.
+        [object]$InputCulture
     )
 
     try {
+        # Resolved first: an unknown culture name must fail before a document exists.
+        $documentCulture = if ($PSBoundParameters.ContainsKey('Culture')) { ConvertTo-VellumPdfCulture -Value $Culture -CommandName 'New-VellumPdfDocument' } else { [cultureinfo]::InvariantCulture }
+        $documentInputCulture = if ($PSBoundParameters.ContainsKey('InputCulture') -and $null -ne $InputCulture) { ConvertTo-VellumPdfCulture -Value $InputCulture -CommandName 'New-VellumPdfDocument' -ParameterName 'InputCulture' }
         $doc = [VellumPdf.Layout.Document]::new()
         $doc.Conformance = [VellumPdf.Document.PdfConformance]::$Conformance
         $doc.PageSize = if ($PSCmdlet.ParameterSetName -eq 'CustomPage') {
@@ -171,6 +194,9 @@ function New-VellumPdfDocument {
         # (read back via Resolve-VellumPdfDefault).
         $doc.PSObject.Properties.Add([psnoteproperty]::new(
             'PSVellumDefault', @{ Font = $DefaultFont; FontSize = $DefaultFontSize }))
+
+        $doc.PSObject.Properties.Add([psnoteproperty]::new('PSVellumCulture', $documentCulture))
+        $doc.PSObject.Properties.Add([psnoteproperty]::new('PSVellumInputCulture', $documentInputCulture))
 
         $hasUniform = $PSBoundParameters.ContainsKey('Margin')
         $hasPerSide = $PSBoundParameters.ContainsKey('MarginTop') -or

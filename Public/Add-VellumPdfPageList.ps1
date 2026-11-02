@@ -17,6 +17,28 @@ function Add-VellumPdfPageList {
         each holding a Lbl (the marker) and an LBody (the text, plus the nested L of an item that has
         children). In an untagged document it is only drawing.
 
+        Items become text with a culture and an optional format. A string item is drawn as given unless it
+        consists only of a number; any other value (a number, a date, ...) is converted with -Culture (the
+        document's -Culture, invariant unless set) and -Format (a .NET format string such as 'N2' or
+        'yyyy-MM-dd'); an item hashtable may carry its own Format key, and Parse = $false to draw its string
+        as given.
+
+        Numbers in strings are always recognised (switch it off with -NoNumberParsing): a string item that is
+        only a number is read as [decimal], keeping its decimals, and then drawn like any other number, so
+        with the invariant default '1.444,50' becomes 1444.50, '1,976.08' becomes 1976.08 and '55433.34'
+        stays 55433.34. The separators are detected from the text:
+          1. With both '.' and ',' the LAST one is the decimal mark (1.444,50 and 1,976.08).
+          2. A separator that appears more than once is grouping (1.234.567).
+          3. A separator that appears once is a decimal mark (55433.34, 66443,85), except that exactly three
+             digits after it with at most three digits before it is ambiguous (1,234 and 1.234; with more
+             than three digits before it, as in 12345,678, it is a decimal mark).
+          4. Grouping must be regular: 1-3 digits, then groups of exactly 3 (1.2.3 and 10.0.0.1 stay text).
+          5. Not a number, so left as is: a leading zero in a multi-digit integer part (007, 01234), spaces,
+             currency symbols, '%', exponents, an empty string.
+          6. An ambiguous number takes the convention of the other items of the same call; without such
+             evidence it is left unchanged and ONE warning per call names the values.
+        -InputCulture switches detection off: every string is read strictly with that culture's separators.
+
         Use a base-14 font by name (-Font) or an embedded TrueType font (-FontHandle from
         Register-VellumPdfFont); PDF/A and PDF/UA documents embed base-14 text automatically.
     .PARAMETER Document
@@ -51,6 +73,22 @@ function Add-VellumPdfPageList {
         Width of the marker column in points (default 1.8 times -FontSize). Children are indented by one more.
     .PARAMETER Language
         BCP 47 language tag of the list text, written on the L element.
+    .PARAMETER Format
+        A .NET format string for items that are not text ('N2', 'yyyy-MM-dd'), applied with -Culture; also to
+        numbers read from strings. An item's own Format key wins. A format the value's type rejects is an
+        error naming the item.
+    .PARAMETER Culture
+        The culture used to turn numbers and dates into text: a name ('de-DE') or a [cultureinfo]
+        (-Culture (Get-Culture) matches the console). Default: the document's -Culture, which is the
+        invariant culture unless New-VellumPdfDocument/New-VellumPdfPageDocument set one. An unknown name is
+        an error.
+    .PARAMETER InputCulture
+        Read number strings strictly with this culture (name or [cultureinfo]) instead of detecting the
+        separators. Default: the document's -InputCulture, else detection. Pass $null to switch the
+        document's -InputCulture off for this call.
+    .PARAMETER NoNumberParsing
+        Draw every string exactly as given instead of reading numbers from it. A single item can do the same
+        with the key Parse = $false.
     .PARAMETER PassThru
         Return an object with Document, Height, Bottom (the y of the list's lower edge) and ItemCount
         instead of the document.
@@ -58,6 +96,8 @@ function Add-VellumPdfPageList {
         $doc | Add-VellumPdfPageList -X 72 -Y 700 -Width 300 -Item 'Read the brief', 'Draft the plan', 'Review with the team'
     .EXAMPLE
         $doc | Add-VellumPdfPageList -X 72 -Y 600 -Width 300 -Numbered -Item 'Prepare', @{ Text = 'Run'; Children = 'Dry run', 'Real run' }, 'Report'
+    .EXAMPLE
+        $doc | Add-VellumPdfPageList -X 72 -Y 500 -Width 300 -Item 1234.5, '1.444,5', 99 -Format 'N2' -Culture de-DE
     .OUTPUTS
         VellumPdf.Document.PdfDocument (the same instance, for chaining), or with -PassThru a summary object.
     #>
@@ -111,6 +151,23 @@ function Add-VellumPdfPageList {
         [ValidateNotNullOrEmpty()]
         [string]$Language,
 
+        # .NET format string for items that are not text ('N2', 'yyyy-MM-dd'); an item hashtable may carry its own Format key.
+        [AllowNull()]
+        [AllowEmptyString()]
+        [string]$Format,
+
+        # Culture used to turn dates and numbers into text; a name or a [cultureinfo].
+        # Default: the document's -Culture (invariant unless set).
+        [object]$Culture,
+
+        # Culture used to read numbers given as strings (strict, no detection); $null switches the
+        # document's -InputCulture off for this call. Default: the document's -InputCulture, else detection.
+        [AllowNull()]
+        [object]$InputCulture,
+
+        # Draw strings exactly as given instead of reading numbers from them.
+        [switch]$NoNumberParsing,
+
         [switch]$PassThru
     )
 
@@ -120,6 +177,8 @@ function Add-VellumPdfPageList {
             $Page = Resolve-VellumPdfPageNumber -Document $Document -Page $(if ($PSBoundParameters.ContainsKey('Page')) { $PSBoundParameters['Page'] } else { 1 }) -Bound $PSBoundParameters.ContainsKey('Page') -CommandName 'Add-VellumPdfPageList'
             [void](Get-VellumPdfPage -Document $Document -Page $Page -CommandName 'Add-VellumPdfPageList')
             Assert-VellumPdfLanguageTag -Value $Language -CommandName 'Add-VellumPdfPageList'
+            $cultures = Resolve-VellumPdfCulture -Document $Document -Culture $Culture -CultureBound:$PSBoundParameters.ContainsKey('Culture') `
+                -InputCulture $InputCulture -InputCultureBound:$PSBoundParameters.ContainsKey('InputCulture') -CommandName 'Add-VellumPdfPageList'
             if (-not $FontHandle) { Assert-VellumPdfMeasurableFont -Font $Font -CommandName 'Add-VellumPdfPageList' -Reason 'it wraps item text' }
             Assert-VellumPdfCoordinate $X 'X' 'Add-VellumPdfPageList'
             Assert-VellumPdfCoordinate $Y 'Y' 'Add-VellumPdfPageList'
@@ -131,14 +190,18 @@ function Add-VellumPdfPageList {
             # --- items ------------------------------------------------------------------------------------
             # An item is text, or a hashtable / object with Text and optionally Children.
             $isRecord = { param($x) $x -is [System.Collections.IDictionary] -or $x -is [pscustomobject] }
+            # The raw value plus the item's own Format / Parse keys: it becomes text (number detection, format,
+            # culture) below, once all items are known, because they are evidence for each other.
             $textOf = {
                 param($x, $what)
                 if (& $isRecord $x) {
                     $t = Get-VellumPdfPropertyValue -InputObject $x -Name 'Text'
                     if ($null -eq $t) { throw "Add-VellumPdfPageList: $what has no Text; give text or a hashtable with a Text key (an empty string draws a marker only)." }
-                    [string]$t
+                    $itemFormat = Get-VellumPdfPropertyValue -InputObject $x -Name 'Format'
+                    $itemParse = Get-VellumPdfPropertyValue -InputObject $x -Name 'Parse'
+                    [pscustomobject]@{ Value = $t; Format = $(if ($null -ne $itemFormat) { [string]$itemFormat } else { $Format }); Parse = ($null -eq $itemParse -or [bool]$itemParse) }
                 }
-                else { [string]$x }
+                else { [pscustomobject]@{ Value = $x; Format = $Format; Parse = $true } }
             }
             $entries = foreach ($spec in $Item) {
                 if ($null -eq $spec) { throw 'Add-VellumPdfPageList: an item is $null; give text or a hashtable with Text (an empty string draws a marker only).' }
@@ -153,11 +216,28 @@ function Add-VellumPdfPageList {
                         if ((& $isRecord $child) -and @(Get-VellumPdfPropertyValue -InputObject $child -Name 'Children').Where({ $null -ne $_ }).Count -gt 0) {
                             throw 'Add-VellumPdfPageList: the list has one nesting level; an item of Children cannot have Children of its own.'
                         }
-                        [pscustomobject]@{ Text = (& $textOf $child 'a child item'); Children = @(); Lines = $null }
+                        [pscustomobject]@{ Source = (& $textOf $child 'a child item'); Text = ''; Children = @(); Lines = $null }
                     })
-                [pscustomobject]@{ Text = $text; Children = $childEntries; Lines = $null }
+                [pscustomobject]@{ Source = $text; Text = ''; Children = $childEntries; Lines = $null }
             }
             $entries = @($entries)
+            $slotList = [System.Collections.Generic.List[object]]::new()
+            $slotOwners = [System.Collections.Generic.List[object]]::new()
+            $itemNumber = 0
+            foreach ($entry in $entries) {
+                $itemNumber++
+                $slotList.Add((New-VellumPdfTextSlot -Value $entry.Source.Value -Format $entry.Source.Format -Parse $entry.Source.Parse -Group 0 -What "item $itemNumber"))
+                $slotOwners.Add($entry)
+                $childNumber = 0
+                foreach ($childEntry in $entry.Children) {
+                    $childNumber++
+                    $slotList.Add((New-VellumPdfTextSlot -Value $childEntry.Source.Value -Format $childEntry.Source.Format -Parse $childEntry.Source.Parse -Group 0 -What "child $childNumber of item $itemNumber"))
+                    $slotOwners.Add($childEntry)
+                }
+            }
+            Convert-VellumPdfSlotText -Slot $slotList.ToArray() -Culture $cultures.Culture -InputCulture $cultures.InputCulture `
+                -NoNumberParsing:$NoNumberParsing -CommandName 'Add-VellumPdfPageList'
+            for ($si = 0; $si -lt $slotOwners.Count; $si++) { $slotOwners[$si].Text = $slotList[$si].Text }
 
             $resolved = Get-VellumPdfPageFont -Document $Document -FontHandle $FontHandle -Font $Font -CommandName 'Add-VellumPdfPageList'
             $allText = @($entries | ForEach-Object { $_.Text; $_.Children | ForEach-Object { $_.Text } })

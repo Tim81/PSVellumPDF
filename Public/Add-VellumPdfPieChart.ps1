@@ -58,6 +58,14 @@ function Add-VellumPdfPieChart {
     .PARAMETER FontHandle
         Embedded font for the -Legend table (needed for PDF/A and non-Windows-1252
         labels).
+    .PARAMETER LabelFormat
+        A .NET format string for the share label of the -Legend, applied to the share as a fraction
+        (0.4 is 40 percent): 'P1' (default) gives 40.0 %, 'P0' 40 %, 'N2' 0.40. An invalid format is an
+        error, with or without a legend.
+    .PARAMETER Culture
+        The culture used for the share labels: a name ('de-DE') or a [cultureinfo]. Default: the document's
+        -Culture, which is the invariant culture unless New-VellumPdfDocument set one, so the labels no
+        longer follow the machine's culture. An unknown name is an error.
     .PARAMETER MarginTop
         Extra spacing in points above the chart.
     .PARAMETER MarginBottom
@@ -67,6 +75,9 @@ function Add-VellumPdfPieChart {
             Add-VellumPdfPieChart -Legend -Slice @(
                 @{ Value = 60; Label = 'Hardware' }, @{ Value = 40; Label = 'Services' }) |
             Save-VellumPdfDocument -Path ./share.pdf
+    .EXAMPLE
+        $doc | Add-VellumPdfPieChart -Legend -Culture de-DE -LabelFormat 'P0' -Slice @(
+            @{ Value = 60; Label = 'Hardware' }, @{ Value = 40; Label = 'Services' })
     .OUTPUTS
         VellumPdf.Layout.Document (the same instance, for chaining)
     #>
@@ -115,6 +126,16 @@ function Add-VellumPdfPieChart {
 
         [VellumPdf.Fonts.EmbeddedFontHandle]$FontHandle,
 
+        # .NET format string for the share label of each slice, applied to its share as a fraction
+        # (0.4 is 40 percent): 'P1' (default) gives 40.0 %, 'P0' 40 %, 'N2' 0.40.
+        [AllowNull()]
+        [AllowEmptyString()]
+        [string]$LabelFormat = 'P1',
+
+        # Culture used for the share labels; a name or a [cultureinfo].
+        # Default: the document's -Culture (invariant unless set).
+        [object]$Culture,
+
         [ValidateRange(0.0, 10000.0)]
         [double]$MarginTop,
 
@@ -134,6 +155,9 @@ function Add-VellumPdfPieChart {
                 param([object[]]$Specs)
 
                 Assert-VellumPdfDocumentOpen -Document $Document -CommandName 'Add-VellumPdfPieChart'
+                $cultures = Resolve-VellumPdfCulture -Document $Document -Culture $Culture -CultureBound:$boundParameters.ContainsKey('Culture') -CommandName 'Add-VellumPdfPieChart'
+                # An invalid -LabelFormat fails whether or not a legend is drawn.
+                [void](ConvertTo-VellumPdfText -Value 0.5 -Culture $cultures.Culture -Format $LabelFormat -CommandName 'Add-VellumPdfPieChart' -What '-LabelFormat')
                 if ($FontHandle) {
                     Assert-VellumPdfFontHandle -FontHandle $FontHandle -Document $Document -CommandName 'Add-VellumPdfPieChart'
                 }
@@ -213,11 +237,11 @@ function Add-VellumPdfPieChart {
                     foreach ($item in $items) {
                         $hex = '#{0:X2}{1:X2}{2:X2}' -f [int][math]::Round($item.Rgb[0] * 255), [int][math]::Round($item.Rgb[1] * 255), [int][math]::Round($item.Rgb[2] * 255)
                         $name = if ($item.Label) { $item.Label } else { "Slice $($n + 1)" }
-                        $share = '{0:P1}' -f ($item.Value / $sum)
+                        $share = ConvertTo-VellumPdfText -Value ([double]($item.Value / $sum)) -Culture $cultures.Culture -Format $LabelFormat -CommandName 'Add-VellumPdfPieChart' -What "the share label of slice $($n + 1)"
                         $rows.Add(@(@{ Text = ' '; Background = $hex }, $name, @{ Text = $share; Alignment = 'Right' }))
                         $n++
                     }
-                    $tableArgs = @{ Document = $Document; Row = $rows.ToArray(); ColumnWidth = @(18, 0, 60); BorderWidth = 0 }
+                    $tableArgs = @{ Document = $Document; Row = $rows.ToArray(); ColumnWidth = @(18, 0, 60); BorderWidth = 0; NoNumberParsing = $true }
                     if ($FontHandle) { $tableArgs['FontHandle'] = $FontHandle }
                     [void](Add-VellumPdfTable @tableArgs)
                 }

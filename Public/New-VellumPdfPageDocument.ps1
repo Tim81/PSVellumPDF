@@ -48,6 +48,20 @@ function New-VellumPdfPageDocument {
         Custom default page height in millimetres (1..5080).
     .PARAMETER Language
         BCP 47 document language written as /Lang (e.g. 'en-US').
+    .PARAMETER Culture
+        The culture used to turn non-string values into text: table cells, list items and pie-chart
+        percentage labels (dates, numbers, and numbers read from strings). A culture name ('de-DE') or a
+        [cultureinfo] (-Culture (Get-Culture) matches the console); an unknown name is an error. Default:
+        the invariant culture, so the output is the same on every machine. Each of Add-VellumPdfTable,
+        Add-VellumPdfList, Add-VellumPdfPieChart (and the page-document counterparts) has its own -Culture
+        that overrides this default for one call. It is deliberately not derived from -Language: a language
+        tag says nothing about how dates and numbers look.
+    .PARAMETER InputCulture
+        A culture name or [cultureinfo] used to READ numbers that are given as strings in table cells and
+        list items (the document default; the table and list cmdlets have a per-call -InputCulture). With it,
+        a string that consists only of a number is parsed strictly with that culture's decimal and grouping
+        separators ('de-DE': '1.234,5' is 1234.5, '1.5' is not a number). Without it (the default) the
+        separators are detected from the text. See Add-VellumPdfTable for the detection rules.
     .PARAMETER UseObjectStreams
         Compress the cross-reference data into object streams (smaller files).
     .PARAMETER Linearize
@@ -98,7 +112,13 @@ function New-VellumPdfPageDocument {
 
         [byte[]]$DocumentId,
 
-        [System.DateTimeOffset]$Timestamp
+        [System.DateTimeOffset]$Timestamp,
+
+        # Culture for turning values into text (tables, lists); a name or a [cultureinfo]. Default: invariant.
+        [object]$Culture,
+
+        # Culture used to read numbers given as strings. Default: detect the separators from the text.
+        [object]$InputCulture
     )
 
     try {
@@ -109,6 +129,9 @@ function New-VellumPdfPageDocument {
             throw "New-VellumPdfPageDocument: -DocumentId must be exactly 16 bytes; got $($DocumentId.Length)."
         }
 
+        # Resolved first: an unknown culture name must fail before a document exists.
+        $documentCulture = if ($PSBoundParameters.ContainsKey('Culture')) { ConvertTo-VellumPdfCulture -Value $Culture -CommandName 'New-VellumPdfPageDocument' } else { [cultureinfo]::InvariantCulture }
+        $documentInputCulture = if ($PSBoundParameters.ContainsKey('InputCulture') -and $null -ne $InputCulture) { ConvertTo-VellumPdfCulture -Value $InputCulture -CommandName 'New-VellumPdfPageDocument' -ParameterName 'InputCulture' }
         $doc = [VellumPdf.Document.PdfDocument]::new()
         $doc.Conformance = [VellumPdf.Document.PdfConformance]::$Conformance
         if ($Tagged -or $Conformance -in 'PdfA2a', 'PdfUA1') { $doc.Tagged = $true }
@@ -123,6 +146,8 @@ function New-VellumPdfPageDocument {
         if ($Linearize) { $doc.Linearize = $true }
         if ($PSBoundParameters.ContainsKey('DocumentId')) { $doc.DocumentId = $DocumentId }
         if ($PSBoundParameters.ContainsKey('Timestamp')) { $doc.Timestamp = $Timestamp }
+        $doc.PSObject.Properties.Add([psnoteproperty]::new('PSVellumCulture', $documentCulture))
+        $doc.PSObject.Properties.Add([psnoteproperty]::new('PSVellumInputCulture', $documentInputCulture))
         $doc
     }
     catch {

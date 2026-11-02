@@ -22,9 +22,37 @@ function Add-VellumPdfTable {
                  Color = 'navy' }
             Text is required; the rest are optional. More keys: FontHandle (an
             embedded font for this cell), Leading, Padding (1, 2 or 4 numbers),
-            and Language (BCP 47 tag, tagged documents only). A LinkUri key is
+            Language (BCP 47 tag, tagged documents only), Format (a .NET format string for
+            this cell) and Parse (set $false to draw a string as given). A LinkUri key is
             refused because VellumPdf ignores hyperlinks in table cells.
           - The same keys work in -Header entries.
+
+        Values become text with a culture and an optional format. A string cell is drawn as given unless it
+        consists only of a number; any other value (a number, a date, ...) is converted with -Culture (the
+        document's -Culture, invariant unless set) and the column's -ColumnFormat or the cell's own Format
+        key (a .NET format string such as 'N2' or 'yyyy-MM-dd'). A rich cell may carry a Format key, which
+        wins over -ColumnFormat, and Parse = $false to draw its string exactly as given.
+
+        Numbers in strings are always recognised (switch it off with -NoNumberParsing): a string cell (never
+        a header cell) that is only a number is read as [decimal], keeping its decimals, and then drawn like
+        any other number, so with the invariant default
+        '1.444,50' becomes 1444.50, '1,976.08' becomes 1976.08 and '55433.34' stays 55433.34. The
+        separators are detected from the text:
+          1. With both '.' and ',' the LAST one is the decimal mark (1.444,50 and 1,976.08).
+          2. A separator that appears more than once is grouping (1.234.567).
+          3. A separator that appears once is a decimal mark (55433.34, 66443,85, 777544434,7755), except
+             that exactly three digits after it with at most three digits before it is ambiguous (1,234
+             and 1.234: with more than three digits before it, as in 12345,678, it is a decimal mark).
+          4. Grouping must be regular: 1-3 digits, then groups of exactly 3 (1.2.3 and the IP-like 10.0.0.1
+             stay text).
+          5. Not a number, so left as is: a leading zero in a multi-digit integer part (007, 01234),
+             spaces, currency symbols, '%', exponents, an empty string.
+          6. An ambiguous number takes the convention of the other values in the same column
+             ('1.444,50' above shows that '.' groups); without such evidence it is left unchanged and
+             ONE warning per call names the values.
+        -InputCulture switches detection off: every string is read strictly with that culture's separators
+        (de-DE: '1.234' is 1234 and '55433.34' is text). -NoNumberParsing draws every string as given
+        (codes, ids, phone numbers).
 
         Colour parameters (-BorderColor, -HeaderBackground, -AlternateRowBackground,
         and a cell's Background/Color) accept an R,G,B triple in 0..1, a hex string
@@ -92,6 +120,23 @@ function Add-VellumPdfTable {
         Per-column horizontal alignment by column index (Left/Center/Right/
         Justify), overriding -Alignment for those columns. A cell's own
         Alignment key still wins over this.
+    .PARAMETER ColumnFormat
+        A .NET format string per column, parallel to -ColumnAlignment (by grid column index, a $null or ''
+        entry leaves a column on the type's default): -ColumnFormat '', 'N2', 'yyyy-MM-dd'. Applied to numbers
+        and dates (and to numbers read from strings) with -Culture; text is never changed. A cell's own
+        Format key wins. A format the value's type rejects is an error naming the column.
+    .PARAMETER Culture
+        The culture used to turn numbers and dates into text: a name ('de-DE') or a [cultureinfo]
+        (-Culture (Get-Culture) matches the console). Default: the document's -Culture, which is the
+        invariant culture unless New-VellumPdfDocument/New-VellumPdfPageDocument set one, so the output is
+        the same on every machine. An unknown name is an error.
+    .PARAMETER InputCulture
+        Read number strings strictly with this culture (name or [cultureinfo]) instead of detecting the
+        separators. Default: the document's -InputCulture, else detection. Pass $null to switch the
+        document's -InputCulture off for this call.
+    .PARAMETER NoNumberParsing
+        Draw every string exactly as given instead of reading numbers from it. A single cell can do the same
+        with the rich-cell key Parse = $false.
     .PARAMETER Font
         A base-14 font name applied as the default cell style for all data
         cells. When omitted the document default font is used.
@@ -119,6 +164,15 @@ function Add-VellumPdfTable {
     .EXAMPLE
         $doc | Add-VellumPdfTable -Row @(@('Cell1','Cell2')) `
                -ColumnWidth @(100, 200) -Font Helvetica -FontSize 10 -Alignment Center
+    .EXAMPLE
+        # Numbers in strings are read, dates and numbers use the culture and the column formats
+        $rows = @(
+            @('Widget', '1.444,50', [datetime]'2026-03-05'),
+            @('Gadget', '55433.34', [datetime]'2026-12-25'))
+        New-VellumPdfDocument |
+            Add-VellumPdfTable -Header 'Item', 'Amount', 'Date' -Row $rows -Culture de-DE `
+                -ColumnFormat '', 'N2', 'd' -ColumnAlignment Left, Right, Right |
+            Save-VellumPdfDocument -Path ./amounts.pdf
     .OUTPUTS
         VellumPdf.Layout.Document (the same instance, for chaining)
     #>
@@ -159,6 +213,24 @@ function Add-VellumPdfTable {
         [ValidateSet('Left', 'Center', 'Right', 'Justify')]
         [string[]]$ColumnAlignment,
 
+        # Per-column .NET format string for values that are not text ('N2', 'yyyy-MM-dd'), by column
+        # index, parallel to -ColumnAlignment; $null or '' leaves a column on the type's default.
+        [AllowNull()]
+        [AllowEmptyString()]
+        [string[]]$ColumnFormat,
+
+        # Culture used to turn dates and numbers into text; a name or a [cultureinfo].
+        # Default: the document's -Culture (invariant unless set).
+        [object]$Culture,
+
+        # Culture used to read numbers given as strings (strict, no detection); $null switches the
+        # document's -InputCulture off for this call. Default: the document's -InputCulture, else detection.
+        [AllowNull()]
+        [object]$InputCulture,
+
+        # Draw strings exactly as given instead of reading numbers from them.
+        [switch]$NoNumberParsing,
+
         [ValidateSet('Courier', 'CourierBold', 'CourierBoldOblique', 'CourierOblique',
             'Helvetica', 'HelveticaBold', 'HelveticaBoldOblique', 'HelveticaOblique',
             'Symbol', 'TimesBold', 'TimesBoldItalic', 'TimesItalic', 'TimesRoman', 'ZapfDingbats')]
@@ -189,6 +261,8 @@ function Add-VellumPdfTable {
     process {
         try {
             Assert-VellumPdfDocumentOpen -Document $Document -CommandName 'Add-VellumPdfTable'
+            $cultures = Resolve-VellumPdfCulture -Document $Document -Culture $Culture -CultureBound:$PSBoundParameters.ContainsKey('Culture') `
+                -InputCulture $InputCulture -InputCultureBound:$PSBoundParameters.ContainsKey('InputCulture') -CommandName 'Add-VellumPdfTable'
             if ($FontHandle) {
                 Assert-VellumPdfFontHandle -FontHandle $FontHandle -Document $Document -CommandName 'Add-VellumPdfTable'
             }
@@ -231,9 +305,12 @@ function Add-VellumPdfTable {
                     if (-not $value.Contains('Text')) {
                         throw "Add-VellumPdfTable: a rich-cell hashtable must include a 'Text' key."
                     }
-                    return $value
+                    # A copy: the text is converted in place below and the caller's hashtable must stay as it was.
+                    $copy = @{}
+                    foreach ($key in $value.Keys) { $copy[$key] = $value[$key] }
+                    return $copy
                 }
-                return @{ Text = [string]$value }
+                return @{ Text = $value }
             }
 
             # Build the rows as arrays of cell specs, and the effective header cells.
@@ -293,6 +370,66 @@ function Add-VellumPdfTable {
                     }
                 }
             }
+
+            # Spans: a cell advances the grid column by its ColSpan, and a RowSpan reserves its columns
+            # in the rows below, so -ColumnAlignment and the -ColumnWidth count follow the grid, not the cell count.
+            $spanOf = {
+                param($cellSpec, $key)
+                if ($cellSpec -is [System.Collections.IDictionary] -and $null -ne $cellSpec[$key]) { [Math]::Max(1, [int]$cellSpec[$key]) } else { 1 }
+            }
+            $gridTaken = @{}
+            $gridState = @{ Row = 0 }
+            $placeRow = {
+                param($rowSpecs)
+                $column = 0
+                $placed = foreach ($cellSpec in $rowSpecs) {
+                    while ($gridTaken.ContainsKey("$($gridState.Row),$column")) { $column++ }
+                    $column
+                    $colSpan = & $spanOf $cellSpec 'ColSpan'
+                    $rowSpan = & $spanOf $cellSpec 'RowSpan'
+                    for ($dr = 0; $dr -lt $rowSpan; $dr++) { for ($dc = 0; $dc -lt $colSpan; $dc++) { $gridTaken["$($gridState.Row + $dr),$($column + $dc)"] = $true } }
+                    $column += $colSpan
+                }
+                $gridState.Row++
+                , @($placed)
+            }
+
+            # Grid column of every cell, header rows first (spans and RowSpans decide it); -ColumnFormat, -ColumnAlignment
+            # and the number evidence of a column follow the grid, not the cell count.
+            $headerPlacements = [System.Collections.Generic.List[object]]::new()
+            foreach ($specsOfRow in $headerRowSpecs) { $headerPlacements.Add((& $placeRow $specsOfRow)) }
+            $dataPlacements = [System.Collections.Generic.List[object]]::new()
+            foreach ($specRow in $specRows) { $dataPlacements.Add((& $placeRow $specRow)) }
+
+            # Values become text here: number detection, -ColumnFormat / a cell's Format key, and the culture.
+            # Header cells are labels: never read as numbers.
+            $slots = [System.Collections.Generic.List[object]]::new()
+            $slotSpecs = [System.Collections.Generic.List[object]]::new()
+            $cellFormat = {
+                param($cellSpec, $gridColumn)
+                if ($null -ne $cellSpec['Format']) { return [string]$cellSpec['Format'] }
+                if ($gridColumn -ge 0 -and $ColumnFormat -and $gridColumn -lt $ColumnFormat.Count) { return $ColumnFormat[$gridColumn] }
+            }
+            for ($hr = 0; $hr -lt $headerRowSpecs.Count; $hr++) {
+                for ($hc = 0; $hc -lt $headerRowSpecs[$hr].Count; $hc++) {
+                    $cellSpec = $headerRowSpecs[$hr][$hc]
+                    $headerFormat = if ($null -ne $cellSpec['Format']) { [string]$cellSpec['Format'] }
+                    $slots.Add((New-VellumPdfTextSlot -Value $cellSpec['Text'] -Format $headerFormat -Parse $false -Group 'header' -What "header cell $($hc + 1)"))
+                    $slotSpecs.Add($cellSpec)
+                }
+            }
+            for ($dr = 0; $dr -lt $specRows.Count; $dr++) {
+                for ($dc = 0; $dc -lt $specRows[$dr].Count; $dc++) {
+                    $cellSpec = $specRows[$dr][$dc]
+                    $gridColumn = $dataPlacements[$dr][$dc]
+                    $parseCell = $null -eq $cellSpec['Parse'] -or [bool]$cellSpec['Parse']
+                    $slots.Add((New-VellumPdfTextSlot -Value $cellSpec['Text'] -Format (& $cellFormat $cellSpec $gridColumn) -Parse $parseCell -Group $gridColumn -What "column $($gridColumn + 1)"))
+                    $slotSpecs.Add($cellSpec)
+                }
+            }
+            Convert-VellumPdfSlotText -Slot $slots.ToArray() -Culture $cultures.Culture -InputCulture $cultures.InputCulture `
+                -NoNumberParsing:$NoNumberParsing -CommandName 'Add-VellumPdfTable'
+            for ($si = 0; $si -lt $slots.Count; $si++) { $slotSpecs[$si]['Text'] = $slots[$si].Text }
 
             # Encoding warning over every header and data cell's text, skipping cells
             # that render in an embedded font (the table's, or the cell's own).
@@ -420,28 +557,6 @@ function Add-VellumPdfTable {
             }
 
             # Apply column widths.
-            # Spans: a cell advances the grid column by its ColSpan, and a RowSpan reserves its columns
-            # in the rows below, so -ColumnAlignment and the -ColumnWidth count follow the grid, not the cell count.
-            $spanOf = {
-                param($cellSpec, $key)
-                if ($cellSpec -is [System.Collections.IDictionary] -and $null -ne $cellSpec[$key]) { [Math]::Max(1, [int]$cellSpec[$key]) } else { 1 }
-            }
-            $gridTaken = @{}
-            $gridState = @{ Row = 0 }
-            $placeRow = {
-                param($rowSpecs)
-                $column = 0
-                $placed = foreach ($cellSpec in $rowSpecs) {
-                    while ($gridTaken.ContainsKey("$($gridState.Row),$column")) { $column++ }
-                    $column
-                    $colSpan = & $spanOf $cellSpec 'ColSpan'
-                    $rowSpan = & $spanOf $cellSpec 'RowSpan'
-                    for ($dr = 0; $dr -lt $rowSpan; $dr++) { for ($dc = 0; $dc -lt $colSpan; $dc++) { $gridTaken["$($gridState.Row + $dr),$($column + $dc)"] = $true } }
-                    $column += $colSpan
-                }
-                $gridState.Row++
-                , @($placed)
-            }
             if ($ColumnWidth) {
                 $firstRow = if ($headerRowSpecs.Count) { $headerRowSpecs[0] } elseif ($specRows.Count) { $specRows[0] } else { @() }
                 $columnCount = 0
@@ -455,12 +570,14 @@ function Add-VellumPdfTable {
             }
 
             # Add optional header row.
+            $headerRowNumber = 0
             foreach ($specsOfRow in $headerRowSpecs) {
                 # The engine cannot lay out a table made only of header rows, so a header-only table draws its
                 # header as ordinary rows (same look and background, but not marked as header cells).
                 $headerRow = if ($specRows.Count -eq 0) { $table.AddRow($false) } else { $table.AddHeaderRow() }
                 if ($headerBg) { $headerRow.Background = $headerBg }
-                $gridColumns = & $placeRow $specsOfRow
+                $gridColumns = $headerPlacements[$headerRowNumber]
+                $headerRowNumber++
                 $hi = 0
                 foreach ($headerSpec in $specsOfRow) {
                     [void]$headerRow.AddCell((& $buildCell $headerSpec $gridColumns[$hi]))
@@ -473,7 +590,7 @@ function Add-VellumPdfTable {
             foreach ($specRow in $specRows) {
                 $tableRow = $table.AddRow($false)
                 if ($altBg -and ($rowIndex % 2 -eq 1)) { $tableRow.Background = $altBg }
-                $gridColumns = & $placeRow $specRow
+                $gridColumns = $dataPlacements[$rowIndex]
                 $colIndex = 0
                 foreach ($spec in $specRow) {
                     [void]$tableRow.AddCell((& $buildCell $spec $gridColumns[$colIndex]))
