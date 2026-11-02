@@ -20,8 +20,9 @@ Draws a table at x/y on a page of a page-based document, tagged as a real table 
 ### Width (Default)
 
 ```
-Add-VellumPdfPageTable [-Row] <Object[]> -Document <PdfDocument> -X <double> -Y <double>
+Add-VellumPdfPageTable [[-Row] <Object[]>] -Document <PdfDocument> -X <double> -Y <double>
  -Width <double> [-Header <Object[]>] [-Page <int>] [-ColumnAlignment <string[]>]
+ [-ColumnFormat <string[]>] [-Culture <Object>] [-InputCulture <Object>] [-NoNumberParsing]
  [-FontSize <double>] [-Font <string>] [-HeaderFont <string>] [-FontHandle <EmbeddedFontHandle>]
  [-Color <Object>] [-Leading <double>] [-Padding <double>] [-BorderWidth <double>]
  [-BorderColor <Object>] [-HeaderBackground <Object>] [-AlternateRowBackground <Object>]
@@ -31,8 +32,9 @@ Add-VellumPdfPageTable [-Row] <Object[]> -Document <PdfDocument> -X <double> -Y 
 ### ColumnWidth
 
 ```
-Add-VellumPdfPageTable [-Row] <Object[]> -Document <PdfDocument> -X <double> -Y <double>
+Add-VellumPdfPageTable [[-Row] <Object[]>] -Document <PdfDocument> -X <double> -Y <double>
  -ColumnWidth <double[]> [-Header <Object[]>] [-Page <int>] [-ColumnAlignment <string[]>]
+ [-ColumnFormat <string[]>] [-Culture <Object>] [-InputCulture <Object>] [-NoNumberParsing]
  [-FontSize <double>] [-Font <string>] [-HeaderFont <string>] [-FontHandle <EmbeddedFontHandle>]
  [-Color <Object>] [-Leading <double>] [-Padding <double>] [-BorderWidth <double>]
  [-BorderColor <Object>] [-HeaderBackground <Object>] [-AlternateRowBackground <Object>]
@@ -49,13 +51,55 @@ bottom-left) and the column widths yourself, and the table must fit on the page:
 too tall is an error rather than being split.
 
 Rows are arrays of cells.
+A row may be empty (@()) when RowSpans from the rows above cover all of
+its columns; it is drawn as the extension of those cells and keeps an empty TR element (PDF/UA counts rows by TR).
+-Row may be an
+empty array when -Header is given (a header-only table); a table with neither is an error.
 A cell is text, or a hashtable with Text and optionally ColSpan,
-RowSpan, Alignment (Left, Center, Right, Justify), Background (colour) and Color (text colour):
+RowSpan, Alignment (Left, Center, Right, Justify), Background (colour), Color (text colour),
+Format (a .NET format string) and Parse ($false draws a string as given):
 
     -Row @(
         @('Widget', '2', '10.00'),
         @(@{ Text = 'Shipping'; ColSpan = 2 }, '5.00')
     )
+
+Values become text with a culture and an optional format.
+A string cell is drawn as given unless it
+consists only of a number; any other value (a number, a date, ...) is converted with -Culture (the
+document's -Culture, invariant unless set) and the column's -ColumnFormat or the cell's own Format
+key (a .NET format string such as 'N2' or 'yyyy-MM-dd').
+A cell hashtable may carry a Format key, which
+wins over -ColumnFormat, and Parse = $false to draw its string exactly as given.
+
+Numbers in strings are always recognised (switch it off with -NoNumberParsing): a string cell (never
+a header cell) that is only a number is read as [decimal], keeping its decimals, and then drawn like
+any other number, so with the invariant default
+'1.444,50' becomes 1444.50, '1,976.08' becomes 1976.08 and '55433.34' stays 55433.34.
+The
+separators are detected from the text:
+  1.
+With both '.' and ',' the LAST one is the decimal mark (1.444,50 and 1,976.08).
+  2.
+A separator that appears more than once is grouping (1.234.567).
+  3.
+A separator that appears once is a decimal mark (55433.34, 66443,85, 777544434,7755), except
+     that exactly three digits after it with at most three digits before it is ambiguous (1,234
+     and 1.234: with more than three digits before it, as in 12345,678, it is a decimal mark).
+  4.
+Grouping must be regular: 1-3 digits, then groups of exactly 3 (1.2.3 and the IP-like 10.0.0.1
+     stay text).
+  5.
+Not a number, so left as is: a leading zero in a multi-digit integer part (007, 01234),
+     spaces, currency symbols, '%', exponents, an empty string.
+  6.
+An ambiguous number takes the convention of the other values in the same column
+     ('1.444,50' above shows that '.' groups); without such evidence it is left unchanged and
+     ONE warning per call names the values.
+-InputCulture switches detection off: every string is read strictly with that culture's separators
+(de-DE: '1.234' is 1234 and '55433.34' is text).
+-NoNumberParsing draws every string as given
+(codes, ids, phone numbers).
 
 A single row is written @(,@('a','b')).
 -Header takes one row of cells (-Header 'Item','Qty')
@@ -81,6 +125,13 @@ $doc | Add-VellumPdfPageTable -X 72 -Y 700 -Width 450 -Header 'Item', 'Qty', 'Pr
         @('Widget', '2', '10.00'),
         @('Gadget', '1', '24.50'),
         @(@{ Text = 'Total'; ColSpan = 2 }, '44.50'))
+
+### EXAMPLE 2
+
+# Numbers in strings are read; the document culture and the column formats decide how they look
+$page = New-VellumPdfPageDocument -Culture de-DE | Add-VellumPdfPage
+$page | Add-VellumPdfPageTable -X 72 -Y 700 -Width 300 -Header 'Item', 'Amount' -ColumnFormat '', 'N2' `
+    -ColumnAlignment Left, Right -Row @(@('Widget', '1.444,5'), @('Gadget', 55433.34))
 
 ## PARAMETERS
 
@@ -191,6 +242,33 @@ AcceptedValues: []
 HelpMessage: ''
 ```
 
+### -ColumnFormat
+
+A .NET format string per column, parallel to -ColumnAlignment (by grid column index, a $null or ''
+entry leaves a column on the type's default): -ColumnFormat '', 'N2', 'yyyy-MM-dd'.
+Applied to numbers
+and dates (and to numbers read from strings) with -Culture; text is never changed.
+A cell's own
+Format key wins.
+A format the value's type rejects is an error naming the column.
+
+```yaml
+Type: System.String[]
+DefaultValue: ''
+SupportsWildcards: false
+Aliases: []
+ParameterSets:
+- Name: (All)
+  Position: Named
+  IsRequired: false
+  ValueFromPipeline: false
+  ValueFromPipelineByPropertyName: false
+  ValueFromRemainingArguments: false
+DontShow: false
+AcceptedValues: []
+HelpMessage: ''
+```
+
 ### -ColumnWidth
 
 One width per grid column, in points.
@@ -205,6 +283,32 @@ ParameterSets:
 - Name: ColumnWidth
   Position: Named
   IsRequired: true
+  ValueFromPipeline: false
+  ValueFromPipelineByPropertyName: false
+  ValueFromRemainingArguments: false
+DontShow: false
+AcceptedValues: []
+HelpMessage: ''
+```
+
+### -Culture
+
+The culture used to turn numbers and dates into text: a name ('de-DE') or a [cultureinfo]
+(-Culture (Get-Culture) matches the console).
+Default: the document's -Culture, which is the
+invariant culture unless New-VellumPdfDocument/New-VellumPdfPageDocument set one, so the output is
+the same on every machine.
+An unknown name is an error.
+
+```yaml
+Type: System.Object
+DefaultValue: ''
+SupportsWildcards: false
+Aliases: []
+ParameterSets:
+- Name: (All)
+  Position: Named
+  IsRequired: false
   ValueFromPipeline: false
   ValueFromPipelineByPropertyName: false
   ValueFromRemainingArguments: false
@@ -361,6 +465,31 @@ AcceptedValues: []
 HelpMessage: ''
 ```
 
+### -InputCulture
+
+Read number strings strictly with this culture (name or [cultureinfo]) instead of detecting the
+separators.
+Default: the document's -InputCulture, else detection.
+Pass $null to switch the
+document's -InputCulture off for this call.
+
+```yaml
+Type: System.Object
+DefaultValue: ''
+SupportsWildcards: false
+Aliases: []
+ParameterSets:
+- Name: (All)
+  Position: Named
+  IsRequired: false
+  ValueFromPipeline: false
+  ValueFromPipelineByPropertyName: false
+  ValueFromRemainingArguments: false
+DontShow: false
+AcceptedValues: []
+HelpMessage: ''
+```
+
 ### -Language
 
 BCP 47 language tag of the table text, written on the Table element.
@@ -390,6 +519,29 @@ Default 1.2 times -FontSize.
 ```yaml
 Type: System.Double
 DefaultValue: 0
+SupportsWildcards: false
+Aliases: []
+ParameterSets:
+- Name: (All)
+  Position: Named
+  IsRequired: false
+  ValueFromPipeline: false
+  ValueFromPipelineByPropertyName: false
+  ValueFromRemainingArguments: false
+DontShow: false
+AcceptedValues: []
+HelpMessage: ''
+```
+
+### -NoNumberParsing
+
+Draw every string exactly as given instead of reading numbers from it.
+A single cell can do the same
+with the rich-cell key Parse = $false.
+
+```yaml
+Type: System.Management.Automation.SwitchParameter
+DefaultValue: False
 SupportsWildcards: false
 Aliases: []
 ParameterSets:
@@ -472,6 +624,7 @@ HelpMessage: ''
 ### -Row
 
 The body rows: an array of rows, each an array of cells.
+May be omitted or empty when -Header is given.
 
 ```yaml
 Type: System.Object[]
@@ -481,7 +634,7 @@ Aliases: []
 ParameterSets:
 - Name: (All)
   Position: 0
-  IsRequired: true
+  IsRequired: false
   ValueFromPipeline: false
   ValueFromPipelineByPropertyName: false
   ValueFromRemainingArguments: false

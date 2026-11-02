@@ -23,7 +23,8 @@ Adds a pie chart to a VellumPdf document.
 Add-VellumPdfPieChart -Document <Document> -Slice <Object[]> [-Diameter <double>]
  [-StrokeColor <Object>] [-StrokeWidth <double>] [-Alignment <string>] [-StartAngle <double>]
  [-CounterClockwise] [-AltText <string>] [-Decorative] [-Legend] [-FontHandle <EmbeddedFontHandle>]
- [-MarginTop <double>] [-MarginBottom <double>] [<CommonParameters>]
+ [-LabelFormat <string>] [-Culture <Object>] [-MarginTop <double>] [-MarginBottom <double>]
+ [<CommonParameters>]
 ```
 
 ### Data
@@ -32,8 +33,8 @@ Add-VellumPdfPieChart -Document <Document> -Slice <Object[]> [-Diameter <double>
 Add-VellumPdfPieChart -Document <Document> -InputObject <Object> -ValueProperty <string>
  [-LabelProperty <string>] [-Diameter <double>] [-StrokeColor <Object>] [-StrokeWidth <double>]
  [-Alignment <string>] [-StartAngle <double>] [-CounterClockwise] [-AltText <string>] [-Decorative]
- [-Legend] [-FontHandle <EmbeddedFontHandle>] [-MarginTop <double>] [-MarginBottom <double>]
- [<CommonParameters>]
+ [-Legend] [-FontHandle <EmbeddedFontHandle>] [-LabelFormat <string>] [-Culture <Object>]
+ [-MarginTop <double>] [-MarginBottom <double>] [<CommonParameters>]
 ```
 
 ## DESCRIPTION
@@ -68,6 +69,11 @@ New-VellumPdfDocument -Tagged -Language en |
     Add-VellumPdfPieChart -Legend -Slice @(
         @{ Value = 60; Label = 'Hardware' }, @{ Value = 40; Label = 'Services' }) |
     Save-VellumPdfDocument -Path ./share.pdf
+
+### EXAMPLE 2
+
+$doc | Add-VellumPdfPieChart -Legend -Culture de-DE -LabelFormat 'P0' -Slice @(
+    @{ Value = 60; Label = 'Hardware' }, @{ Value = 40; Label = 'Services' })
 
 ## PARAMETERS
 
@@ -122,6 +128,31 @@ Draw the slices counter-clockwise (default clockwise).
 ```yaml
 Type: System.Management.Automation.SwitchParameter
 DefaultValue: False
+SupportsWildcards: false
+Aliases: []
+ParameterSets:
+- Name: (All)
+  Position: Named
+  IsRequired: false
+  ValueFromPipeline: false
+  ValueFromPipelineByPropertyName: false
+  ValueFromRemainingArguments: false
+DontShow: false
+AcceptedValues: []
+HelpMessage: ''
+```
+
+### -Culture
+
+The culture used for the share labels: a name ('de-DE') or a [cultureinfo].
+Default: the document's
+-Culture, which is the invariant culture unless New-VellumPdfDocument set one, so the labels no
+longer follow the machine's culture.
+An unknown name is an error.
+
+```yaml
+Type: System.Object
+DefaultValue: ''
 SupportsWildcards: false
 Aliases: []
 ParameterSets:
@@ -248,6 +279,30 @@ ParameterSets:
   Position: Named
   IsRequired: true
   ValueFromPipeline: true
+  ValueFromPipelineByPropertyName: false
+  ValueFromRemainingArguments: false
+DontShow: false
+AcceptedValues: []
+HelpMessage: ''
+```
+
+### -LabelFormat
+
+A .NET format string for the share label of the -Legend, applied to the share as a fraction
+(0.4 is 40 percent): 'P1' (default) gives 40.0 %, 'P0' 40 %, 'N2' 0.40.
+An invalid format is an
+error, with or without a legend.
+
+```yaml
+Type: System.String
+DefaultValue: P1
+SupportsWildcards: false
+Aliases: []
+ParameterSets:
+- Name: (All)
+  Position: Named
+  IsRequired: false
+  ValueFromPipeline: false
   ValueFromPipelineByPropertyName: false
   ValueFromRemainingArguments: false
 DontShow: false

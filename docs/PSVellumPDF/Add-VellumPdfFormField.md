@@ -348,6 +348,11 @@ HelpMessage: ''
 
 Choice: the initially selected entry.
 Radio: the initially selected export value.
+Matching ignores
+case, and the field stores the entry's own spelling ('large' selects the option 'Large' and writes
+Large).
+If two entries differ only in case and -Selected is not an exact match for one of them, the
+choice is ambiguous and an error is raised.
 
 ```yaml
 Type: System.String

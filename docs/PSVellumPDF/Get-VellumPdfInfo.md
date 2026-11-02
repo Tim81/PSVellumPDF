@@ -60,6 +60,13 @@ output intents and named destinations.
 The reader does not verify
 a signature, so this does not tell you whether one is valid.
 
+Several files can be given (or piped); they are opened one at a time.
+A failure for
+one file (not found, unreadable, malformed, wrong password, ...) is a non-terminating
+error with that file as TargetObject and the next file is still processed; use
+-ErrorAction Stop to stop at the first one.
+Invalid parameters terminate.
+
 ## EXAMPLES
 
 ### EXAMPLE 1
@@ -141,6 +148,8 @@ HelpMessage: ''
 ### -LiteralPath
 
 The PDF file(s), taken literally.
+Aliases PSPath and FullName, so objects with either property
+(FileInfo, Select-Object FullName) bind by name.
 
 ```yaml
 Type: System.String[]
@@ -148,6 +157,7 @@ DefaultValue: ''
 SupportsWildcards: false
 Aliases:
 - PSPath
+- FullName
 ParameterSets:
 - Name: LiteralPath
   Position: Named
@@ -252,7 +262,8 @@ HelpMessage: ''
 
 The PDF file(s).
 Accepts wildcards.
-Piped strings bind here; piped FileInfo objects (Get-ChildItem) bind to -LiteralPath through their PSPath, so names containing [ ] work.
+Piped strings bind here, and so do piped objects with a Path property;
+piped FileInfo objects (Get-ChildItem) bind to -LiteralPath through their PSPath, so names containing [ ] work.
 
 ```yaml
 Type: System.String[]
@@ -264,7 +275,7 @@ ParameterSets:
   Position: 0
   IsRequired: true
   ValueFromPipeline: true
-  ValueFromPipelineByPropertyName: false
+  ValueFromPipelineByPropertyName: true
   ValueFromRemainingArguments: false
 DontShow: false
 AcceptedValues: []

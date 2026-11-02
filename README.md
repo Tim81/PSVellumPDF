@@ -193,6 +193,49 @@ Several cmdlets take their input as arrays of arrays; a single table row is writ
   thread: they cannot be combined with an asynchronous signer
   (`-ExternalSigner`).
 
+### Numbers, dates and culture
+
+Tables, lists and pie charts write numbers and dates with the invariant culture
+unless you choose one: `-Culture de-DE` on the document (or on one call) writes
+`1.234,5` and `05.03.2026`. Format strings give the layout:
+
+```powershell
+$doc | Add-VellumPdfTable -Header 'Item', 'Price', 'Date' -Row $rows `
+       -ColumnFormat '', 'N2', 'yyyy-MM-dd' -Culture de-DE
+```
+
+Strings that are only a number are read as numbers first, whichever separator
+convention they use (`1.444,50`, `1,976.08`, `66443,85`, `775444335.7325`), so
+mixed input comes out consistent. A value such as `1,234` can mean either; the
+other values in the column decide, then `-InputCulture`, and otherwise it stays
+as typed (with a warning). Use `-NoNumberParsing`, or `Parse = $false` on a
+cell, for codes and ids. Values with leading zeros (`007`), IP addresses,
+currency signs and percentages are never treated as numbers.
+
+### Errors
+
+Errors carry a stable id, an exception type you can catch and a category; the
+messages are unchanged. PowerShell appends `,<function name>` to the id, so
+compare with `-like 'PSVellumPDF.FileNotFound*'`.
+
+| Id | Exception | Category |
+|---|---|---|
+| `PSVellumPDF.FileNotFound` | `System.Management.Automation.ItemNotFoundException` | ObjectNotFound |
+| `PSVellumPDF.InvalidArgument` | `System.ArgumentException` | InvalidArgument |
+| `PSVellumPDF.PasswordRequired` | `System.UnauthorizedAccessException` | SecurityError |
+| `PSVellumPDF.InvalidPdf` | `System.IO.InvalidDataException` | InvalidData |
+| `PSVellumPDF.NotConformant` | `System.InvalidOperationException` | InvalidResult |
+| `PSVellumPDF.FileReadError` | `System.IO.IOException` | ReadError |
+| `PSVellumPDF.InputError` | `System.InvalidOperationException` | InvalidData |
+| `PSVellumPDF.FileExists` | `System.IO.IOException` | ResourceExists |
+| `PSVellumPDF.<Cmdlet>` (anything else) | `System.InvalidOperationException` | InvalidOperation |
+
+The reader cmdlets (`Get-VellumPdfInfo`, `Get-VellumPdfText`,
+`Test-VellumPdfConformance`, `Export-VellumPdfImage`,
+`Unprotect-VellumPdfDocument`) report a bad file among several as a
+non-terminating error with these ids and the file as `TargetObject`, and go on
+with the next file; with `-ErrorAction Stop` they throw the same record.
+
 ### Embedded fonts (Unicode / PDF&#8203;/A / PDF&#8203;/UA)
 
 The base-14 fonts cover only Windows-1252 (Latin-1 plus the euro sign, curly
@@ -244,6 +287,11 @@ Existing scripts keep working, apart from these changes (details in the
 - **Conformant flow documents** embed metric-compatible Liberation fonts in
   place of the base-14 fonts, so PDF/A and PDF/UA-1 files pass without
   `-FontHandle`. Text in embedded fonts is not extracted by `Get-VellumPdfText`.
+- **Numbers in tables and lists**: strings that are only a number are read
+  as numbers and written with the chosen culture (invariant by default), so
+  `1.444,50` becomes `1444.50` unless you pass `-Culture de-DE`, a format, or
+  `-NoNumberParsing`. Pie-chart percentages no longer follow the machine
+  culture.
 - **Installation**: the module now loads eight assemblies, including
   `VellumPdf.Reader` and a small `PSVellumPDF.Interop`. Run
   `./build.ps1 Restore` after pulling; a stale `lib/` is detected and

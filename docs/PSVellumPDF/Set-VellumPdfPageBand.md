@@ -331,6 +331,7 @@ HelpMessage: ''
 
 The band text with optional {page} and {pages} tokens.
 A single line.
+A tab is drawn as four spaces.
 
 ```yaml
 Type: System.String

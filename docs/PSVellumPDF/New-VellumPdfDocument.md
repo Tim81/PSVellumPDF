@@ -23,7 +23,7 @@ Creates a new VellumPdf layout document.
 New-VellumPdfDocument [-Conformance <string>] [-PageSize <string>] [-DefaultFont <string>]
  [-DefaultFontSize <double>] [-Tagged] [-Language <string>] [-Margin <double>] [-MarginTop <double>]
  [-MarginRight <double>] [-MarginBottom <double>] [-MarginLeft <double>] [-UseObjectStreams]
- [<CommonParameters>]
+ [-Culture <Object>] [-InputCulture <Object>] [<CommonParameters>]
 ```
 
 ### CustomPage
@@ -32,7 +32,8 @@ New-VellumPdfDocument [-Conformance <string>] [-PageSize <string>] [-DefaultFont
 New-VellumPdfDocument -PageWidthMm <double> -PageHeightMm <double> [-Conformance <string>]
  [-DefaultFont <string>] [-DefaultFontSize <double>] [-Tagged] [-Language <string>]
  [-Margin <double>] [-MarginTop <double>] [-MarginRight <double>] [-MarginBottom <double>]
- [-MarginLeft <double>] [-UseObjectStreams] [<CommonParameters>]
+ [-MarginLeft <double>] [-UseObjectStreams] [-Culture <Object>] [-InputCulture <Object>]
+ [<CommonParameters>]
 ```
 
 ## DESCRIPTION
@@ -85,10 +86,21 @@ PDF/UA-1 forces a tagged document.
 To pass the
 preflight (Test-VellumPdfConformance, or Save-VellumPdfDocument -Validate)
 also set -Language, give the document a title with Set-VellumPdfDocumentInfo
--Title, embed a TrueType font (Register-VellumPdfFont + -FontHandle on
-every text element; base-14 fonts are not embedded), and give images,
-charts and barcodes alternate text.
-PDF/A likewise requires embedded fonts.
+-Title, and give images, charts and barcodes alternate text.
+Both levels
+require embedded fonts: a conformant document therefore draws every base-14
+font name it uses (the document default, -Font on paragraphs, headings,
+tables, lists, text runs, headers and footers) in the metric-compatible
+Liberation font (Helvetica -> Liberation Sans, Times -> Serif, Courier ->
+Mono, with bold and italic variants), embedded once per document; layout is
+unchanged.
+Symbol and ZapfDingbats have no substitute: use -FontHandle
+(Register-VellumPdfFont) for those and for text outside Windows-1252.
+Text
+in embedded fonts is not extracted by Get-VellumPdfText (its reader decodes
+simple fonts only).
+A document without -Conformance keeps the plain base-14
+fonts.
 Hyperlinks (-LinkUri) are not tagged by
 VellumPdf, so a PDF/UA document containing them is not fully conformant.
 Note that PDF/A forbids encryption, so PDF/A is incompatible with
@@ -97,6 +109,37 @@ Protect-VellumPdfDocument; PDF/UA-1 may be encrypted if Extract is kept.
 ```yaml
 Type: System.String
 DefaultValue: None
+SupportsWildcards: false
+Aliases: []
+ParameterSets:
+- Name: (All)
+  Position: Named
+  IsRequired: false
+  ValueFromPipeline: false
+  ValueFromPipelineByPropertyName: false
+  ValueFromRemainingArguments: false
+DontShow: false
+AcceptedValues: []
+HelpMessage: ''
+```
+
+### -Culture
+
+The culture used to turn non-string values into text: table cells, list items and pie-chart
+percentage labels (dates, numbers, and numbers read from strings).
+A culture name ('de-DE') or a
+[cultureinfo] (-Culture (Get-Culture) matches the console); an unknown name is an error.
+Default:
+the invariant culture, so the output is the same on every machine.
+Each of Add-VellumPdfTable,
+Add-VellumPdfList, Add-VellumPdfPieChart (and the page-document counterparts) has its own -Culture
+that overrides this default for one call.
+It is deliberately not derived from -Language: a language
+tag says nothing about how dates and numbers look.
+
+```yaml
+Type: System.Object
+DefaultValue: ''
 SupportsWildcards: false
 Aliases: []
 ParameterSets:
@@ -147,6 +190,34 @@ Defaults to 11.
 ```yaml
 Type: System.Double
 DefaultValue: 11
+SupportsWildcards: false
+Aliases: []
+ParameterSets:
+- Name: (All)
+  Position: Named
+  IsRequired: false
+  ValueFromPipeline: false
+  ValueFromPipelineByPropertyName: false
+  ValueFromRemainingArguments: false
+DontShow: false
+AcceptedValues: []
+HelpMessage: ''
+```
+
+### -InputCulture
+
+A culture name or [cultureinfo] used to READ numbers that are given as strings in table cells and
+list items (the document default; the table and list cmdlets have a per-call -InputCulture).
+With it,
+a string that consists only of a number is parsed strictly with that culture's decimal and grouping
+separators ('de-DE': '1.234,5' is 1234.5, '1.5' is not a number).
+Without it (the default) the
+separators are detected from the text.
+See Add-VellumPdfTable for the detection rules.
+
+```yaml
+Type: System.Object
+DefaultValue: ''
 SupportsWildcards: false
 Aliases: []
 ParameterSets:

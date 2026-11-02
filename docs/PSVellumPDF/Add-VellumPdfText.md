@@ -39,6 +39,7 @@ TrueType font (-FontHandle from Register-VellumPdfFont) for Unicode text.
 In a PDF/A document base-14 text is embedded automatically with a
 metric-compatible Liberation font (VellumPdf.Fonts.Standard14), as PDF/A
 forbids non-embedded fonts.
+A tab is drawn as four spaces (a tab has no glyph in a PDF font).
 For several lines of wrapped text use the
 flow-layout document (New-VellumPdfDocument).
 
@@ -74,7 +75,9 @@ HelpMessage: ''
 ### -CharSpacing
 
 Extra space after every character, in points; negative tightens.
-Alignment accounts for it.
+Alignment accounts for it: the space after the
+last character is not counted, so right-aligned text ends exactly at -X and centred text is
+centred on its visible glyphs.
 
 ```yaml
 Type: System.Double

@@ -162,7 +162,8 @@ HelpMessage: ''
 
 ### -PassThru
 
-Return the new PdfPage object instead of the document.
+Return the new PdfPage object instead of the document; with -Count above 1, every new page
+(one PdfPage object each, in order).
 
 ```yaml
 Type: System.Management.Automation.SwitchParameter

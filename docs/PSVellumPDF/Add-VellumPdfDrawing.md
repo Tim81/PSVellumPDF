@@ -52,7 +52,16 @@ SetStrokeColor, ShowGlyphs) instead.
 
 The script block runs while the document is saved, on the PowerShell
 thread.
-It therefore works with Save-VellumPdfDocument but not with an
+The variables it reads (such as a loop variable or a function's
+locals) are captured when Add-VellumPdfDrawing is called, so the block
+draws with the values they had then; $script: and $global: variables and
+functions stay live, and assignments to a captured variable stay inside
+the block.
+SaveState/RestoreState must balance inside the block: an
+uneven block makes the save fail with an error naming Add-VellumPdfDrawing.
+In a PDF/A or PDF/UA document draw text with an embedded font
+($ctx.UseEmbeddedFont), since $ctx.GetFont uses a non-embedded base-14 font.
+Because it runs at save time it works with Save-VellumPdfDocument but not with an
 asynchronous save or an external asynchronous signer.
 In a tagged document
 the drawing is a Figure with -AltText (or the text 'Drawing'); pass

@@ -23,9 +23,10 @@ Adds a table to a VellumPdf document.
 Add-VellumPdfTable [-Document] <Document> [[-Header] <Object[]>] [-Row] <Object[]>
  [[-ColumnWidth] <double[]>] [[-BorderWidth] <double>] [[-BorderColor] <Object>]
  [[-HeaderBackground] <Object>] [[-AlternateRowBackground] <Object>] [[-ColumnAlignment] <string[]>]
- [[-Font] <string>] [[-FontSize] <double>] [[-FontHandle] <EmbeddedFontHandle>]
- [[-CellPadding] <Object>] [[-Alignment] <string>] [[-MarginTop] <double>]
- [[-MarginBottom] <double>] [<CommonParameters>]
+ [[-ColumnFormat] <string[]>] [[-Culture] <Object>] [[-InputCulture] <Object>] [[-Font] <string>]
+ [[-FontSize] <double>] [[-FontHandle] <EmbeddedFontHandle>] [[-CellPadding] <Object>]
+ [[-Alignment] <string>] [[-MarginTop] <double>] [[-MarginBottom] <double>] [-NoNumberParsing]
+ [<CommonParameters>]
 ```
 
 ## DESCRIPTION
@@ -39,9 +40,16 @@ chaining with other Add-VellumPdf* functions.
 
 -Row accepts two shapes (the first row decides which):
   - Records: PSCustomObject rows straight from Import-Csv or Select-Object,
-    or one hashtable per row.
-Columns are the property/key names and a
-    header is derived from them when -Header is omitted.
+    or one [ordered] dictionary per row.
+Columns are the property/key names,
+    in the first row's order, and a header is derived from them when -Header
+    is omitted.
+A plain @{} hashtable with more than one key is refused: it
+    has no fixed key order, so the columns would come out shuffled.
+Write
+    [ordered]@{ ...
+} or [pscustomobject]@{ ...
+} (a one-key hashtable is fine).
   - Cell arrays: one array per row.
 Each element is a scalar (added as
     text) or a rich-cell hashtable for that one cell:
@@ -51,10 +59,48 @@ Each element is a scalar (added as
     Text is required; the rest are optional.
 More keys: FontHandle (an
     embedded font for this cell), Leading, Padding (1, 2 or 4 numbers),
-    and Language (BCP 47 tag, tagged documents only).
+    Language (BCP 47 tag, tagged documents only), Format (a .NET format string for
+    this cell) and Parse (set $false to draw a string as given).
 A LinkUri key is
     refused because VellumPdf ignores hyperlinks in table cells.
   - The same keys work in -Header entries.
+
+Values become text with a culture and an optional format.
+A string cell is drawn as given unless it
+consists only of a number; any other value (a number, a date, ...) is converted with -Culture (the
+document's -Culture, invariant unless set) and the column's -ColumnFormat or the cell's own Format
+key (a .NET format string such as 'N2' or 'yyyy-MM-dd').
+A rich cell may carry a Format key, which
+wins over -ColumnFormat, and Parse = $false to draw its string exactly as given.
+
+Numbers in strings are always recognised (switch it off with -NoNumberParsing): a string cell (never
+a header cell) that is only a number is read as [decimal], keeping its decimals, and then drawn like
+any other number, so with the invariant default
+'1.444,50' becomes 1444.50, '1,976.08' becomes 1976.08 and '55433.34' stays 55433.34.
+The
+separators are detected from the text:
+  1.
+With both '.' and ',' the LAST one is the decimal mark (1.444,50 and 1,976.08).
+  2.
+A separator that appears more than once is grouping (1.234.567).
+  3.
+A separator that appears once is a decimal mark (55433.34, 66443,85, 777544434,7755), except
+     that exactly three digits after it with at most three digits before it is ambiguous (1,234
+     and 1.234: with more than three digits before it, as in 12345,678, it is a decimal mark).
+  4.
+Grouping must be regular: 1-3 digits, then groups of exactly 3 (1.2.3 and the IP-like 10.0.0.1
+     stay text).
+  5.
+Not a number, so left as is: a leading zero in a multi-digit integer part (007, 01234),
+     spaces, currency symbols, '%', exponents, an empty string.
+  6.
+An ambiguous number takes the convention of the other values in the same column
+     ('1.444,50' above shows that '.' groups); without such evidence it is left unchanged and
+     ONE warning per call names the values.
+-InputCulture switches detection off: every string is read strictly with that culture's separators
+(de-DE: '1.234' is 1234 and '55433.34' is text).
+-NoNumberParsing draws every string as given
+(codes, ids, phone numbers).
 
 Colour parameters (-BorderColor, -HeaderBackground, -AlternateRowBackground,
 and a cell's Background/Color) accept an R,G,B triple in 0..1, a hex string
@@ -91,6 +137,17 @@ New-VellumPdfDocument |
 $doc | Add-VellumPdfTable -Row @(@('Cell1','Cell2')) `
        -ColumnWidth @(100, 200) -Font Helvetica -FontSize 10 -Alignment Center
 
+### EXAMPLE 3
+
+# Numbers in strings are read, dates and numbers use the culture and the column formats
+$rows = @(
+    @('Widget', '1.444,50', [datetime]'2026-03-05'),
+    @('Gadget', '55433.34', [datetime]'2026-12-25'))
+New-VellumPdfDocument |
+    Add-VellumPdfTable -Header 'Item', 'Amount', 'Date' -Row $rows -Culture de-DE `
+        -ColumnFormat '', 'N2', 'd' -ColumnAlignment Left, Right, Right |
+    Save-VellumPdfDocument -Path ./amounts.pdf
+
 ## PARAMETERS
 
 ### -Alignment
@@ -107,7 +164,7 @@ SupportsWildcards: false
 Aliases: []
 ParameterSets:
 - Name: (All)
-  Position: 13
+  Position: 16
   IsRequired: false
   ValueFromPipeline: false
   ValueFromPipelineByPropertyName: false
@@ -200,7 +257,7 @@ SupportsWildcards: false
 Aliases: []
 ParameterSets:
 - Name: (All)
-  Position: 12
+  Position: 15
   IsRequired: false
   ValueFromPipeline: false
   ValueFromPipelineByPropertyName: false
@@ -234,6 +291,33 @@ AcceptedValues: []
 HelpMessage: ''
 ```
 
+### -ColumnFormat
+
+A .NET format string per column, parallel to -ColumnAlignment (by grid column index, a $null or ''
+entry leaves a column on the type's default): -ColumnFormat '', 'N2', 'yyyy-MM-dd'.
+Applied to numbers
+and dates (and to numbers read from strings) with -Culture; text is never changed.
+A cell's own
+Format key wins.
+A format the value's type rejects is an error naming the column.
+
+```yaml
+Type: System.String[]
+DefaultValue: ''
+SupportsWildcards: false
+Aliases: []
+ParameterSets:
+- Name: (All)
+  Position: 9
+  IsRequired: false
+  ValueFromPipeline: false
+  ValueFromPipelineByPropertyName: false
+  ValueFromRemainingArguments: false
+DontShow: false
+AcceptedValues: []
+HelpMessage: ''
+```
+
 ### -ColumnWidth
 
 Column widths in points, each between 0 and 100000.
@@ -251,6 +335,32 @@ Aliases: []
 ParameterSets:
 - Name: (All)
   Position: 3
+  IsRequired: false
+  ValueFromPipeline: false
+  ValueFromPipelineByPropertyName: false
+  ValueFromRemainingArguments: false
+DontShow: false
+AcceptedValues: []
+HelpMessage: ''
+```
+
+### -Culture
+
+The culture used to turn numbers and dates into text: a name ('de-DE') or a [cultureinfo]
+(-Culture (Get-Culture) matches the console).
+Default: the document's -Culture, which is the
+invariant culture unless New-VellumPdfDocument/New-VellumPdfPageDocument set one, so the output is
+the same on every machine.
+An unknown name is an error.
+
+```yaml
+Type: System.Object
+DefaultValue: ''
+SupportsWildcards: false
+Aliases: []
+ParameterSets:
+- Name: (All)
+  Position: 10
   IsRequired: false
   ValueFromPipeline: false
   ValueFromPipelineByPropertyName: false
@@ -296,7 +406,7 @@ SupportsWildcards: false
 Aliases: []
 ParameterSets:
 - Name: (All)
-  Position: 9
+  Position: 12
   IsRequired: false
   ValueFromPipeline: false
   ValueFromPipelineByPropertyName: false
@@ -323,7 +433,7 @@ SupportsWildcards: false
 Aliases: []
 ParameterSets:
 - Name: (All)
-  Position: 11
+  Position: 14
   IsRequired: false
   ValueFromPipeline: false
   ValueFromPipelineByPropertyName: false
@@ -346,7 +456,7 @@ SupportsWildcards: false
 Aliases: []
 ParameterSets:
 - Name: (All)
-  Position: 10
+  Position: 13
   IsRequired: false
   ValueFromPipeline: false
   ValueFromPipelineByPropertyName: false
@@ -408,6 +518,31 @@ AcceptedValues: []
 HelpMessage: ''
 ```
 
+### -InputCulture
+
+Read number strings strictly with this culture (name or [cultureinfo]) instead of detecting the
+separators.
+Default: the document's -InputCulture, else detection.
+Pass $null to switch the
+document's -InputCulture off for this call.
+
+```yaml
+Type: System.Object
+DefaultValue: ''
+SupportsWildcards: false
+Aliases: []
+ParameterSets:
+- Name: (All)
+  Position: 11
+  IsRequired: false
+  ValueFromPipeline: false
+  ValueFromPipelineByPropertyName: false
+  ValueFromRemainingArguments: false
+DontShow: false
+AcceptedValues: []
+HelpMessage: ''
+```
+
 ### -MarginBottom
 
 Extra spacing in points below the table element.
@@ -421,7 +556,7 @@ SupportsWildcards: false
 Aliases: []
 ParameterSets:
 - Name: (All)
-  Position: 15
+  Position: 18
   IsRequired: false
   ValueFromPipeline: false
   ValueFromPipelineByPropertyName: false
@@ -444,7 +579,30 @@ SupportsWildcards: false
 Aliases: []
 ParameterSets:
 - Name: (All)
-  Position: 14
+  Position: 17
+  IsRequired: false
+  ValueFromPipeline: false
+  ValueFromPipelineByPropertyName: false
+  ValueFromRemainingArguments: false
+DontShow: false
+AcceptedValues: []
+HelpMessage: ''
+```
+
+### -NoNumberParsing
+
+Draw every string exactly as given instead of reading numbers from it.
+A single cell can do the same
+with the rich-cell key Parse = $false.
+
+```yaml
+Type: System.Management.Automation.SwitchParameter
+DefaultValue: False
+SupportsWildcards: false
+Aliases: []
+ParameterSets:
+- Name: (All)
+  Position: Named
   IsRequired: false
   ValueFromPipeline: false
   ValueFromPipelineByPropertyName: false
@@ -457,12 +615,17 @@ HelpMessage: ''
 ### -Row
 
 The table rows.
-Either PSCustomObject/hashtable records (columns are the
+Either PSCustomObject/[ordered] records (columns are the
 property/key names; header derived when -Header is omitted), or one array
 per row whose elements are scalars or rich-cell hashtables (see the
 description).
 For a single cell-array row, use the unary comma operator to
 prevent PowerShell from flattening the outer array: -Row @(,@('a','b')).
+May be empty (or $null) when -Header is given: the result is a header-only
+table (drawn as ordinary rows, because the engine cannot lay out a table
+of header rows alone, so a tagged document does not mark them as header
+cells).
+An empty -Row without -Header is an error.
 
 ```yaml
 Type: System.Object[]

@@ -21,18 +21,18 @@ Writes a decrypted copy of a password-protected PDF.
 
 ```
 Unprotect-VellumPdfDocument [-Path] <string> -DestinationPath <string> [-Password <securestring>]
- [-AllowInvalidatingSignatures] [-Force] [-MaxDecodedStreamBytes <long>] [-MaxDiagnostics <int>]
- [-MaxFormXObjectDepth <int>] [-ReconstructionBudgetMultiplier <int>] [-WhatIf] [-Confirm]
- [<CommonParameters>]
+ [-AllowInvalidatingSignatures] [-Force] [-AllowReconstruction] [-MaxDecodedStreamBytes <long>]
+ [-MaxDiagnostics <int>] [-MaxFormXObjectDepth <int>] [-ReconstructionBudgetMultiplier <int>]
+ [-WhatIf] [-Confirm] [<CommonParameters>]
 ```
 
 ### LiteralPath
 
 ```
 Unprotect-VellumPdfDocument -LiteralPath <string> -DestinationPath <string>
- [-Password <securestring>] [-AllowInvalidatingSignatures] [-Force] [-MaxDecodedStreamBytes <long>]
- [-MaxDiagnostics <int>] [-MaxFormXObjectDepth <int>] [-ReconstructionBudgetMultiplier <int>]
- [-WhatIf] [-Confirm] [<CommonParameters>]
+ [-Password <securestring>] [-AllowInvalidatingSignatures] [-Force] [-AllowReconstruction]
+ [-MaxDecodedStreamBytes <long>] [-MaxDiagnostics <int>] [-MaxFormXObjectDepth <int>]
+ [-ReconstructionBudgetMultiplier <int>] [-WhatIf] [-Confirm] [<CommonParameters>]
 ```
 
 ## DESCRIPTION
@@ -50,6 +50,15 @@ signatures (they cover the encrypted bytes).
 The cmdlet refuses by default;
 pass -AllowInvalidatingSignatures to accept that.
 
+One file at a time: a path that matches several files is refused (counted before any
+file is read).
+A failure for the file itself (not found, unreadable, not encrypted,
+wrong or missing password, malformed) is a non-terminating error with the file as
+TargetObject, so it follows -ErrorAction (use -ErrorAction Stop to throw).
+Invalid
+parameters (a destination equal to the source, an existing destination without -Force)
+terminate.
+
 ## EXAMPLES
 
 ### EXAMPLE 1
@@ -61,6 +70,28 @@ Unprotect-VellumPdfDocument ./locked.pdf -DestinationPath ./open.pdf -Password (
 ### -AllowInvalidatingSignatures
 
 Decrypt even though existing digital signatures become invalid.
+
+```yaml
+Type: System.Management.Automation.SwitchParameter
+DefaultValue: False
+SupportsWildcards: false
+Aliases: []
+ParameterSets:
+- Name: (All)
+  Position: Named
+  IsRequired: false
+  ValueFromPipeline: false
+  ValueFromPipelineByPropertyName: false
+  ValueFromRemainingArguments: false
+DontShow: false
+AcceptedValues: []
+HelpMessage: ''
+```
+
+### -AllowReconstruction
+
+Try to recover a damaged file (missing or broken cross-reference table) by
+scanning for objects before decrypting it.
 
 ```yaml
 Type: System.Management.Automation.SwitchParameter
@@ -147,6 +178,7 @@ HelpMessage: ''
 ### -LiteralPath
 
 The encrypted PDF, taken literally.
+Aliases PSPath and FullName, so objects with either property bind by name.
 
 ```yaml
 Type: System.String
@@ -154,6 +186,7 @@ DefaultValue: ''
 SupportsWildcards: false
 Aliases:
 - PSPath
+- FullName
 ParameterSets:
 - Name: LiteralPath
   Position: Named
@@ -255,6 +288,9 @@ HelpMessage: ''
 ### -Path
 
 The encrypted PDF.
+Accepts wildcards, but the path must match exactly one file.
+Piped strings bind here, and so do
+piped objects with a Path property; piped FileInfo objects bind to -LiteralPath through their PSPath.
 
 ```yaml
 Type: System.String
@@ -266,7 +302,7 @@ ParameterSets:
   Position: 0
   IsRequired: true
   ValueFromPipeline: true
-  ValueFromPipelineByPropertyName: false
+  ValueFromPipelineByPropertyName: true
   ValueFromRemainingArguments: false
 DontShow: false
 AcceptedValues: []

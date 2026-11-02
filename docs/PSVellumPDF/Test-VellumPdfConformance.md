@@ -58,6 +58,15 @@ formal compliance statement is required.
 Known gap: it does not examine
 fonts that are used only by form fields or other annotation appearances.
 
+Several files can be given (or piped); they are opened one at a time.
+A failure for
+one file (not found, unreadable, malformed, wrong password, ...) is a non-terminating
+error with that file as TargetObject and the next file is still processed; use
+-ErrorAction Stop to stop at the first one.
+Invalid parameters terminate.
+With -Quiet a file that could
+not be checked makes the result $false.
+
 ## EXAMPLES
 
 ### EXAMPLE 1
@@ -96,6 +105,8 @@ HelpMessage: ''
 ### -LiteralPath
 
 The PDF file(s), taken literally (no wildcards).
+Aliases PSPath and FullName, so objects with either
+property (FileInfo, Select-Object FullName) bind by name.
 
 ```yaml
 Type: System.String[]
@@ -103,6 +114,7 @@ DefaultValue: ''
 SupportsWildcards: false
 Aliases:
 - PSPath
+- FullName
 ParameterSets:
 - Name: LiteralPath
   Position: Named
@@ -142,8 +154,8 @@ HelpMessage: ''
 
 The PDF file(s).
 Accepts wildcards.
-Piped strings bind here; the file returned
-by Save-VellumPdfDocument (a FileInfo) binds to -LiteralPath, so it can be piped
+Piped strings bind here, and so do piped objects with a Path property;
+the file returned by Save-VellumPdfDocument (a FileInfo) binds to -LiteralPath, so it can be piped
 straight in and names containing [ ] work.
 
 ```yaml
@@ -156,7 +168,7 @@ ParameterSets:
   Position: 0
   IsRequired: true
   ValueFromPipeline: true
-  ValueFromPipelineByPropertyName: false
+  ValueFromPipelineByPropertyName: true
   ValueFromRemainingArguments: false
 DontShow: false
 AcceptedValues: []

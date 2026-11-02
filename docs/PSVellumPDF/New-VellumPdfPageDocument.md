@@ -22,7 +22,7 @@ Creates a page-based PDF document for precise placement: drawing, forms, links, 
 ```
 New-VellumPdfPageDocument [-Conformance <string>] [-Tagged] [-PageSize <string>]
  [-Language <string>] [-UseObjectStreams] [-Linearize] [-DocumentId <byte[]>]
- [-Timestamp <DateTimeOffset>] [<CommonParameters>]
+ [-Timestamp <DateTimeOffset>] [-Culture <Object>] [-InputCulture <Object>] [<CommonParameters>]
 ```
 
 ### CustomPage
@@ -30,7 +30,7 @@ New-VellumPdfPageDocument [-Conformance <string>] [-Tagged] [-PageSize <string>]
 ```
 New-VellumPdfPageDocument -PageWidthMm <double> -PageHeightMm <double> [-Conformance <string>]
  [-Tagged] [-Language <string>] [-UseObjectStreams] [-Linearize] [-DocumentId <byte[]>]
- [-Timestamp <DateTimeOffset>] [<CommonParameters>]
+ [-Timestamp <DateTimeOffset>] [-Culture <Object>] [-InputCulture <Object>] [<CommonParameters>]
 ```
 
 ## DESCRIPTION
@@ -114,6 +114,37 @@ AcceptedValues: []
 HelpMessage: ''
 ```
 
+### -Culture
+
+The culture used to turn non-string values into text: table cells, list items and pie-chart
+percentage labels (dates, numbers, and numbers read from strings).
+A culture name ('de-DE') or a
+[cultureinfo] (-Culture (Get-Culture) matches the console); an unknown name is an error.
+Default:
+the invariant culture, so the output is the same on every machine.
+Each of Add-VellumPdfTable,
+Add-VellumPdfList, Add-VellumPdfPieChart (and the page-document counterparts) has its own -Culture
+that overrides this default for one call.
+It is deliberately not derived from -Language: a language
+tag says nothing about how dates and numbers look.
+
+```yaml
+Type: System.Object
+DefaultValue: ''
+SupportsWildcards: false
+Aliases: []
+ParameterSets:
+- Name: (All)
+  Position: Named
+  IsRequired: false
+  ValueFromPipeline: false
+  ValueFromPipelineByPropertyName: false
+  ValueFromRemainingArguments: false
+DontShow: false
+AcceptedValues: []
+HelpMessage: ''
+```
+
 ### -DocumentId
 
 Exactly 16 bytes used as the document /ID.
@@ -122,6 +153,34 @@ and the creation time.
 
 ```yaml
 Type: System.Byte[]
+DefaultValue: ''
+SupportsWildcards: false
+Aliases: []
+ParameterSets:
+- Name: (All)
+  Position: Named
+  IsRequired: false
+  ValueFromPipeline: false
+  ValueFromPipelineByPropertyName: false
+  ValueFromRemainingArguments: false
+DontShow: false
+AcceptedValues: []
+HelpMessage: ''
+```
+
+### -InputCulture
+
+A culture name or [cultureinfo] used to READ numbers that are given as strings in table cells and
+list items (the document default; the table and list cmdlets have a per-call -InputCulture).
+With it,
+a string that consists only of a number is parsed strictly with that culture's decimal and grouping
+separators ('de-DE': '1.234,5' is 1234.5, '1.5' is not a number).
+Without it (the default) the
+separators are detected from the text.
+See Add-VellumPdfTable for the detection rules.
+
+```yaml
+Type: System.Object
 DefaultValue: ''
 SupportsWildcards: false
 Aliases: []

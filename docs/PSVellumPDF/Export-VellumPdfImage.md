@@ -21,7 +21,7 @@ Saves the images embedded in an existing PDF as files.
 
 ```
 Export-VellumPdfImage [-Path] <string[]> -DestinationPath <string> [-BaseName <string>]
- [-Page <int[]>] [-ExcludeInline] [-Password <securestring>] [-Force]
+ [-Page <int[]>] [-ExcludeInline] [-Password <securestring>] [-Force] [-AllowReconstruction]
  [-MaxDecodedStreamBytes <long>] [-MaxDiagnostics <int>] [-MaxFormXObjectDepth <int>]
  [-ReconstructionBudgetMultiplier <int>] [-WhatIf] [-Confirm] [<CommonParameters>]
 ```
@@ -30,7 +30,7 @@ Export-VellumPdfImage [-Path] <string[]> -DestinationPath <string> [-BaseName <s
 
 ```
 Export-VellumPdfImage -LiteralPath <string[]> -DestinationPath <string> [-BaseName <string>]
- [-Page <int[]>] [-ExcludeInline] [-Password <securestring>] [-Force]
+ [-Page <int[]>] [-ExcludeInline] [-Password <securestring>] [-Force] [-AllowReconstruction]
  [-MaxDecodedStreamBytes <long>] [-MaxDiagnostics <int>] [-MaxFormXObjectDepth <int>]
  [-ReconstructionBudgetMultiplier <int>] [-WhatIf] [-Confirm] [<CommonParameters>]
 ```
@@ -39,9 +39,9 @@ Export-VellumPdfImage -LiteralPath <string[]> -DestinationPath <string> [-BaseNa
 
 ```
 Export-VellumPdfImage -Bytes <byte[]> -DestinationPath <string> [-BaseName <string>] [-Page <int[]>]
- [-ExcludeInline] [-Password <securestring>] [-Force] [-MaxDecodedStreamBytes <long>]
- [-MaxDiagnostics <int>] [-MaxFormXObjectDepth <int>] [-ReconstructionBudgetMultiplier <int>]
- [-WhatIf] [-Confirm] [<CommonParameters>]
+ [-ExcludeInline] [-Password <securestring>] [-Force] [-AllowReconstruction]
+ [-MaxDecodedStreamBytes <long>] [-MaxDiagnostics <int>] [-MaxFormXObjectDepth <int>]
+ [-ReconstructionBudgetMultiplier <int>] [-WhatIf] [-Confirm] [<CommonParameters>]
 ```
 
 ## DESCRIPTION
@@ -64,9 +64,21 @@ or indexed samples) are skipped with a warning.
 Each file object carries Page, Encoding, Width, Height, BitsPerComponent,
 ColorSpace, ComponentCount, IsInline, IsStencilMask and HasSoftMask.
 
-Files are named <pdf name>-p<page>-i<n>.<ext>.
-An existing file is not
-overwritten unless -Force is given.
+Files are named <pdf name>-p<page>-i<n>.<ext> (<n> counts the images of that page
+in that PDF; -BaseName replaces <pdf name>).
+Names are unique within one call: when
+several PDFs would produce the same name (a/report.pdf and b/report.pdf, or any
+input with -BaseName) the later file gets a numeric suffix, for example
+report-p1-i1-2.png, and a file written earlier in the same call is never
+overwritten.
+A file that already existed before the call is not overwritten
+unless -Force is given.
+
+A failure for one PDF (not found, unreadable, malformed, wrong password, ...) is a
+non-terminating error for that file: the other PDFs are still processed.
+Use
+-ErrorAction Stop to stop at the first one.
+Inputs are read one at a time.
 
 ## EXAMPLES
 
@@ -75,6 +87,28 @@ overwritten unless -Force is given.
 Export-VellumPdfImage ./brochure.pdf -DestinationPath ./images
 
 ## PARAMETERS
+
+### -AllowReconstruction
+
+Try to recover a damaged file (missing or broken cross-reference table) by
+scanning for objects.
+
+```yaml
+Type: System.Management.Automation.SwitchParameter
+DefaultValue: False
+SupportsWildcards: false
+Aliases: []
+ParameterSets:
+- Name: (All)
+  Position: Named
+  IsRequired: false
+  ValueFromPipeline: false
+  ValueFromPipelineByPropertyName: false
+  ValueFromRemainingArguments: false
+DontShow: false
+AcceptedValues: []
+HelpMessage: ''
+```
 
 ### -BaseName
 
@@ -186,7 +220,9 @@ HelpMessage: ''
 
 ### -Force
 
-Overwrite existing files.
+Overwrite files that existed before the call.
+Files written earlier in the same call
+are never overwritten (see the naming rules above).
 
 ```yaml
 Type: System.Management.Automation.SwitchParameter
@@ -208,6 +244,7 @@ HelpMessage: ''
 ### -LiteralPath
 
 The PDF file(s), taken literally.
+Aliases PSPath and FullName, so objects with either property bind by name.
 
 ```yaml
 Type: System.String[]
@@ -215,6 +252,7 @@ DefaultValue: ''
 SupportsWildcards: false
 Aliases:
 - PSPath
+- FullName
 ParameterSets:
 - Name: LiteralPath
   Position: Named
@@ -339,7 +377,8 @@ HelpMessage: ''
 
 The PDF file(s).
 Accepts wildcards.
-Piped strings bind here; piped file objects bind to -LiteralPath.
+Piped strings bind here, and so do piped objects with a Path property;
+piped FileInfo objects (Get-ChildItem) bind to -LiteralPath through their PSPath, so names containing [ ] work.
 
 ```yaml
 Type: System.String[]
@@ -351,7 +390,7 @@ ParameterSets:
   Position: 0
   IsRequired: true
   ValueFromPipeline: true
-  ValueFromPipelineByPropertyName: false
+  ValueFromPipelineByPropertyName: true
   ValueFromRemainingArguments: false
 DontShow: false
 AcceptedValues: []

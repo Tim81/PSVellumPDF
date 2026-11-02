@@ -79,6 +79,19 @@ in ways that change output. Upgrade notes are in the README.
 - **Right- and centre-aligned text with `-CharSpacing`** aligns on its visible glyphs: the spacing after the last
   character is no longer counted, so right-aligned text ends exactly at `-X`.
 
+- **Numbers in table cells and list items**: a string that is only a number (`1.444,50`, `1,976.08`, `66443,85`)
+  is read as a decimal and drawn with the cell's format and culture; with the invariant default and no format,
+  `1.444,50` is drawn as `1444.50`. Both separator conventions are detected; an ambiguous value such as `1,234` is
+  resolved from the other values in the column or list, then from `-InputCulture`, and otherwise left as typed with
+  one warning. `-NoNumberParsing` (or a cell's `Parse = $false`) draws strings exactly as given; header cells are
+  never parsed.
+- **Pie-chart legend percentages** use the invariant culture (`33.3 %`) instead of the machine's culture; pass
+  `-Culture` to choose one.
+- **Error ids**: the reader cmdlets' per-file ids `PdfFileNotFound`, `PdfFileReadError` and `PdfInputError` (new in
+  this release's development) are `PSVellumPDF.FileNotFound`, `PSVellumPDF.FileReadError`, `PSVellumPDF.InvalidPdf`,
+  `PSVellumPDF.PasswordRequired` and `PSVellumPDF.InputError`; `Export-VellumPdfImage`'s `ImageFileExists` is
+  `PSVellumPDF.FileExists`.
+
 ### Added
 - **New flow-document cmdlets**: `Add-VellumPdfPieChart` (slices or pipeline data,
   colour-blind-safe palette, legend, alternate text), `Add-VellumPdfBarcode`
@@ -207,6 +220,21 @@ in ways that change output. Upgrade notes are in the README.
 - B-LT/B-LTA revocation lookups use a per-signature HTTP client that follows at most
   three redirects, instead of the engine's process-wide shared client.
 - Table without `-Header`: the column-count check no longer counts a phantom header.
+
+### Added (second review)
+- **Culture and formats**: `-Culture` (a name such as `de-DE` or a `[cultureinfo]`) on `New-VellumPdfDocument` and
+  `New-VellumPdfPageDocument` sets how numbers and dates are written; the same parameter on `Add-VellumPdfTable`,
+  `Add-VellumPdfPageTable`, `Add-VellumPdfList`, `Add-VellumPdfPageList` and `Add-VellumPdfPieChart` overrides it for
+  one call. The default is the invariant culture, so output does not depend on the machine.
+- .NET format strings: `-ColumnFormat` (tables, one per column, beside `-ColumnAlignment`), `-Format` (lists) and
+  `-LabelFormat` (pie charts, default `P1`); a table cell or list item may carry its own `Format`. The format
+  decides the layout and the culture the separators: `-ColumnFormat 'N2' -Culture de-DE` writes `1.234,50`.
+- `-InputCulture` (documents and the table/list cmdlets) reads number strings strictly in that culture instead of
+  detecting the convention.
+- **Stable error ids**: errors carry an id in `FullyQualifiedErrorId`, a typed exception and a category
+  (`PSVellumPDF.FileNotFound`, `.InvalidArgument`, `.PasswordRequired`, `.InvalidPdf`, `.NotConformant`,
+  `.FileReadError`, `.InputError`, `.FileExists`, and `PSVellumPDF.<Cmdlet>` for anything else); message texts are
+  unchanged. See "Errors" in the README.
 
 ### Fixed (second review)
 - `Add-VellumPdfList` with `-FontHandle` and a list item that contains itself crashed the PowerShell process

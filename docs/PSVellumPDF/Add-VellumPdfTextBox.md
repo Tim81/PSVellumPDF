@@ -37,11 +37,16 @@ character boundaries.
 page's bottom-left; the first baseline sits one -FontSize below -Y and the lines follow
 at -Leading (default 1.2 times the font size).
 
+A tab is expanded to four spaces before measuring; as in any wrapped text, runs of spaces
+and tabs separate words and are drawn as one space.
+
 -Align Justify stretches every line except the last line of a paragraph to the full
 width by widening the gaps between words.
 A justified line is drawn word by word, each
 word followed by an invisible space, so extracted text keeps its spaces.
 
+Without -MaxHeight, a box that would reach below the bottom of the page is an error (boxes are
+not split across pages).
 With -MaxHeight the box stops after the lines that fit and warns about the rest.
 Use
 -PassThru to get the number of lines and the height used (to place the next box); the

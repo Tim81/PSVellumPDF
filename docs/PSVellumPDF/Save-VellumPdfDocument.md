@@ -50,8 +50,10 @@ against the stale document fail with a clear error.
 Use -KeepOpen to keep
 the document alive for inspection, in which case you are responsible
 for calling $doc.Dispose() yourself.
-A layout document is single-use:
-saving it a second time is refused, and after a FAILED save the document
+Every document is single-use: saving it
+a second time is refused, and so is adding content to it (-KeepOpen is for
+inspecting a saved document, not for drawing more).
+After a FAILED save the document
 must be rebuilt (the engine can leave state from the failed attempt, so a
 retry could write a different file).
 With -WhatIf nothing is saved and the

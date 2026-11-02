@@ -22,7 +22,8 @@ Adds an ordered or unordered list to a VellumPdf document.
 ```
 Add-VellumPdfList [-Document] <Document> [-Item] <Object[]> [[-Style] <string>] [[-Indent] <double>]
  [[-Font] <string>] [[-FontSize] <double>] [[-FontHandle] <EmbeddedFontHandle>] [[-Color] <Object>]
- [[-Leading] <double>] [[-Language] <string>] [[-MarginTop] <double>] [[-MarginBottom] <double>]
+ [[-Leading] <double>] [[-Language] <string>] [[-Format] <string>] [[-Culture] <Object>]
+ [[-InputCulture] <Object>] [[-MarginTop] <double>] [[-MarginBottom] <double>] [-NoNumberParsing]
  [<CommonParameters>]
 ```
 
@@ -39,6 +40,36 @@ every item; when omitted the document default font is used.
 
 -MarginTop and -MarginBottom apply spacing above and below the list
 without affecting the left/right margins already set on the element.
+
+Items become text with a culture and an optional format.
+A string item is drawn as given unless it
+consists only of a number; any other value (a number, a date, ...) is converted with -Culture (the
+document's -Culture, invariant unless set) and -Format (a .NET format string such as 'N2' or
+'yyyy-MM-dd'); an item hashtable may carry its own Format key, and Parse = $false to draw its string
+as given.
+
+Numbers in strings are always recognised (switch it off with -NoNumberParsing): a string item that is
+only a number is read as [decimal], keeping its decimals, and then drawn like any other number, so
+with the invariant default '1.444,50' becomes 1444.50, '1,976.08' becomes 1976.08 and '55433.34'
+stays 55433.34.
+The separators are detected from the text:
+  1.
+With both '.' and ',' the LAST one is the decimal mark (1.444,50 and 1,976.08).
+  2.
+A separator that appears more than once is grouping (1.234.567).
+  3.
+A separator that appears once is a decimal mark (55433.34, 66443,85), except that exactly three
+     digits after it with at most three digits before it is ambiguous (1,234 and 1.234; with more
+     than three digits before it, as in 12345,678, it is a decimal mark).
+  4.
+Grouping must be regular: 1-3 digits, then groups of exactly 3 (1.2.3 and 10.0.0.1 stay text).
+  5.
+Not a number, so left as is: a leading zero in a multi-digit integer part (007, 01234), spaces,
+     currency symbols, '%', exponents, an empty string.
+  6.
+An ambiguous number takes the convention of the other items of the same call; without such
+     evidence it is left unchanged and ONE warning per call names the values.
+-InputCulture switches detection off: every string is read strictly with that culture's separators.
 
 The document flows through the pipeline for chaining with other
 Add-VellumPdf* functions.
@@ -64,6 +95,13 @@ $doc | Add-VellumPdfList -Item @(
     @{ Text = 'Vegetables'; Children = @('Carrot', 'Potato') }
 )
 
+### EXAMPLE 4
+
+# Numbers and dates with a culture and a format
+New-VellumPdfDocument |
+    Add-VellumPdfList -Item 1234.5, '1.444,5', 99 -Format 'N2' -Culture de-DE |
+    Save-VellumPdfDocument -Path ./amounts.pdf
+
 ## PARAMETERS
 
 ### -Color
@@ -79,6 +117,32 @@ Aliases: []
 ParameterSets:
 - Name: (All)
   Position: 7
+  IsRequired: false
+  ValueFromPipeline: false
+  ValueFromPipelineByPropertyName: false
+  ValueFromRemainingArguments: false
+DontShow: false
+AcceptedValues: []
+HelpMessage: ''
+```
+
+### -Culture
+
+The culture used to turn numbers and dates into text: a name ('de-DE') or a [cultureinfo]
+(-Culture (Get-Culture) matches the console).
+Default: the document's -Culture, which is the
+invariant culture unless New-VellumPdfDocument/New-VellumPdfPageDocument set one.
+An unknown name is
+an error.
+
+```yaml
+Type: System.Object
+DefaultValue: ''
+SupportsWildcards: false
+Aliases: []
+ParameterSets:
+- Name: (All)
+  Position: 11
   IsRequired: false
   ValueFromPipeline: false
   ValueFromPipelineByPropertyName: false
@@ -182,6 +246,31 @@ AcceptedValues: []
 HelpMessage: ''
 ```
 
+### -Format
+
+A .NET format string for items that are not text ('N2', 'yyyy-MM-dd'), applied with -Culture; also to
+numbers read from strings.
+An item's own Format key wins.
+A format the value's type rejects is an
+error naming the item.
+
+```yaml
+Type: System.String
+DefaultValue: ''
+SupportsWildcards: false
+Aliases: []
+ParameterSets:
+- Name: (All)
+  Position: 10
+  IsRequired: false
+  ValueFromPipeline: false
+  ValueFromPipelineByPropertyName: false
+  ValueFromRemainingArguments: false
+DontShow: false
+AcceptedValues: []
+HelpMessage: ''
+```
+
 ### -Indent
 
 Left indent for the list in points, between 0 and 1000.
@@ -196,6 +285,31 @@ Aliases: []
 ParameterSets:
 - Name: (All)
   Position: 3
+  IsRequired: false
+  ValueFromPipeline: false
+  ValueFromPipelineByPropertyName: false
+  ValueFromRemainingArguments: false
+DontShow: false
+AcceptedValues: []
+HelpMessage: ''
+```
+
+### -InputCulture
+
+Read number strings strictly with this culture (name or [cultureinfo]) instead of detecting the
+separators.
+Default: the document's -InputCulture, else detection.
+Pass $null to switch the
+document's -InputCulture off for this call.
+
+```yaml
+Type: System.Object
+DefaultValue: ''
+SupportsWildcards: false
+Aliases: []
+ParameterSets:
+- Name: (All)
+  Position: 12
   IsRequired: false
   ValueFromPipeline: false
   ValueFromPipelineByPropertyName: false
@@ -299,7 +413,7 @@ SupportsWildcards: false
 Aliases: []
 ParameterSets:
 - Name: (All)
-  Position: 11
+  Position: 14
   IsRequired: false
   ValueFromPipeline: false
   ValueFromPipelineByPropertyName: false
@@ -322,7 +436,30 @@ SupportsWildcards: false
 Aliases: []
 ParameterSets:
 - Name: (All)
-  Position: 10
+  Position: 13
+  IsRequired: false
+  ValueFromPipeline: false
+  ValueFromPipelineByPropertyName: false
+  ValueFromRemainingArguments: false
+DontShow: false
+AcceptedValues: []
+HelpMessage: ''
+```
+
+### -NoNumberParsing
+
+Draw every string exactly as given instead of reading numbers from it.
+A single item can do the same
+with the key Parse = $false.
+
+```yaml
+Type: System.Management.Automation.SwitchParameter
+DefaultValue: False
+SupportsWildcards: false
+Aliases: []
+ParameterSets:
+- Name: (All)
+  Position: Named
   IsRequired: false
   ValueFromPipeline: false
   ValueFromPipelineByPropertyName: false

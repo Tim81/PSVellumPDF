@@ -45,6 +45,14 @@ documents (it is silently ignored otherwise), so this cmdlet throws when
 the document's Conformance is None - create the document with
 New-VellumPdfDocument -Conformance PdfA2b (or another PDF/A level).
 
+The profile of an -IccProfilePath intent must be a printer, display, scanner or
+colour-space-conversion profile ('prtr', 'mntr', 'scnr', 'spac') of ICC major
+version 4 or lower; an abstract profile or a version 5 profile fails PDF/A
+(ISO 19005-2, 6.2.3) and is refused.
+
+RGB content drawn into a document whose output intent is CMYK fails the
+same validation (6.2.4.3), so the drawing cmdlets warn once per intent.
+
 CMYK CAVEAT: the layout engine renders text and table fills in DeviceRGB.
 A CMYK output intent is intended for documents that also carry CMYK
 content produced at the kernel level (not exposed by this module); strict

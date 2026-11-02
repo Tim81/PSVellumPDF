@@ -34,6 +34,11 @@ Use it to size a box, to centre something by hand or
 to check that a label fits before placing it.
 -CharSpacing, -WordSpacing and
 -HorizontalScale are added the way Add-VellumPdfText applies them.
+The width is the PDF advance
+width: with -CharSpacing it includes the space after the last character (a viewer adds it there
+too), whereas Add-VellumPdfText aligns on the visible extent without it.
+A tab is measured as
+four spaces, which is how the drawing cmdlets draw it.
 
 The result also lists characters the font cannot show: UnencodableCharacters for a base-14 font
 (outside Windows-1252, drawn as a question mark) and MissingGlyphs for an embedded font (drawn
