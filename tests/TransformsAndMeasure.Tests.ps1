@@ -6,13 +6,17 @@
 
 param()
 
+BeforeDiscovery {
+    $script:render = [bool]((Get-Command pdftoppm -ErrorAction SilentlyContinue) -and (Get-Command convert -ErrorAction SilentlyContinue) -and ((& convert -version 2>&1 | Out-String) -match 'ImageMagick'))   # Windows has its own unrelated convert.exe
+}
+
 BeforeAll {
     $manifest = Join-Path (Split-Path $PSScriptRoot -Parent) 'PSVellumPDF.psd1'
     Import-Module $manifest -Force
     . (Join-Path $PSScriptRoot 'TestHelpers.ps1')
     $script:fontPath = Join-Path $PSScriptRoot 'assets' 'DejaVuSans.ttf'
     $script:photo = Join-Path $PSScriptRoot 'assets' 'photo.jpg'
-    $script:render = [bool]((Get-Command pdftoppm -ErrorAction SilentlyContinue) -and (Get-Command convert -ErrorAction SilentlyContinue))
+    $script:render = [bool]((Get-Command pdftoppm -ErrorAction SilentlyContinue) -and (Get-Command convert -ErrorAction SilentlyContinue) -and ((& convert -version 2>&1 | Out-String) -match 'ImageMagick'))   # Windows has its own unrelated convert.exe
     function script:New-Page([double]$Mm = 35.2778) { New-VellumPdfPageDocument -Language en | Add-VellumPdfPage -PageWidthMm $Mm -PageHeightMm $Mm }   # 100 x 100 pt
     function script:Save-It($Doc, [string]$Name) { $p = Join-Path $TestDrive "$Name.pdf"; $Doc | Save-VellumPdfDocument -Path $p | Out-Null; $p }
     # "WxH+X+Y" of the dark pixels of page 1 rendered at 72 dpi (origin top-left), or $null without renderer tools.

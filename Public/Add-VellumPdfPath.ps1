@@ -169,13 +169,13 @@ function Add-VellumPdfPath {
                 throw 'Add-VellumPdfPath: give a colour as RGB/hex/name, CMYK, or ICC components, not several.'
             }
             if ($PSCmdlet.ParameterSetName -eq 'Point') {
-                $ops = ConvertTo-VellumPdfPathOps -Point $Point -Close:$Close -CommandName 'Add-VellumPdfPath'
+                $ops = ConvertTo-VellumPdfPathOp -Point $Point -Close:$Close -CommandName 'Add-VellumPdfPath'
             }
             else {
-                $ops = ConvertTo-VellumPdfPathOps -Data $Data -CommandName 'Add-VellumPdfPath'
+                $ops = ConvertTo-VellumPdfPathOp -Data $Data -CommandName 'Add-VellumPdfPath'
             }
             if (($bound.ContainsKey('FillCmyk') -or $bound.ContainsKey('StrokeCmyk')) -and
-                (Get-VellumPdfConformanceNeeds -Document $Document).IsPdfA -and
+                (Get-VellumPdfConformanceRequirement -Document $Document).IsPdfA -and
                 -not $Document.PSObject.Properties['PSVellumCmykIntent']) {
                 Write-Warning ('Add-VellumPdfPath: PDF/A allows CMYK colour only with a CMYK output intent. Call ' +
                     'Set-VellumPdfOutputIntent -Cmyk on this document, or use RGB colours.')
@@ -225,12 +225,12 @@ function Add-VellumPdfPath {
                         if ($Dash) { [void][PSVellumPDF.Interop.CanvasHelpers]::SetLineDash($canvas, $Dash, 0) }
                     }
 
-                    Write-VellumPdfPathOps -Canvas $canvas -Ops $ops
+                    Write-VellumPdfPathOp -Canvas $canvas -Ops $ops
                     if ($hasFill -and $hasStroke) {
                         if ($FillRule -eq 'EvenOdd') {
                             # No fill-even-odd-and-stroke operator: paint the fill, then the same outline again as a stroke.
                             [void]$canvas.FillEvenOdd()
-                            Write-VellumPdfPathOps -Canvas $canvas -Ops $ops
+                            Write-VellumPdfPathOp -Canvas $canvas -Ops $ops
                             [void]$canvas.Stroke()
                         }
                         else { [void]$canvas.FillAndStroke() }

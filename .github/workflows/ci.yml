@@ -61,6 +61,16 @@ jobs:
         shell: bash
         run: pwsh -NoProfile -File ./build.ps1 Lint
 
+      # Some tests render pages (poppler's pdftoppm + ImageMagick) or read the structure tree (qpdf) to check
+      # output pixel for pixel; they skip themselves where the tools are missing, so install them where it is easy.
+      - name: Install rendering tools for the pixel and structure tests (Linux)
+        if: runner.os == 'Linux'
+        run: sudo apt-get update -q && sudo apt-get install -y -q qpdf poppler-utils imagemagick
+
+      - name: Install rendering tools for the pixel and structure tests (macOS)
+        if: runner.os == 'macOS'
+        run: brew install qpdf poppler imagemagick
+
       - name: Test (Pester + coverage)
         shell: bash
         run: pwsh -NoProfile -File ./build.ps1 Test

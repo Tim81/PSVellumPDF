@@ -108,8 +108,12 @@ Test-VellumPdfConformance ./report.pdf            # in-process PDF/A / PDF/UA pr
 |---|---|
 | `New-VellumPdfPageDocument` | Create one: `-Conformance` (None, PdfA2b/2u/2a, PdfUA1), `-Tagged`, page size, `-Linearize`, `-DocumentId`/`-Timestamp` for reproducible output |
 | `Add-VellumPdfPage` | Add pages: size, `-Rotate`, `-Count` |
-| `Add-VellumPdfShape` / `-Text` / `-Gradient` / `-PageImage` / `-PageBarcode` | Draw at x/y: shapes (rectangle, ellipse, arc, line; RGB, CMYK or ICC colour, dashes, caps, joins, opacity) and text (alignment, character/word spacing, rise, scaling, heading roles) |
+| `Add-VellumPdfShape` / `-Text` / `-Gradient` / `-PageImage` / `-PageBarcode` | Draw at x/y: shapes (rectangle, ellipse, arc, line; RGB, grey, CMYK or ICC colour, dashes, caps, joins, opacity) and text (alignment, character/word spacing, rise, scaling, rotation, heading roles) |
 | `Add-VellumPdfPath` / `Use-VellumPdfClip` | Free-form paths (`M`/`L`/`C`/`Z` path data or points; nonzero or even-odd fill) and clipping of any drawing to a rectangle, ellipse or path |
+| `Use-VellumPdfTransform` | Rotate, scale or move everything a script block draws (a diagonal stamp, a mirrored logo) |
+| `Add-VellumPdfPageTable` / `Add-VellumPdfPageList` | Tables (spans, backgrounds, wrapping) and bulleted/numbered lists at x/y, tagged as real Table/TR/TH/TD and L/LI/Lbl/LBody in accessible PDFs |
+| `Use-VellumPdfStructure` | Group tagged content under a section, division or article element |
+| `Measure-VellumPdfText` | Width of a line of text in a base-14 or embedded font, plus characters the font cannot show |
 | `Add-VellumPdfTextBox` | Wrapped text in a column: left, centre, right or justified, leading, `-MaxHeight`, one tagged paragraph |
 | `Set-VellumPdfPageBand` | Repeated header/footer on every page, with `{page}`/`{pages}` numbering, `-SkipFirstPage`, `-StartNumber` |
 | `Invoke-VellumPdfCanvas` | Full canvas access from a script block |
@@ -145,6 +149,8 @@ lives in [docs/PSVellumPDF](docs/PSVellumPDF), and runnable demo scripts in
 rich text and encryption, digital signing, an accessible PDF/UA report, charts
 and barcodes and drawing, a form with links and pages, preflight/reader/
 signing, a KMS-signed PDF, and paths with clipping, text boxes and page numbers.
+Several cmdlets take their input as arrays of arrays; a single table row is written
+`-Row @(,@('a','b'))`.
 
 ### Scope and limitations
 
@@ -162,6 +168,13 @@ signing, a KMS-signed PDF, and paths with clipping, text boxes and page numbers.
   [Tim81/VellumPDF#569](https://github.com/Tim81/VellumPDF/issues/569)), so a
   PDF/UA page document that contains them is not fully conformant. Form fields use
   the non-embedded Helvetica font, so PDF/A page documents cannot contain them.
+- Page tables and lists are not split across pages (one that does not fit is an error), a table
+  cell holds text only, and lists nest one level. Text drawn in a rotated or transformed scope is
+  tagged like any other text.
+- `Export-VellumPdfImage` writes JBIG2 as a standard sequential file, but VellumPdf's own JBIG2
+  loader reads only the 8-byte ID string, so such a file cannot be embedded again with
+  `Add-VellumPdfPageImage`; JBIG2 with shared segments is checked structurally only (no JBIG2
+  decoder was available to verify the output).
 - An external signer (`Set-VellumPdfSignature -ExternalSigner`) must be a compiled
   `IExternalSigner`, not a script block: the engine calls it on thread-pool threads
   (see `examples/09-kms-signing.ps1`).

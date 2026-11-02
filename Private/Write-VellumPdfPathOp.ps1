@@ -1,7 +1,7 @@
-function Write-VellumPdfPathOps {
+function Write-VellumPdfPathOp {
     <#
     .SYNOPSIS
-        Emits parsed path operations (from ConvertTo-VellumPdfPathOps) as canvas path construction.
+        Emits parsed path operations (from ConvertTo-VellumPdfPathOp) as canvas path construction.
     #>
     [CmdletBinding()]
     param(

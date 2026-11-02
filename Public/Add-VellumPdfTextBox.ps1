@@ -170,7 +170,7 @@ function Add-VellumPdfTextBox {
                 }
                 if ($resolved.Handle) { $Document.RegisterEmbeddedFontUsage($pdfPage, $resolved.Handle) }
                 Invoke-VellumPdfTagged -Document $Document -Canvas $canvas -PdfPage $pdfPage -Kind Structure -StructType $Role -Language $Language -Draw {
-                    Write-VellumPdfTextLines -Canvas $canvas -Resolved $resolved -FontSize $FontSize -Lines $lines.ToArray() -X $X -Top $Y -Width $Width -Leading $Leading -Align $Align
+                    Write-VellumPdfTextLine -Canvas $canvas -Resolved $resolved -FontSize $FontSize -Lines $lines.ToArray() -X $X -Top $Y -Width $Width -Leading $Leading -Align $Align
                 }
             }
             finally { [void]$canvas.RestoreState() }

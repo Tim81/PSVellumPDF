@@ -201,7 +201,7 @@ function Add-VellumPdfShape {
             }
 
             if (($bound.ContainsKey('FillCmyk') -or $bound.ContainsKey('StrokeCmyk')) -and
-                (Get-VellumPdfConformanceNeeds -Document $Document).IsPdfA -and
+                (Get-VellumPdfConformanceRequirement -Document $Document).IsPdfA -and
                 -not $Document.PSObject.Properties['PSVellumCmykIntent']) {
                 Write-Warning ('Add-VellumPdfShape: PDF/A allows CMYK colour only with a CMYK output intent. Call ' +
                     'Set-VellumPdfOutputIntent -Cmyk on this document, or use RGB colours.')

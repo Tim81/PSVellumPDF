@@ -1,4 +1,4 @@
-function Write-VellumPdfTextLines {
+function Write-VellumPdfTextLine {
     <#
     .SYNOPSIS
         Draws lines from Split-VellumPdfTextLine, one text object per line.

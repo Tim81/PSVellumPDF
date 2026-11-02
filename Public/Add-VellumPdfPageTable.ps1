@@ -344,7 +344,7 @@ function Add-VellumPdfPageTable {
                                     [void]$canvas.SaveState().SetFillColorRgb($rgb[0], $rgb[1], $rgb[2])
                                     $hasText = [bool]($cellLines | Where-Object { $_.Words.Count -gt 0 })
                                     if ($hasText) {
-                                        Write-VellumPdfTextLines -Canvas $canvas -Resolved $cellFont -FontSize $FontSize -Lines $cellLines -X $cellLeft -Top $cellTop -Width $cellWidth -Leading $Leading -Align $alignment
+                                        Write-VellumPdfTextLine -Canvas $canvas -Resolved $cellFont -FontSize $FontSize -Lines $cellLines -X $cellLeft -Top $cellTop -Width $cellWidth -Leading $Leading -Align $alignment
                                     }
                                     [void]$canvas.RestoreState()
                                 }

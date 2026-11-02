@@ -210,7 +210,7 @@ function Add-VellumPdfPageList {
                         $drawLines = {
                             param($lines, $left, $width)
                             [void]$canvas.SaveState().SetFillColorRgb($rgb[0], $rgb[1], $rgb[2])
-                            Write-VellumPdfTextLines -Canvas $canvas -Resolved $resolved -FontSize $FontSize -Lines $lines -X $left -Top $p.Top -Width $width -Leading $Leading -Align Left
+                            Write-VellumPdfTextLine -Canvas $canvas -Resolved $resolved -FontSize $FontSize -Lines $lines -X $left -Top $p.Top -Width $width -Leading $Leading -Align Left
                             [void]$canvas.RestoreState()
                         }
                         if ($tagged) {

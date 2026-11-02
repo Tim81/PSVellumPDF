@@ -58,6 +58,7 @@ function Get-PdfStructureTree {
         $scope = [regex]::Match($body, '/Scope /(\w+)'); if ($scope.Success) { $node.Scope = $scope.Groups[1].Value }
         $rowSpan = [regex]::Match($body, '/RowSpan (\d+)'); if ($rowSpan.Success) { $node.RowSpan = [int]$rowSpan.Groups[1].Value }
         $colSpan = [regex]::Match($body, '/ColSpan (\d+)'); if ($colSpan.Success) { $node.ColSpan = [int]$colSpan.Groups[1].Value }
+        $alt = [regex]::Match($body, '/Alt <([0-9a-f]+)>'); if ($alt.Success) { $node.Alt = [System.Text.Encoding]::BigEndianUnicode.GetString([Convert]::FromHexString($alt.Groups[1].Value)).TrimStart([char]0xFEFF) }
         $lang = [regex]::Match($body, '/Lang <([0-9a-f]+)>'); if ($lang.Success) { $node.Lang = [System.Text.Encoding]::BigEndianUnicode.GetString([Convert]::FromHexString($lang.Groups[1].Value)).TrimStart([char]0xFEFF) }
         $array = [regex]::Match($body, '/K \[([^\]]*)\]')
         $single = [regex]::Match($body, '/K (\d+) 0 R')
@@ -73,4 +74,25 @@ function Get-PdfStructureTree {
     # StructTreeRoot has no /S; its single /K child is the Document element.
     $document = $rootNode.Children[0]
     , @($document.Children)
+}
+
+# The content stream of one page of an unsaved page document, as Latin-1 text: finishes the page canvases the way a
+# save would (bands, balance check) without writing a file. The document cannot be drawn on afterwards.
+function Get-PageContent {
+    param($Document, [int]$Page = 1)
+    & (Get-Module PSVellumPDF) { param($d) Complete-VellumPdfPageDocument -Document $d } $Document
+    $bytes = $Document.Pages[$Page - 1].ContentBytes
+    if ($null -eq $bytes) { return '' }
+    [System.Text.Encoding]::Latin1.GetString($bytes)
+}
+
+# Lines of page content that start a text object outside any marked-content sequence (BMC/BDC ... EMC).
+function Get-UnmarkedTextStart {
+    param([string]$Content)
+    $depth = 0
+    foreach ($line in ($Content -split "\r?\n")) {
+        if ($line -match ' (BMC|BDC)$') { $depth++ }
+        elseif ($line -eq 'EMC') { $depth-- }
+        elseif ($line -eq 'BT' -and $depth -le 0) { $line }
+    }
 }

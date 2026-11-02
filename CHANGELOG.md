@@ -42,6 +42,22 @@ in ways that change output. Upgrade notes are in the README.
   longer applied twice (tables with a left/top margin move), the column count comes
   from the widest row, header/footer text wider than the page is cut at a word
   boundary and honours its colour, and links are written with the Print flag.
+- **Errors always stop the cmdlet.** Every public cmdlet raises its errors as terminating errors, so
+  `-ErrorAction SilentlyContinue`/`Ignore` can no longer let a cmdlet carry on after a failed check
+  (previously `Save-VellumPdfDocument -Validate` was skipped, conflicting colours were both written, and
+  an unknown path command looped for ever). Wrap the call in `try`/`catch` to handle an error.
+- **The document default font reaches every element.** With `New-VellumPdfDocument -DefaultFont/-DefaultFontSize`,
+  list items, table cells, header and footer bands and `New-VellumPdfTextRun` runs used Helvetica 12; they now
+  use the default (11 pt Helvetica when none is set), so existing documents change size.
+- **Piped file objects bind to `-LiteralPath`** in `Get-VellumPdfInfo`, `Get-VellumPdfText`,
+  `Test-VellumPdfConformance`, `Export-VellumPdfImage` and `Unprotect-VellumPdfDocument`; `-Path` no longer binds
+  by property name (so `report[1].pdf` from `Get-ChildItem` works). Strings piped in still bind to `-Path`.
+- **Stricter input**: page coordinates and sizes must be finite and within +-14,400 pt (the largest page); language
+  tags must be BCP 47; alternate text must not be empty or whitespace; `Set-VellumPdfOutputIntent` reads the colour
+  space from the ICC profile and refuses a mismatching `-ComponentCount`; barcode captions are off by default in
+  PDF/UA as well as PDF/A (a non-embedded font fails PDF/UA).
+- **`Export-VellumPdfImage`** writes CCITT as TIFF and JBIG2 as a standalone file (see Fixed), and skips images that
+  have no file format (for example raw CMYK) with a warning instead of writing headerless `.bin` files.
 - **Installation**: the module loads `VellumPdf.Kernel/Layout/Reader/Signing/
   Barcodes/Conformance/Fonts.Standard14` and `PSVellumPDF.Interop`. The loader
   checks their identity (version 2.0.0.0, strong-name token `b2757187a6d18ae5`),
@@ -123,7 +139,33 @@ in ways that change output. Upgrade notes are in the README.
   engine-surface test that fails by name when a VellumPdf upgrade removes anything
   the module uses. `tools/Get-VellumPdfApiSurface.py` diffs two engine releases.
 
+### Added (review follow-up)
+- **Page documents**: `Add-VellumPdfPath` (path data or points, nonzero/even-odd fill), `Use-VellumPdfClip`,
+  `Use-VellumPdfTransform` (rotate, scale, move a drawing), `Add-VellumPdfTextBox` (wrapped, justified text),
+  `Set-VellumPdfPageBand` (repeated header/footer, page numbers), `Add-VellumPdfPageTable` and
+  `Add-VellumPdfPageList` (tables and lists tagged as real Table/TR/TH/TD and L/LI/Lbl/LBody), and
+  `Use-VellumPdfStructure` (group tagged content under Sect, Div, Art ...). `-Rotation` on `Add-VellumPdfText` and
+  `Add-VellumPdfPageImage`; `-FillGray`/`-StrokeGray` on shapes and paths.
+- `Measure-VellumPdfText`: text width in a base-14 or embedded font, with missing and unencodable characters.
+- `Get-VellumPdfInfo -IncludeSignatureContents` returns the CMS bytes of each signature, so a script can verify it.
+- `Export-VellumPdfImage` file objects carry Page, Encoding, Width, Height, BitsPerComponent, ColorSpace,
+  ComponentCount, IsInline, IsStencilMask and HasSoftMask.
+- Warnings for characters an embedded font has no glyph for (they draw as empty boxes and fail PDF/A).
+- `examples/09-kms-signing.ps1` (a KMS/HSM signer) and `examples/10-paths-clipping-and-text-boxes.ps1`.
+
 ### Fixed
+- **Embedded fonts and word spacing**: `Add-VellumPdfText -WordSpacing` had no effect with an embedded font (and
+  therefore in PDF/A and PDF/UA documents), so aligned text ended in the wrong place; the words are now placed
+  individually.
+- **Tables** align cells by grid column when they use `ColSpan`/`RowSpan` (`-ColumnAlignment`, `-ColumnWidth` count).
+- **Export-VellumPdfImage**: CCITT fax data is wrapped in a TIFF (pixel-identical to the PDF's rendering), and JBIG2
+  segments are joined with their shared segments into a standard sequential file. Limitation: VellumPdf's own
+  JBIG2 loader reads only the 8-byte ID string, so these standard files cannot be embedded again with
+  `Add-VellumPdfPageImage`.
+- `Invoke-VellumPdfCanvas` refuses to save a document whose script block saved more graphics states than it restored.
+- A clip scope's `-Page` is the page its drawing goes to; a text box no longer splits on no-break spaces and honours
+  `-MaxHeight` exactly; page bands warn when they run off the page; `-LineCap`/`-LineJoin` accept any letter case;
+  table and pie data tolerate missing properties; `Save-VellumPdfDocument` leaked a task object with `-ExternalSigner`.
 - Pie chart `-StrokeColor` and `-MarginTop`/`-MarginBottom` had no effect (the cmdlet's
   bound parameters were read from inside a script block, where they are empty).
 - `Add-VellumPdfElement` now honours the space a previous `-MarginBottom` left (an

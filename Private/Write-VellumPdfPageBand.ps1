@@ -1,4 +1,4 @@
-function Write-VellumPdfPageBands {
+function Write-VellumPdfPageBand {
     <#
     .SYNOPSIS
         Stamps the repeated headers and footers (Set-VellumPdfPageBand) on every page.

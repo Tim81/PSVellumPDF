@@ -10,7 +10,7 @@ BeforeAll {
     $manifest = Join-Path (Split-Path $PSScriptRoot -Parent) 'PSVellumPDF.psd1'
     Import-Module $manifest -Force
     $script:assets = Join-Path $PSScriptRoot 'assets'
-    $script:render = [bool]((Get-Command pdftoppm -ErrorAction SilentlyContinue) -and (Get-Command convert -ErrorAction SilentlyContinue))
+    $script:render = [bool]((Get-Command pdftoppm -ErrorAction SilentlyContinue) -and (Get-Command convert -ErrorAction SilentlyContinue) -and ((& convert -version 2>&1 | Out-String) -match 'ImageMagick'))   # Windows has its own unrelated convert.exe
 
     # A PDF whose only content is the image, placed 1 point per pixel so that a 72 dpi render is the image.
     function script:New-ImagePdf([string]$ImagePath, [string]$Name, [int]$Width, [int]$Height) {

@@ -270,7 +270,7 @@ function Add-VellumPdfBarcode {
         try {
             Assert-VellumPdfDocumentOpen -Document $Document -CommandName 'Add-VellumPdfBarcode'
             $bound = $PSBoundParameters
-            $isPdfA = (Get-VellumPdfConformanceNeeds -Document $Document).NeedsEmbeddedFonts
+            $isPdfA = (Get-VellumPdfConformanceRequirement -Document $Document).NeedsEmbeddedFonts
 
             # Option validation and symbol construction are shared with Add-VellumPdfPageBarcode.
             $barcodes = @(New-VellumPdfBarcodeSet -Parameters $PSBoundParameters -IsPdfA $isPdfA -ParameterSetName $PSCmdlet.ParameterSetName)

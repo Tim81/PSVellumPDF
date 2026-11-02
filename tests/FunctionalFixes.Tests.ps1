@@ -15,7 +15,7 @@ BeforeAll {
     function script:Save-It($Doc, [string]$Name) { $p = Join-Path $TestDrive "$Name.pdf"; $Doc | Save-VellumPdfDocument -Path $p | Out-Null; $p }
     # Right edge of the dark pixels of page 1 in points, or $null when no renderer is installed.
     function script:Get-InkRight([string]$Pdf) {
-        if (-not (Get-Command pdftoppm -ErrorAction SilentlyContinue) -or -not (Get-Command convert -ErrorAction SilentlyContinue)) { return $null }
+        if (-not (Get-Command pdftoppm -ErrorAction SilentlyContinue) -or -not (Get-Command convert -ErrorAction SilentlyContinue) -or ((& convert -version 2>&1 | Out-String) -notmatch 'ImageMagick')) { return $null }
         $base = Join-Path $TestDrive ([guid]::NewGuid().ToString('N'))
         & pdftoppm -r 72 -png -f 1 -l 1 $Pdf $base
         $png = Get-ChildItem "$base*.png" | Select-Object -First 1

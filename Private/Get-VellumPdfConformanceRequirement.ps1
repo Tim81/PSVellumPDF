@@ -1,4 +1,4 @@
-function Get-VellumPdfConformanceNeeds {
+function Get-VellumPdfConformanceRequirement {
     <#
     .SYNOPSIS
         Describes what a document's conformance level demands from the content the module draws.

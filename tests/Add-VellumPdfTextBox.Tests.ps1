@@ -13,7 +13,7 @@ BeforeAll {
     function script:Get-DrawnLines([string]$Path) {
         $content = Get-PdfContentText $Path
         foreach ($m in [regex]::Matches($content, '(?s)BT\r?\n(.*?)ET')) {
-            $parts = [regex]::Matches($m.Groups[1].Value, '1 0 0 1 ([\d.]+) ([\d.]+) Tm\r?\n\((.*?)\) Tj')
+            $parts = [regex]::Matches($m.Groups[1].Value, '1 0 0 1 (-?[\d.]+) (-?[\d.]+) Tm\r?\n\((.*?)\) Tj')
             [pscustomobject]@{
                 Text = (($parts | ForEach-Object { $_.Groups[3].Value.TrimEnd() }) -join ' ')
                 X    = [double]$parts[0].Groups[1].Value

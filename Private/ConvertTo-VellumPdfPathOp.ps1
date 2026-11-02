@@ -1,4 +1,4 @@
-function ConvertTo-VellumPdfPathOps {
+function ConvertTo-VellumPdfPathOp {
     <#
     .SYNOPSIS
         Parses path data or a point list into validated drawing operations.

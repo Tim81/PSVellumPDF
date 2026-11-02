@@ -78,8 +78,8 @@ function Use-VellumPdfClip {
             Assert-VellumPdfDocumentOpen -Document $Document -CommandName 'Use-VellumPdfClip'
             $Page = Resolve-VellumPdfPageNumber -Document $Document -Page $Page -Bound $PSBoundParameters.ContainsKey('Page') -CommandName 'Use-VellumPdfClip'
             switch ($PSCmdlet.ParameterSetName) {
-                'Data' { $ops = ConvertTo-VellumPdfPathOps -Data $Data -CommandName 'Use-VellumPdfClip' }
-                'Point' { $ops = ConvertTo-VellumPdfPathOps -Point $Point -Close -CommandName 'Use-VellumPdfClip' }
+                'Data' { $ops = ConvertTo-VellumPdfPathOp -Data $Data -CommandName 'Use-VellumPdfClip' }
+                'Point' { $ops = ConvertTo-VellumPdfPathOp -Point $Point -Close -CommandName 'Use-VellumPdfClip' }
                 default {
                     foreach ($pair in @('X', $X), @('Y', $Y), @('Width', $Width), @('Height', $Height)) {
                         Assert-VellumPdfCoordinate $pair[1] $pair[0] 'Use-VellumPdfClip'
@@ -113,7 +113,7 @@ function Use-VellumPdfClip {
             [void]$canvas.SaveState()
             Push-VellumPdfScopePage -Document $Document -Page $Page
             try {
-                Write-VellumPdfPathOps -Canvas $canvas -Ops $ops
+                Write-VellumPdfPathOp -Canvas $canvas -Ops $ops
                 if ($FillRule -eq 'EvenOdd') { [void]$canvas.ClipEvenOdd() } else { [void]$canvas.Clip() }
                 [void]$canvas.EndPath()
                 # Run in the caller's scope with the document as $_; the block's own output is dropped.
