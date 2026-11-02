@@ -242,6 +242,15 @@ Describe 'Set-VellumPdfSignature external keys' {
         Get-PdfText $path | Should -Match '/ByteRange'
     }
 
+    It 'writes only the file info to the pipeline when signing with an -ExternalSigner' {
+        $signer = [PSVellumPDF.Tests.MockExternalSigner]::new($script:rsa)
+        $doc = New-VellumPdfDocument | Add-VellumPdfParagraph -Text 'x' |
+            Set-VellumPdfSignature -Certificate $script:pubOnly -ExternalSigner $signer
+        $out = @($doc | Save-VellumPdfDocument -Path (Join-Path $TestDrive 'quiet.pdf'))
+        $out.Count | Should -Be 1
+        $out[0] | Should -BeOfType ([System.IO.FileInfo])
+    }
+
     It 'still demands a private key when no external key is supplied' {
         $doc = New-VellumPdfDocument | Add-VellumPdfParagraph -Text 'x'
         try { { $doc | Set-VellumPdfSignature -Certificate $script:pubOnly } | Should -Throw '*does not include a private key*-ExternalPrivateKey*' }

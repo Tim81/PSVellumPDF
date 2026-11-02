@@ -187,7 +187,7 @@ function Save-VellumPdfDocument {
                                 throw ('an external signer signs asynchronously, which cannot run the script blocks of ' +
                                     'Add-VellumPdfDrawing elements in this document')
                             }
-                            [VellumPdf.Signing.SigningExtensions]::SignAsync(
+                            [void][VellumPdf.Signing.SigningExtensions]::SignAsync(
                                 $Document, $Target, $signature.Value, [System.Threading.CancellationToken]::None).GetAwaiter().GetResult()
                         }
                         elseif ($signature) {
