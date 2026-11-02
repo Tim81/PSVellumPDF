@@ -20,9 +20,12 @@ function Add-VellumPdfList {
     .PARAMETER Item
         The list items. Each element is either a string (a leaf item) or a
         hashtable describing a nested item:
-            @{ Text = 'Parent'; Children = @('Child A', @{ Text = 'Child B';
-               Children = @('Grandchild') }) }
-        Children nest to any depth via ListItem.AddChild. Empty strings are
+            @{ Text = 'Parent'; Children = @('Child A', @{ Text = 'Child B' }) }
+        One level of children is supported: VellumPdf.Layout draws a child's own
+        children nowhere (a grandchild's text would silently vanish), so deeper
+        nesting is refused with an error. Flatten deeper trees or add separate
+        lists. A nested item in an Unordered list is marked with U+25E6, which
+        the base-14 fonts cannot encode (it shows as '?'). Empty strings are
         permitted. Mandatory.
     .PARAMETER Style
         The list marker style. Unordered uses bullet points; OrderedDecimal,
@@ -94,16 +97,20 @@ function Add-VellumPdfList {
     process {
         Assert-VellumPdfDocumentOpen -Document $Document -CommandName 'Add-VellumPdfList'
 
-        # Cap nesting depth so a cyclic/self-referential hashtable cannot recurse
-        # into an uncatchable StackOverflow that would kill the host.
-        $maxDepth = 64
+        # VellumPdf.Layout renders exactly one nesting level (ListItem.Children
+        # is read, a child's own Children never are). Refuse deeper input rather
+        # than lose text silently; this also bounds cyclic hashtables, which
+        # would otherwise recurse into an uncatchable StackOverflow.
+        $maxDepth = 1
 
         # Gather every label (recursing into nested children) for the encoding
         # warning, which scans for characters the base-14 fonts cannot render.
         $collectText = {
             param($spec, $depth = 0)
             if ($depth -gt $maxDepth) {
-                throw "Add-VellumPdfList: nested -Item exceeds the maximum depth of $maxDepth (cyclic input?)."
+                throw ("Add-VellumPdfList: nested -Item exceeds the maximum depth of $maxDepth child level " +
+                    '(VellumPdf.Layout draws one nesting level only; flatten the list or split it, ' +
+                    'and check for cyclic input).')
             }
             if ($spec -is [System.Collections.IDictionary]) {
                 if (-not $spec.Contains('Text')) {
@@ -161,7 +168,7 @@ function Add-VellumPdfList {
         }
 
         Set-VellumPdfElementMargin -Element $list -Top $MarginTop -Bottom $MarginBottom `
-            -BoundParameters $PSBoundParameters
+            -BoundParameters $PSBoundParameters -Document $Document -DeferBottom
 
         [void]$Document.Add($list)
         $Document

@@ -77,7 +77,7 @@ function Add-VellumPdfLineSeparator {
         }
 
         Set-VellumPdfElementMargin -Element $sep -Top $MarginTop -Bottom $MarginBottom `
-            -BoundParameters $PSBoundParameters
+            -BoundParameters $PSBoundParameters -Document $Document
 
         [void]$Document.Add($sep)
         $Document

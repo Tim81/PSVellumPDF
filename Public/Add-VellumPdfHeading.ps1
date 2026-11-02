@@ -16,8 +16,8 @@ function Add-VellumPdfHeading {
         The string content of the heading. Mandatory and positional (position 0).
     .PARAMETER Level
         The heading level from 1 (top-level) to 6 (lowest). Controls the PDF
-        outline depth and the H1-H6 structure tag in tagged documents. Defaults
-        to 1.
+        outline depth and the H1-H6 structure tag in tagged documents (level 1
+        is tagged H1). Defaults to 1.
     .PARAMETER Font
         A base-14 font name for the heading. Defaults to HelveticaBold. Ignored
         when -FontHandle is supplied.
@@ -95,12 +95,13 @@ function Add-VellumPdfHeading {
         }
         $style = New-VellumTextStyle @styleParams
         $heading = [VellumPdf.Layout.Elements.Heading]::new($Text, $style)
-        $heading.Level = $Level
+        # VellumPdf.Layout counts heading levels from 0 (0 = H1); the cmdlet takes 1..6.
+        $heading.Level = $Level - 1
         $heading.Alignment = [VellumPdf.Layout.Core.HorizontalAlignment]::$Alignment
         if ($BookmarkTitle) { $heading.BookmarkTitle = $BookmarkTitle }
 
         Set-VellumPdfElementMargin -Element $heading -Top $MarginTop -Bottom $MarginBottom `
-            -BoundParameters $PSBoundParameters
+            -BoundParameters $PSBoundParameters -Document $Document -DeferBottom
 
         [void]$Document.Add($heading)
         $Document

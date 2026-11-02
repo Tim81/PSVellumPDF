@@ -10,9 +10,18 @@ function Save-VellumPdfDocument {
         disposes it after the save attempt (success or failure) because saving is
         the terminal step of a build pipeline, and marks it so later cmdlet calls
         against the stale document fail with a clear error. Use -KeepOpen to keep
-        the document alive for further edits, in which case you are responsible
-        for calling $doc.Dispose() yourself. With -WhatIf nothing is saved and the
+        the document alive for inspection, in which case you are responsible
+        for calling $doc.Dispose() yourself. A layout document is single-use:
+        saving it a second time is refused, and after a FAILED save the document
+        must be rebuilt (the engine can leave state from the failed attempt, so a
+        retry could write a different file). With -WhatIf nothing is saved and the
         document is left open.
+
+        After a successful save the engine's own diagnostics are reported:
+        characters the base-14 fonts could not encode (written as '?') produce one
+        warning, and a header or footer cut to fit the page produces one warning
+        each. The same information is attached to the returned file object as
+        the TextEncodingWarnings and BandTruncations properties.
 
         If the pipeline is aborted BEFORE this cmdlet runs (for example by an
         error in an earlier Add-VellumPdf* call, or -WarningAction Stop turning
@@ -35,12 +44,14 @@ function Save-VellumPdfDocument {
     .PARAMETER KeepOpen
         When specified, the document is not disposed after saving. The caller is
         responsible for calling $doc.Dispose() when finished. Useful when the
-        same document object must be inspected or further manipulated after the
-        file is written.
+        same document object must be inspected after the file is written. The
+        document cannot be saved a second time.
     .EXAMPLE
         $doc | Save-VellumPdfDocument -Path ./out.pdf
     .OUTPUTS
-        System.IO.FileInfo for the written file.
+        System.IO.FileInfo for the written file, with extra TextEncodingWarnings
+        (CodePoint, Character) and BandTruncations (Band, PageNumber,
+        DrawnCharacters, ResolvedCharacters, DroppedCharacters) properties.
     #>
     [CmdletBinding(SupportsShouldProcess)]
     [OutputType([System.IO.FileInfo])]
@@ -57,6 +68,18 @@ function Save-VellumPdfDocument {
 
     process {
         Assert-VellumPdfDocumentOpen -Document $Document -CommandName 'Save-VellumPdfDocument'
+        # A Layout document is single-use: layout runs inside Save, a second Save
+        # throws, and a failed Save can leave pages from the failed attempt so a
+        # retry may write a wrong file (VellumPdf #530). Say so plainly.
+        if ($Document.PSObject.Properties['PSVellumFailed']) {
+            throw ('Save-VellumPdfDocument: a previous save of this document failed, which can leave it in an ' +
+                'inconsistent state (a retry could write a different file). Build a new document with ' +
+                'New-VellumPdfDocument.')
+        }
+        if ($Document.PSObject.Properties['PSVellumSaved']) {
+            throw ('Save-VellumPdfDocument: this document was already saved (-KeepOpen). A VellumPdf layout ' +
+                'document can be written only once; build a new document with New-VellumPdfDocument.')
+        }
 
         $resolved = $ExecutionContext.SessionState.Path.GetUnresolvedProviderPathFromPSPath($Path)
 
@@ -101,6 +124,8 @@ function Save-VellumPdfDocument {
                         }
                     }
                     catch {
+                        # The engine may keep state from the failed attempt: never let a retry write a file.
+                        $Document.PSObject.Properties.Add([psnoteproperty]::new('PSVellumFailed', $true))
                         # Surface failures with context specific to the operation
                         # that failed instead of a bare library exception.
                         $reason = $_.Exception.Message
@@ -135,7 +160,12 @@ function Save-VellumPdfDocument {
                     }
                 }
 
-                Get-Item -LiteralPath $resolved
+                $Document.PSObject.Properties.Add([psnoteproperty]::new('PSVellumSaved', $true))
+                $diagnostics = Write-VellumPdfSaveDiagnostic -Document $Document
+                $file = Get-Item -LiteralPath $resolved
+                $file | Add-Member -NotePropertyName TextEncodingWarnings -NotePropertyValue $diagnostics.TextEncodingWarnings
+                $file | Add-Member -NotePropertyName BandTruncations -NotePropertyValue $diagnostics.BandTruncations
+                $file
             }
         }
         finally {

@@ -98,8 +98,9 @@ with an embedded font, rich text + encryption, digital signing).
 
 ### Embedded fonts (Unicode / PDF&#8203;/A)
 
-The base-14 fonts cover only Latin-1: text containing characters beyond it
-(e.g. Czech diacritics, CJK, the euro sign) renders **mangled** with those
+The base-14 fonts cover only Windows-1252 (Latin-1 plus the euro sign, curly
+quotes, bullets and dashes): text containing characters beyond it
+(e.g. Czech diacritics, CJK, emoji) renders **mangled** with those
 fonts — the cmdlets emit a warning when this is about to happen. The fix, which
 also satisfies PDF/A's embedding requirement, is a TrueType font:
 

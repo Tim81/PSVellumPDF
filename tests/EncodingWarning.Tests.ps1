@@ -52,9 +52,20 @@ Describe 'Base-14 encoding warnings (silent Unicode data loss)' {
         @($wv2).Count | Should -Be 0
     }
 
+    It 'does NOT warn for Windows-1252 typographic characters the engine now encodes' {
+        # euro, ellipsis, bullet, en/em dash, curly quotes, trademark - built from
+        # codepoints to keep this file ASCII-only.
+        $winAnsi = -join ([int[]](0x20AC, 0x2026, 0x2022, 0x2013, 0x2014, 0x201C, 0x201D, 0x2122) | ForEach-Object { [char]$_ })
+        $script:doc | Add-VellumPdfParagraph -Text $winAnsi -WarningVariable wv | Out-Null
+        @($wv).Count | Should -Be 0
+    }
+
+    It 'still warns for C1 controls and characters outside Windows-1252' {
+        $script:doc | Add-VellumPdfParagraph -Text ('a' + [char]0x0081) -WarningVariable wv -WarningAction SilentlyContinue | Out-Null
+        @($wv).Count | Should -BeGreaterThan 0
+    }
+
     It 'does NOT warn for ASCII or Latin-1 text (accents, tabs, newlines)' {
-        # Note: the euro sign (U+20AC) is intentionally NOT here - it is above
-        # U+00FF and would (correctly) warn.
         $latin1Only = 'caf' + [char]0x00E9 + ' nai' + [char]0x00EF + "ve`tnewline:`n."
         $script:doc | Add-VellumPdfParagraph -Text $latin1Only -WarningVariable wv | Out-Null
         @($wv).Count | Should -Be 0

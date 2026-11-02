@@ -131,7 +131,7 @@ function Add-VellumPdfParagraph {
                 [System.Collections.Generic.List[VellumPdf.Layout.Elements.TextRun]]$Run)
             $paragraph.Alignment = [VellumPdf.Layout.Core.HorizontalAlignment]::$Alignment
             Set-VellumPdfElementMargin -Element $paragraph -Top $MarginTop -Bottom $MarginBottom `
-                -BoundParameters $PSBoundParameters
+                -BoundParameters $PSBoundParameters -Document $Document -DeferBottom
             [void]$Document.Add($paragraph)
             return $Document
         }
@@ -149,7 +149,8 @@ function Add-VellumPdfParagraph {
 
         if (-not $wantsStyle -and $Alignment -eq 'Left' `
                 -and -not $PSBoundParameters.ContainsKey('MarginTop') `
-                -and -not $PSBoundParameters.ContainsKey('MarginBottom')) {
+                -and -not $PSBoundParameters.ContainsKey('MarginBottom') `
+                -and -not $Document.PSObject.Properties['PSVellumPendingSpace']?.Value) {
             # No overrides at all: use the document's default font.
             [void]$Document.Add($Text, $null)
             return $Document
@@ -178,7 +179,7 @@ function Add-VellumPdfParagraph {
         $paragraph = [VellumPdf.Layout.Elements.Paragraph]::new($Text, $style)
         $paragraph.Alignment = [VellumPdf.Layout.Core.HorizontalAlignment]::$Alignment
         Set-VellumPdfElementMargin -Element $paragraph -Top $MarginTop -Bottom $MarginBottom `
-            -BoundParameters $PSBoundParameters
+            -BoundParameters $PSBoundParameters -Document $Document -DeferBottom
         [void]$Document.Add($paragraph)
         $Document
     }

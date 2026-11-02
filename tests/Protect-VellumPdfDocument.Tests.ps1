@@ -118,6 +118,41 @@ Describe 'Protect-VellumPdfDocument' {
         finally { $doc.Dispose() }
     }
 
+    It 'refuses an empty owner password beside a user password' {
+        $userPw  = ConvertTo-SecureString 'userpw123' -AsPlainText -Force
+        $emptyPw = [System.Security.SecureString]::new()
+        $doc = New-VellumPdfDocument | Add-VellumPdfParagraph -Text 'x'
+        try {
+            { $doc | Protect-VellumPdfDocument -UserPassword $userPw -OwnerPassword $emptyPw } |
+                Should -Throw '*empty -OwnerPassword*'
+        }
+        finally { $doc.Dispose() }
+    }
+
+    It 'refuses encryption on a document created with -UseObjectStreams' {
+        $pw = ConvertTo-SecureString 'testpw' -AsPlainText -Force
+        $doc = New-VellumPdfDocument -UseObjectStreams | Add-VellumPdfParagraph -Text 'x'
+        try {
+            { $doc | Protect-VellumPdfDocument -UserPassword $pw } | Should -Throw '*object streams*'
+        }
+        finally { $doc.Dispose() }
+    }
+
+    It 'allows PDF/UA-1 encryption only with the Extract permission' {
+        $pw = ConvertTo-SecureString 'testpw' -AsPlainText -Force
+        $doc = New-VellumPdfDocument -Language en | Add-VellumPdfParagraph -Text 'UA'
+        $doc.Conformance = [VellumPdf.Document.PdfConformance]::PdfUA1
+        try {
+            { $doc | Protect-VellumPdfDocument -UserPassword $pw -Permission Print } |
+                Should -Throw '*PDF/UA-1*Extract*'
+            $doc | Protect-VellumPdfDocument -UserPassword $pw -Permission Print, Extract | Out-Null
+            $out = Join-Path $TestDrive 'ua-encrypted.pdf'
+            $doc | Save-VellumPdfDocument -Path $out | Out-Null
+            [System.IO.File]::ReadAllText($out, [System.Text.Encoding]::Latin1) | Should -Match '/Encrypt'
+        }
+        finally { try { $doc.Dispose() } catch { Write-Verbose "already disposed: $_" } }
+    }
+
     It 'applies UserPassword and OwnerPassword both when both are supplied' {
         $userPw  = ConvertTo-SecureString 'userpw123'  -AsPlainText -Force
         $ownerPw = ConvertTo-SecureString 'ownerpw456' -AsPlainText -Force

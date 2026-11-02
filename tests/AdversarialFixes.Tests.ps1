@@ -158,9 +158,12 @@ Describe 'Table column-width validation' {
     BeforeEach { $script:doc = New-VellumPdfDocument }
     AfterEach { if ($script:doc) { try { $script:doc.Dispose() } catch { Write-Verbose "noop: $_" } } }
 
-    It 'rejects negative and zero column widths' {
+    It 'rejects negative column widths' {
         { $script:doc | Add-VellumPdfTable -Row @(,@('a','b')) -ColumnWidth @(-5.0, 100.0) } | Should -Throw
-        { $script:doc | Add-VellumPdfTable -Row @(,@('a','b')) -ColumnWidth @(0.0, 100.0) } | Should -Throw
+    }
+
+    It 'accepts a zero column width, which VellumPdf 2.x treats as auto' {
+        { $script:doc | Add-VellumPdfTable -Row @(,@('a','b')) -ColumnWidth @(0.0, 100.0) } | Should -Not -Throw
     }
 
     It 'warns when the width count does not match the column count' {

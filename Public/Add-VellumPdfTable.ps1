@@ -49,7 +49,8 @@ function Add-VellumPdfTable {
         description). For a single cell-array row, use the unary comma operator to
         prevent PowerShell from flattening the outer array: -Row @(,@('a','b')).
     .PARAMETER ColumnWidth
-        Column widths in points, each between 0.01 and 100000. The count should
+        Column widths in points, each between 0 and 100000. A width of 0 means
+        "auto": the column shares the remaining space. The count should
         match the number of columns determined by the -Header or first -Row; a
         mismatch emits a warning and extra widths are ignored.
     .PARAMETER BorderWidth
@@ -110,7 +111,7 @@ function Add-VellumPdfTable {
         [Parameter(Mandatory)]
         [object[]]$Row,
 
-        [ValidateRange(0.01, 100000)]
+        [ValidateRange(0, 100000)]
         [double[]]$ColumnWidth,
 
         [ValidateRange(0, 100)]
@@ -339,7 +340,7 @@ function Add-VellumPdfTable {
         }
 
         Set-VellumPdfElementMargin -Element $table -Top $MarginTop -Bottom $MarginBottom `
-            -BoundParameters $PSBoundParameters
+            -BoundParameters $PSBoundParameters -Document $Document -DeferBottom
 
         [void]$Document.Add($table)
         $Document

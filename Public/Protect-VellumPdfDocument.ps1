@@ -16,7 +16,14 @@ function Protect-VellumPdfDocument {
         document's Conformance is anything other than None (e.g. PdfA2b, PdfA2u,
         PdfA2a) this cmdlet throws a clear terminating error before calling Encrypt().
         The VellumPdf library also enforces this constraint at Save() time, so the
-        fail-fast check here gives an earlier, more actionable message.
+        fail-fast check here gives an earlier, more actionable message. A PDF/UA-1
+        document, in contrast, may be encrypted as long as -Permission includes
+        Extract, so assistive technology can still read the content.
+
+        OTHER CONSTRAINTS (VellumPdf 2.x): an empty -OwnerPassword beside a
+        non-empty -UserPassword is refused (such a file would open with full owner
+        access and no password), and encryption cannot be combined with
+        New-VellumPdfDocument -UseObjectStreams.
 
         SIGNING CONSTRAINT: encryption and digital signatures cannot be combined
         (the library rejects the pair at save time). This cmdlet throws if a
@@ -132,16 +139,33 @@ function Protect-VellumPdfDocument {
                 'permission flags are advisory - a reader may ignore them, and the owner password removes them.')
         }
 
-        # Fail fast: PDF/A forbids encryption (ISO 19005-2 section 6.3.1).
-        if ($Document.Conformance -ne [VellumPdf.Document.PdfConformance]::None) {
-            throw ("Protect-VellumPdfDocument: PDF/A conformance ($($Document.Conformance)) does not allow " +
-                'encryption. Remove -Conformance or use a non-conformant document.')
-        }
-
         # Build combined permissions flags.
         $flags = [VellumPdf.Encryption.PdfPermissions]::None
         foreach ($p in $Permission) {
             $flags = $flags -bor [VellumPdf.Encryption.PdfPermissions]$p
+        }
+
+        # Fail fast on the combinations the engine rejects at Save time.
+        # PDF/A forbids encryption (ISO 19005-2 section 6.3.1). PDF/UA-1 allows it
+        # only while the permissions keep content extraction for assistive
+        # technology (ISO 14289-1, 7.16): VellumPdf 2.x accepts PDF/UA-1 + encryption
+        # exactly when the Extract permission is present.
+        $conformance = $Document.Conformance
+        if ($conformance -eq [VellumPdf.Document.PdfConformance]::PdfUA1) {
+            if (-not ($flags -band [VellumPdf.Encryption.PdfPermissions]::Extract)) {
+                throw ('Protect-VellumPdfDocument: a PDF/UA-1 document may be encrypted only when -Permission ' +
+                    'includes Extract (assistive technology must be able to read the content).')
+            }
+        }
+        elseif ($conformance -ne [VellumPdf.Document.PdfConformance]::None) {
+            throw ("Protect-VellumPdfDocument: PDF/A conformance ($conformance) does not allow " +
+                'encryption. Remove -Conformance or use a non-conformant document.')
+        }
+
+        # The engine cannot write encrypted files with object streams.
+        if ($Document.UseObjectStreams) {
+            throw ('Protect-VellumPdfDocument: encryption cannot be combined with object streams ' +
+                '(New-VellumPdfDocument -UseObjectStreams). Create the document without -UseObjectStreams.')
         }
 
         $settings = [VellumPdf.Encryption.PdfEncryptionSettings]::new()
@@ -153,6 +177,13 @@ function Protect-VellumPdfDocument {
         }
         if ($PSBoundParameters.ContainsKey('OwnerPassword')) {
             $settings.OwnerPassword = [System.Net.NetworkCredential]::new('', $OwnerPassword).Password
+        }
+
+        # VellumPdf 2.2 refuses an empty owner password beside a real user
+        # password: such a file opens with owner access and no password at all.
+        if ($settings.OwnerPassword -eq '' -and $settings.UserPassword) {
+            throw ('Protect-VellumPdfDocument: an empty -OwnerPassword with a non-empty -UserPassword would ' +
+                'let anyone open the file with full owner access. Pass a real owner password or omit -OwnerPassword.')
         }
 
         if ($PSBoundParameters.ContainsKey('EncryptMetadata')) {

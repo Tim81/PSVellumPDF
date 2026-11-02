@@ -177,7 +177,7 @@ function Add-VellumPdfImage {
         }
 
         Set-VellumPdfElementMargin -Element $layoutImage -Top $MarginTop -Bottom $MarginBottom `
-            -BoundParameters $PSBoundParameters
+            -BoundParameters $PSBoundParameters -Document $Document
 
         [void]$Document.Add($layoutImage)
         $Document
