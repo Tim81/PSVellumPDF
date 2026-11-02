@@ -27,7 +27,7 @@ function Set-VellumPdfPageBand {
     .PARAMETER Position
         Header (near the top edge) or Footer (near the bottom edge).
     .PARAMETER Template
-        The band text with optional {page} and {pages} tokens. A single line.
+        The band text with optional {page} and {pages} tokens. A single line. A tab is drawn as four spaces.
     .PARAMETER Align
         Left, Center (default) or Right.
     .PARAMETER FontSize
@@ -126,6 +126,7 @@ function Set-VellumPdfPageBand {
             }
             if ($Template -match '[\r\n]') { throw 'Set-VellumPdfPageBand: -Template must be a single line.' }
             Assert-VellumPdfValidText -Text $Template -CommandName 'Set-VellumPdfPageBand'
+            $Template = Expand-VellumPdfTab -Text $Template
             if (-not $FontHandle) { Assert-VellumPdfMeasurableFont -Font $Font -CommandName 'Set-VellumPdfPageBand' -Reason 'it aligns and checks the width of the band' }
             $resolved = Get-VellumPdfPageFont -Document $Document -FontHandle $FontHandle -Font $Font -CommandName 'Set-VellumPdfPageBand'
             Write-VellumPdfMissingGlyphWarning -Handle $resolved.Handle -Text ($Template -replace '\{pages?\}', '0') -CommandName 'Set-VellumPdfPageBand'

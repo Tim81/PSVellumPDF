@@ -7,7 +7,10 @@ function Measure-VellumPdfText {
         TrueType font (-FontHandle from Register-VellumPdfFont), using the same metrics the drawing
         cmdlets use for alignment and wrapping. Use it to size a box, to centre something by hand or
         to check that a label fits before placing it. -CharSpacing, -WordSpacing and
-        -HorizontalScale are added the way Add-VellumPdfText applies them.
+        -HorizontalScale are added the way Add-VellumPdfText applies them. The width is the PDF advance
+        width: with -CharSpacing it includes the space after the last character (a viewer adds it there
+        too), whereas Add-VellumPdfText aligns on the visible extent without it. A tab is measured as
+        four spaces, which is how the drawing cmdlets draw it.
 
         The result also lists characters the font cannot show: UnencodableCharacters for a base-14 font
         (outside Windows-1252, drawn as a question mark) and MissingGlyphs for an embedded font (drawn
@@ -65,13 +68,14 @@ function Measure-VellumPdfText {
         try {
             if ($Text -match '[\r\n]') { throw 'Measure-VellumPdfText: -Text must be a single line.' }
             Assert-VellumPdfValidText -Text $Text -CommandName 'Measure-VellumPdfText'
+            $measured = Expand-VellumPdfTab -Text $Text
             if (-not $FontHandle) { Assert-VellumPdfMeasurableFont -Font $Font -CommandName 'Measure-VellumPdfText' -Reason 'it measures text' }
             $resolved = $null
             $unencodable = [System.Collections.Generic.List[string]]::new()
             $missing = [System.Collections.Generic.List[string]]::new()
             if ($FontHandle) {
                 $resolved = [pscustomobject]@{ Handle = $FontHandle; Resource = $null }
-                foreach ($rune in $Text.EnumerateRunes()) {
+                foreach ($rune in $measured.EnumerateRunes()) {
                     if ($FontHandle.GetGlyphId($rune.Value) -eq 0 -and -not $missing.Contains($rune.ToString())) { $missing.Add($rune.ToString()) }
                 }
                 $fontName = 'embedded'
@@ -84,16 +88,16 @@ function Measure-VellumPdfText {
                     [VellumPdf.Fonts.Standard14Metrics]::MeasureString($standard, $s, $size)
                 }.GetNewClosure()
                 $resolved = [pscustomobject]@{ Handle = $null; Resource = $resource }
-                for ($i = 0; $i -lt $Text.Length; $i++) {
-                    $code = [int]$Text[$i]
+                for ($i = 0; $i -lt $measured.Length; $i++) {
+                    $code = [int]$measured[$i]
                     if ($code -lt 0x80 -or (Test-VellumPdfWinAnsiChar -CodeUnit $code)) { continue }
-                    $shown = if ([char]::IsHighSurrogate($Text[$i]) -and $i + 1 -lt $Text.Length) { $Text.Substring($i, 2) } else { [string]$Text[$i] }
+                    $shown = if ([char]::IsHighSurrogate($measured[$i]) -and $i + 1 -lt $measured.Length) { $measured.Substring($i, 2) } else { [string]$measured[$i] }
                     if ($shown.Length -eq 2) { $i++ }
                     if (-not $unencodable.Contains($shown)) { $unencodable.Add($shown) }
                 }
                 $fontName = $Font
             }
-            $width = Measure-VellumPdfTextWidth -Resolved $resolved -Text $Text -FontSize $FontSize -CharSpacing $CharSpacing -WordSpacing $WordSpacing -HorizontalScale $HorizontalScale
+            $width = Measure-VellumPdfTextWidth -Resolved $resolved -Text $measured -FontSize $FontSize -CharSpacing $CharSpacing -WordSpacing $WordSpacing -HorizontalScale $HorizontalScale
             [pscustomobject]@{
                 PSTypeName             = 'PSVellumPDF.TextMeasurement'
                 Text                   = $Text

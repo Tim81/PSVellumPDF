@@ -8,7 +8,8 @@ function Add-VellumPdfPageList {
         edge and -Y the top of the list in points from the page's bottom-left. A list that does not fit
         above the bottom of the page is an error.
 
-        An item is text, or a hashtable with Text and optionally Children (one more level of items):
+        An item is text, or a hashtable (or object) with Text and optionally Children (one more level of
+        items). An item without Text is an error; a missing or $null Children means no children:
 
             -Item 'First', @{ Text = 'Second'; Children = 'Second A', 'Second B' }, 'Third'
 
@@ -125,20 +126,34 @@ function Add-VellumPdfPageList {
             Assert-VellumPdfCoordinate $Width 'Width' 'Add-VellumPdfPageList'
             $bound = $PSBoundParameters
             if (-not $bound.ContainsKey('Leading')) { $Leading = 1.2 * $FontSize }
-            if (-not $bound.ContainsKey('Indent')) { $Indent = 1.8 * $FontSize }
+            $markerIndent = if ($bound.ContainsKey('Indent')) { $Indent } else { 1.8 * $FontSize }
 
             # --- items ------------------------------------------------------------------------------------
+            # An item is text, or a hashtable / object with Text and optionally Children.
+            $isRecord = { param($x) $x -is [System.Collections.IDictionary] -or $x -is [pscustomobject] }
+            $textOf = {
+                param($x, $what)
+                if (& $isRecord $x) {
+                    $t = Get-VellumPdfPropertyValue -InputObject $x -Name 'Text'
+                    if ($null -eq $t) { throw "Add-VellumPdfPageList: $what has no Text; give text or a hashtable with a Text key (an empty string draws a marker only)." }
+                    [string]$t
+                }
+                else { [string]$x }
+            }
             $entries = foreach ($spec in $Item) {
                 if ($null -eq $spec) { throw 'Add-VellumPdfPageList: an item is $null; give text or a hashtable with Text (an empty string draws a marker only).' }
-                $isMap = $spec -is [System.Collections.IDictionary]
-                $text = if ($isMap) { [string](Get-VellumPdfPropertyValue -InputObject $spec -Name 'Text') } else { [string]$spec }
-                $children = @(if ($isMap) { Get-VellumPdfPropertyValue -InputObject $spec -Name 'Children' })
+                $text = & $textOf $spec 'an item'
+                $children = @()
+                if (& $isRecord $spec) {
+                    $rawChildren = Get-VellumPdfPropertyValue -InputObject $spec -Name 'Children'
+                    if ($null -ne $rawChildren) { $children = @($rawChildren) }
+                }
                 $childEntries = @(foreach ($child in $children) {
-                        if ($child -is [System.Collections.IDictionary] -and $child['Children']) {
+                        if ($null -eq $child) { throw 'Add-VellumPdfPageList: a child item is $null; give text or a hashtable with Text.' }
+                        if ((& $isRecord $child) -and @(Get-VellumPdfPropertyValue -InputObject $child -Name 'Children').Where({ $null -ne $_ }).Count -gt 0) {
                             throw 'Add-VellumPdfPageList: the list has one nesting level; an item of Children cannot have Children of its own.'
                         }
-                        $childText = if ($child -is [System.Collections.IDictionary]) { [string](Get-VellumPdfPropertyValue -InputObject $child -Name 'Text') } else { [string]$child }
-                        [pscustomobject]@{ Text = $childText; Children = @(); Lines = $null }
+                        [pscustomobject]@{ Text = (& $textOf $child 'a child item'); Children = @(); Lines = $null }
                     })
                 [pscustomobject]@{ Text = $text; Children = $childEntries; Lines = $null }
             }
@@ -179,21 +194,21 @@ function Add-VellumPdfPageList {
                         $widest = [Math]::Max($widest, (Measure-VellumPdfTextWidth -Resolved $resolved -Text (& $markerFor $j 1) -FontSize $FontSize))
                     }
                 }
-                $Indent = [Math]::Max($Indent, $widest + 0.5 * $FontSize)
+                $markerIndent = [Math]::Max($markerIndent, $widest + 0.5 * $FontSize)
             }
-            if ($Width -le 2 * $Indent + 1) { throw "Add-VellumPdfPageList: -Width $Width is too narrow for a marker column of $([math]::Round($Indent, 1)) pt and one nested level." }
+            if ($Width -le 2 * $markerIndent + 1) { throw "Add-VellumPdfPageList: -Width $Width is too narrow for a marker column of $([math]::Round($markerIndent, 1)) pt and one nested level." }
 
             # --- measure -----------------------------------------------------------------------------------
             # Every entry becomes a placed record; children are kept with their parent for drawing.
             $layout = @{ Cursor = $Y }
             $place = {
                 param($entry, $index, $level)
-                $left = $X + $level * $Indent
-                $bodyWidth = $Width - ($level + 1) * $Indent
+                $left = $X + $level * $markerIndent
+                $bodyWidth = $Width - ($level + 1) * $markerIndent
                 $entry.Lines = Split-VellumPdfTextLine -Text $entry.Text -Width $bodyWidth -Resolved $resolved -FontSize $FontSize
                 $textHeight = $entry.Lines.Count * $Leading
                 $record = [pscustomobject]@{
-                    Entry = $entry; Level = $level; Index = $index; Left = $left; BodyLeft = $left + $Indent; BodyWidth = $bodyWidth
+                    Entry = $entry; Level = $level; Index = $index; Left = $left; BodyLeft = $left + $markerIndent; BodyWidth = $bodyWidth
                     Top = $layout.Cursor; TextHeight = $textHeight; Children = [System.Collections.Generic.List[object]]::new()
                 }
                 $layout.Cursor -= $textHeight + $ItemSpacing
@@ -237,11 +252,11 @@ function Add-VellumPdfPageList {
                 $markerText = & $markerFor $record.Index $record.Level
                 $markerLines = & $oneLine $markerText
                 if (-not $tagged) {
-                    & $drawLines $markerLines $record.Left $Indent $record.Top
+                    & $drawLines $markerLines $record.Left $markerIndent $record.Top
                     & $drawLines $record.Entry.Lines $record.BodyLeft $record.BodyWidth $record.Top
                     return
                 }
-                Invoke-VellumPdfTagged -Document $Document -Canvas $canvas -PdfPage $pdfPage -Kind Structure -StructType Lbl -Draw { & $drawLines $markerLines $record.Left $Indent $record.Top }
+                Invoke-VellumPdfTagged -Document $Document -Canvas $canvas -PdfPage $pdfPage -Kind Structure -StructType Lbl -Draw { & $drawLines $markerLines $record.Left $markerIndent $record.Top }
                 if ($bodyIsGroup) {
                     Invoke-VellumPdfTagged -Document $Document -Canvas $canvas -PdfPage $pdfPage -Kind Structure -StructType P -Draw { & $drawLines $record.Entry.Lines $record.BodyLeft $record.BodyWidth $record.Top }
                 }
@@ -276,7 +291,7 @@ function Add-VellumPdfPageList {
                                     $itemBody = [VellumPdf.Document.PdfStructElem]::new('LBody')
                                     $nestedList = [VellumPdf.Document.PdfStructElem]::new('L')
                                     $markerLines = & $oneLine (& $markerFor $record.Index 0)
-                                    Invoke-VellumPdfTagged -Document $Document -Canvas $canvas -PdfPage $pdfPage -Kind Structure -StructType Lbl -Draw { & $drawLines $markerLines $record.Left $Indent $record.Top }
+                                    Invoke-VellumPdfTagged -Document $Document -Canvas $canvas -PdfPage $pdfPage -Kind Structure -StructType Lbl -Draw { & $drawLines $markerLines $record.Left $markerIndent $record.Top }
                                     Add-VellumPdfStructElement -Document $Document -Element $itemBody
                                     Push-VellumPdfStructParent -Document $Document -Element $itemBody
                                 }

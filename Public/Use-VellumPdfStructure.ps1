@@ -57,7 +57,8 @@ function Use-VellumPdfStructure {
                 $null = $Document | ForEach-Object -Process $ScriptBlock
                 return $Document
             }
-            $group = [VellumPdf.Document.PdfStructElem]::new($Type)
+            $structType = Resolve-VellumPdfValidSetValue -Command $PSCmdlet.MyInvocation.MyCommand -Parameter 'Type' -Value $Type
+            $group = [VellumPdf.Document.PdfStructElem]::new($structType)
             if ($Language) { $group.Language = $Language }
             Push-VellumPdfStructParent -Document $Document -Element $group
             $completed = $false
@@ -69,7 +70,7 @@ function Use-VellumPdfStructure {
                 Pop-VellumPdfStructParent -Document $Document
                 # Whatever was tagged before a failure stays in the tree: its marked content is already in the page.
                 if ($group.Children.Count -gt 0) { Add-VellumPdfStructElement -Document $Document -Element $group }
-                elseif ($completed) { Write-Warning "Use-VellumPdfStructure: nothing was tagged inside the $Type block, so no structure element was written." }
+                elseif ($completed) { Write-Warning "Use-VellumPdfStructure: nothing was tagged inside the $structType block, so no structure element was written." }
             }
             $Document
         }

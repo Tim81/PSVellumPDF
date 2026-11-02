@@ -10,7 +10,8 @@ function Add-VellumPdfText {
 
         In a PDF/A document base-14 text is embedded automatically with a
         metric-compatible Liberation font (VellumPdf.Fonts.Standard14), as PDF/A
-        forbids non-embedded fonts. For several lines of wrapped text use the
+        forbids non-embedded fonts. A tab is drawn as four spaces (a tab has no glyph in a PDF font).
+        For several lines of wrapped text use the
         flow-layout document (New-VellumPdfDocument).
     .PARAMETER Document
         A document from New-VellumPdfPageDocument.
@@ -33,7 +34,9 @@ function Add-VellumPdfText {
     .PARAMETER Align
         Left (default), Center or Right, about -X.
     .PARAMETER CharSpacing
-        Extra space after every character, in points; negative tightens. Alignment accounts for it.
+        Extra space after every character, in points; negative tightens. Alignment accounts for it: the space after the
+        last character is not counted, so right-aligned text ends exactly at -X and centred text is
+        centred on its visible glyphs.
     .PARAMETER WordSpacing
         Extra space after every space character, in points.
     .PARAMETER Rise
@@ -117,6 +120,8 @@ function Add-VellumPdfText {
             $Page = Resolve-VellumPdfPageNumber -Document $Document -Page $(if ($PSBoundParameters.ContainsKey('Page')) { $PSBoundParameters['Page'] } else { 1 }) -Bound $PSBoundParameters.ContainsKey('Page') -CommandName 'Add-VellumPdfText'
             Assert-VellumPdfLanguageTag -Value $Language -CommandName 'Add-VellumPdfText'
             Assert-VellumPdfValidText -Text $Text -CommandName 'Add-VellumPdfText'
+            $Text = Expand-VellumPdfTab -Text $Text
+            $structType = Resolve-VellumPdfValidSetValue -Command $PSCmdlet.MyInvocation.MyCommand -Parameter 'Role' -Value $Role
             Assert-VellumPdfCoordinate $X 'X' 'Add-VellumPdfText'; Assert-VellumPdfCoordinate $Y 'Y' 'Add-VellumPdfText'
             if ($Text -match '[\r\n]') { throw 'Add-VellumPdfText: -Text must be a single line; use New-VellumPdfDocument for wrapped text.' }
 
@@ -151,7 +156,7 @@ function Add-VellumPdfText {
             $tw = if ($bound.ContainsKey('WordSpacing')) { $WordSpacing } else { 0.0 }
             $th = if ($bound.ContainsKey('HorizontalScale')) { $HorizontalScale } else { 100.0 }
             if ($hasSpacing -and $Align -ne 'Left') {
-                $width = Measure-VellumPdfTextWidth -Resolved $resolved -Text $Text -FontSize $FontSize -CharSpacing $tc -WordSpacing $tw -HorizontalScale $th
+                $width = Measure-VellumPdfTextWidth -Resolved $resolved -Text $Text -FontSize $FontSize -CharSpacing $tc -WordSpacing $tw -HorizontalScale $th -VisibleExtent
                 $startX = if ($Align -eq 'Center') { $drawX - $width / 2 } else { $drawX - $width }
                 $showAlignment = [VellumPdf.Canvas.TextAlignment]::Left
             }
@@ -171,7 +176,7 @@ function Add-VellumPdfText {
                     $c = ConvertTo-VellumColor $Color
                     [void]$canvas.SetFillColorRgb($c[0], $c[1], $c[2])
                 }
-                Invoke-VellumPdfTagged -Document $Document -Canvas $canvas -PdfPage $pdfPage -Kind Structure -StructType $Role -Language $Language -Draw {
+                Invoke-VellumPdfTagged -Document $Document -Canvas $canvas -PdfPage $pdfPage -Kind Structure -StructType $structType -Language $Language -Draw {
                     [void]$canvas.BeginText()
                     try {
                     if ($bound.ContainsKey('CharSpacing')) { [void]$canvas.SetCharSpacing($CharSpacing) }

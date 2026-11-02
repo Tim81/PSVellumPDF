@@ -20,11 +20,12 @@ function Add-VellumPdfPage {
     .PARAMETER Count
         Number of identical pages to add (default 1).
     .PARAMETER PassThru
-        Return the new PdfPage object instead of the document.
+        Return the new PdfPage object instead of the document; with -Count above 1, every new page
+        (one PdfPage object each, in order).
     .EXAMPLE
         $doc | Add-VellumPdfPage -PageSize Letter -Rotate 90
     .OUTPUTS
-        VellumPdf.Document.PdfDocument (the same instance), or PdfPage with -PassThru
+        VellumPdf.Document.PdfDocument (the same instance), or PdfPage (one per new page) with -PassThru
     #>
     [CmdletBinding(DefaultParameterSetName = 'Default')]
     [OutputType([VellumPdf.Document.PdfDocument])]
@@ -62,11 +63,13 @@ function Add-VellumPdfPage {
                 'Custom' { [VellumPdf.Document.PageSize]::Mm($PageWidthMm, $PageHeightMm) }
                 default { $Document.DefaultPageSize }
             }
+            $added = [System.Collections.Generic.List[object]]::new()
             for ($i = 0; $i -lt $Count; $i++) {
                 $page = $Document.AddPage($size)
                 if ($Rotate -ne 0) { $page.Rotate = $Rotate }
+                $added.Add($page)
             }
-            if ($PassThru) { $page } else { $Document }
+            if ($PassThru) { $added.ToArray() } else { $Document }
         }
         catch {
             $PSCmdlet.ThrowTerminatingError($_)

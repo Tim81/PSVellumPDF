@@ -10,11 +10,15 @@ function Add-VellumPdfTextBox {
         page's bottom-left; the first baseline sits one -FontSize below -Y and the lines follow
         at -Leading (default 1.2 times the font size).
 
+        A tab is expanded to four spaces before measuring; as in any wrapped text, runs of spaces
+        and tabs separate words and are drawn as one space.
+
         -Align Justify stretches every line except the last line of a paragraph to the full
         width by widening the gaps between words. A justified line is drawn word by word, each
         word followed by an invisible space, so extracted text keeps its spaces.
 
-        With -MaxHeight the box stops after the lines that fit and warns about the rest. Use
+        Without -MaxHeight, a box that would reach below the bottom of the page is an error (boxes are
+        not split across pages). With -MaxHeight the box stops after the lines that fit and warns about the rest. Use
         -PassThru to get the number of lines and the height used (to place the next box); the
         object also carries the document.
 
@@ -119,6 +123,8 @@ function Add-VellumPdfTextBox {
             $Page = Resolve-VellumPdfPageNumber -Document $Document -Page $(if ($PSBoundParameters.ContainsKey('Page')) { $PSBoundParameters['Page'] } else { 1 }) -Bound $PSBoundParameters.ContainsKey('Page') -CommandName 'Add-VellumPdfTextBox'
             Assert-VellumPdfLanguageTag -Value $Language -CommandName 'Add-VellumPdfTextBox'
             Assert-VellumPdfValidText -Text $Text -CommandName 'Add-VellumPdfTextBox'
+            $Text = Expand-VellumPdfTab -Text $Text
+            $structType = Resolve-VellumPdfValidSetValue -Command $PSCmdlet.MyInvocation.MyCommand -Parameter 'Role' -Value $Role
             if (-not $FontHandle) { Assert-VellumPdfMeasurableFont -Font $Font -CommandName 'Add-VellumPdfTextBox' -Reason 'it wraps text' }
             Assert-VellumPdfCoordinate $X 'X' 'Add-VellumPdfTextBox'; Assert-VellumPdfCoordinate $Y 'Y' 'Add-VellumPdfTextBox'; Assert-VellumPdfCoordinate $Width 'Width' 'Add-VellumPdfTextBox'
             $bound = $PSBoundParameters
@@ -143,6 +149,16 @@ function Add-VellumPdfTextBox {
             }
             $height = $lines.Count * $Leading
 
+            # Without -MaxHeight the whole text is drawn, so it must fit above the bottom of the page
+            # (the same rule Add-VellumPdfPageTable and Add-VellumPdfPageList apply).
+            if (-not $bound.ContainsKey('MaxHeight') -and $hadWords) {
+                $pageBottom = (Get-VellumPdfPage -Document $Document -Page $Page -CommandName 'Add-VellumPdfTextBox').MediaBox.LlY
+                if ($Y - $height -lt $pageBottom) {
+                    throw ("Add-VellumPdfTextBox: the text is $([math]::Round($height, 1)) pt tall ($($lines.Count) lines) but only " +
+                        "$([math]::Round($Y - $pageBottom, 1)) pt are left below -Y on page $Page. Shorten the text, widen the box or use -MaxHeight to cut it off.")
+                }
+            }
+
             # A box without any word draws nothing: an empty tagged paragraph or heading is not valid structure.
             if (-not ($lines | Where-Object { $_.Words.Count -gt 0 })) {
                 if ($hadWords) {
@@ -150,8 +166,8 @@ function Add-VellumPdfTextBox {
                     if ($PassThru) { return [pscustomobject]@{ Document = $Document; LineCount = $lines.Count; Height = $height; Bottom = $Y - $height } }
                     return $Document
                 }
-                if ($Document.Tagged -and $Role -match '^H[1-6]$') {
-                    throw "Add-VellumPdfTextBox: -Text has no words, so a $Role heading would be empty. Give it text or leave the box out."
+                if ($Document.Tagged -and $structType -match '^H[1-6]$') {
+                    throw "Add-VellumPdfTextBox: -Text has no words, so a $structType heading would be empty. Give it text or leave the box out."
                 }
                 Write-Verbose 'Add-VellumPdfTextBox: -Text has no words; nothing was drawn.'
                 if ($PassThru) { return [pscustomobject]@{ Document = $Document; LineCount = $lines.Count; Height = $height; Bottom = $Y - $height } }
@@ -171,7 +187,7 @@ function Add-VellumPdfTextBox {
                     [void]$canvas.SetFillColorRgb($c[0], $c[1], $c[2])
                 }
                 if ($resolved.Handle) { $Document.RegisterEmbeddedFontUsage($pdfPage, $resolved.Handle) }
-                Invoke-VellumPdfTagged -Document $Document -Canvas $canvas -PdfPage $pdfPage -Kind Structure -StructType $Role -Language $Language -Draw {
+                Invoke-VellumPdfTagged -Document $Document -Canvas $canvas -PdfPage $pdfPage -Kind Structure -StructType $structType -Language $Language -Draw {
                     Write-VellumPdfTextLine -Canvas $canvas -Resolved $resolved -FontSize $FontSize -Lines $lines.ToArray() -X $X -Top $Y -Width $Width -Leading $Leading -Align $Align
                 }
             }

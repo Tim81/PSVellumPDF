@@ -539,7 +539,7 @@ Describe 'Text spacing and line options' {
         $plain = & $x @{} 'c-plain'
         $wide = & $x @{ CharSpacing = 10 } 'c-wide'
         $wide | Should -BeLessThan $plain   # wider text starts further left to stay centred on x
-        ([math]::Abs((300 - $plain) - ((300 - $wide) - 30))) | Should -BeLessThan 0.5   # 6 chars x 10pt = 60, half of it is 30
+        ([math]::Abs((300 - $plain) - ((300 - $wide) - 25))) | Should -BeLessThan 0.5   # 5 gaps between 6 chars x 10pt = 50 (the space after the last glyph is not ink), half of it is 25
     }
 
     It 'writes line cap, join and miter limit' {

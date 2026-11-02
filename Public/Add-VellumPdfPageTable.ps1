@@ -9,7 +9,10 @@ function Add-VellumPdfPageTable {
         bottom-left) and the column widths yourself, and the table must fit on the page: one that is
         too tall is an error rather than being split.
 
-        Rows are arrays of cells. A cell is text, or a hashtable with Text and optionally ColSpan,
+        Rows are arrays of cells. A row may be empty (@()) when RowSpans from the rows above cover all of
+        its columns; it is drawn as the extension of those cells and gets no TR element. -Row may be an
+        empty array when -Header is given (a header-only table); a table with neither is an error.
+        A cell is text, or a hashtable with Text and optionally ColSpan,
         RowSpan, Alignment (Left, Center, Right, Justify), Background (colour) and Color (text colour):
 
             -Row @(
@@ -31,7 +34,7 @@ function Add-VellumPdfPageTable {
     .PARAMETER Document
         A document from New-VellumPdfPageDocument.
     .PARAMETER Row
-        The body rows: an array of rows, each an array of cells.
+        The body rows: an array of rows, each an array of cells. May be omitted or empty when -Header is given.
     .PARAMETER Header
         The header row (an array of cells) or rows (an array of arrays).
     .PARAMETER Page
@@ -90,8 +93,9 @@ function Add-VellumPdfPageTable {
         [Parameter(Mandatory, ValueFromPipeline)]
         [VellumPdf.Document.PdfDocument]$Document,
 
-        [Parameter(Mandatory, Position = 0)]
+        [Parameter(Position = 0)]
         [AllowEmptyCollection()]
+        [AllowNull()]
         [object[]]$Row,
 
         [object[]]$Header,
@@ -174,7 +178,8 @@ function Add-VellumPdfPageTable {
                 $oneRow = $headerList.Count -gt 0 -and ($headerList[0] -is [string] -or $headerList[0] -is [System.Collections.IDictionary] -or $headerList[0] -is [ValueType])
                 if ($oneRow) { $headerRows = @(, $headerList) } else { $headerRows = $headerList }
             }
-            $bodyRows = @($Row)
+            # Plain assignments: an if-expression would unroll a one-row array into its cells.
+            if ($null -eq $Row) { $bodyRows = @() } else { $bodyRows = @($Row) }
             $cellOf = {
                 param($spec)
                 $isMap = $spec -is [System.Collections.IDictionary]
@@ -232,7 +237,7 @@ function Add-VellumPdfPageTable {
                 }
             }
             $rowCount = $rowIndex
-            if ($cells.Count -eq 0) { throw 'Add-VellumPdfPageTable: the table has no cells.' }
+            if ($cells.Count -eq 0) { throw 'Add-VellumPdfPageTable: the table has no cells; give at least one -Row of cells or a -Header.' }
             $columnCount = ($cells | ForEach-Object { $_.Col + $_.ColSpan } | Measure-Object -Maximum).Maximum
             $lastRowUsed = ($cells | ForEach-Object { $_.Row + $_.RowSpan } | Measure-Object -Maximum).Maximum
             if ($lastRowUsed -gt $rowCount) { throw "Add-VellumPdfPageTable: a RowSpan runs past the last row (the table has $rowCount row(s))." }
@@ -346,6 +351,8 @@ function Add-VellumPdfPageTable {
                 }
                 try {
                     for ($r = 0; $r -lt $rowCount; $r++) {
+                        # A row whose slots are all covered by RowSpans from above has no cells of its own, but it
+                        # still gets its (empty) TR: PDF/UA counts rows from the TR elements (7.2-41..43).
                         $tableRow = $null
                         if ($Document.Tagged) {
                             $tableRow = [VellumPdf.Document.PdfStructElem]::new('TR')
@@ -353,7 +360,7 @@ function Add-VellumPdfPageTable {
                             Push-VellumPdfStructParent -Document $Document -Element $tableRow
                         }
                         try {
-                            foreach ($cell in @($cellsByRow[$r])) {
+                            foreach ($cell in $(if ($cellsByRow.ContainsKey($r)) { $cellsByRow[$r] })) {
                                 $structType = if ($cell.IsHeader) { 'TH' } else { 'TD' }
                                 $configure = {
                                     param($element)

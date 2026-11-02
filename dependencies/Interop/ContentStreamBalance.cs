@@ -1,24 +1,55 @@
-// PSVellumPDF.Interop: scans a PDF content stream for q/Q (save/restore graphics state) balance.
+// PSVellumPDF.Interop: scans a PDF content stream for the balance of q/Q (graphics state), BT/ET (text objects)
+// and BMC/BDC/EMC (marked content).
 using System.Text;
 
 namespace PSVellumPDF.Interop;
 
 /// <summary>
-/// Counts q and Q operators in a content stream while skipping everything that could contain the
-/// letters q or Q without being an operator: literal strings, hex strings, comments, names and
-/// inline image data.
+/// Counts the paired operators q/Q, BT/ET and BMC|BDC/EMC in a content stream while skipping everything
+/// that could contain their letters without being an operator: literal strings, hex strings, comments,
+/// names and inline image data.
 /// </summary>
 public static class ContentStreamBalance
 {
-    /// <summary>Result of a scan: the lowest depth reached and the depth at the end.</summary>
-    public readonly record struct Result(int MinDepth, int FinalDepth);
+    /// <summary>
+    /// Result of a scan. MinDepth and FinalDepth are the lowest and final q/Q depth; the Text and Marked
+    /// pairs are the same for BT/ET and for BMC|BDC / EMC.
+    /// </summary>
+    public readonly record struct Result(
+        int MinDepth, int FinalDepth,
+        int TextMinDepth = 0, int TextFinalDepth = 0,
+        int MarkedMinDepth = 0, int MarkedFinalDepth = 0)
+    {
+        /// <summary>True when q/Q, BT/ET and BMC|BDC/EMC are all balanced and never close more than was opened.</summary>
+        public bool IsBalanced => Describe().Length == 0;
 
-    /// <summary>Scans <paramref name="content"/> and returns the lowest and final q/Q depth.</summary>
+        /// <summary>Names every unbalanced operator pair, for example "BT/ET (final depth 1)"; empty when balanced.</summary>
+        public string Describe()
+        {
+            var parts = new List<string>();
+            Add(parts, "q/Q", MinDepth, FinalDepth);
+            Add(parts, "BT/ET", TextMinDepth, TextFinalDepth);
+            Add(parts, "BMC|BDC/EMC", MarkedMinDepth, MarkedFinalDepth);
+            return string.Join("; ", parts);
+        }
+
+        private static void Add(List<string> parts, string pair, int min, int final)
+        {
+            if (min < 0 || final != 0)
+                parts.Add($"{pair} (lowest depth {min}, final depth {final})");
+        }
+    }
+
+    /// <summary>Scans <paramref name="content"/> and returns the lowest and final depth of each operator pair.</summary>
     public static Result Scan(byte[] content)
     {
         ArgumentNullException.ThrowIfNull(content);
         var depth = 0;
         var min = 0;
+        var text = 0;
+        var textMin = 0;
+        var marked = 0;
+        var markedMin = 0;
         var i = 0;
         var n = content.Length;
         while (i < n)
@@ -59,9 +90,14 @@ public static class ContentStreamBalance
             else if (length == 1 && content[start] == (byte)'Q') { depth--; if (depth < min) min = depth; }
             else if (length == 2 && content[start] == (byte)'B' && content[start + 1] == (byte)'I')
                 i = SkipInlineImage(content, i);
+            else if (length == 2 && content[start] == (byte)'B' && content[start + 1] == (byte)'T') text++;
+            else if (length == 2 && content[start] == (byte)'E' && content[start + 1] == (byte)'T') { text--; if (text < textMin) textMin = text; }
+            else if (length == 3 && content[start] == (byte)'B' && content[start + 1] == (byte)'M' && content[start + 2] == (byte)'C') marked++;
+            else if (length == 3 && content[start] == (byte)'B' && content[start + 1] == (byte)'D' && content[start + 2] == (byte)'C') marked++;
+            else if (length == 3 && content[start] == (byte)'E' && content[start + 1] == (byte)'M' && content[start + 2] == (byte)'C') { marked--; if (marked < markedMin) markedMin = marked; }
         }
 
-        return new Result(min, depth);
+        return new Result(min, depth, textMin, text, markedMin, marked);
     }
 
     private static bool IsWhite(byte b) => b is 0 or 9 or 10 or 12 or 13 or 32;
