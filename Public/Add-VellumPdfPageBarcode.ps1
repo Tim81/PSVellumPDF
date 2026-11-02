@@ -117,14 +117,14 @@ function Add-VellumPdfPageBarcode {
         [Parameter(Mandatory)] [double]$X,
         [Parameter(Mandatory)] [double]$Y,
 
-        [ValidateRange(0.01, 1000)] [double]$ModuleSize,
-        [ValidateRange(1, 100000)] [double]$TargetWidth,
+        [ValidateRange(0.01, 1000.0)] [double]$ModuleSize,
+        [ValidateRange(1.0, 100000.0)] [double]$TargetWidth,
         [object]$Foreground,
         [object]$Background,
         [switch]$NoQuietZone,
-        [ValidateRange(1, 10000)] [double]$BarHeight,
+        [ValidateRange(1.0, 10000.0)] [double]$BarHeight,
         [bool]$ShowText,
-        [ValidateRange(0, 1000)] [double]$TextSize,
+        [ValidateRange(0.0, 1000.0)] [double]$TextSize,
         [ValidateSet('Courier', 'CourierBold', 'CourierBoldOblique', 'CourierOblique',
             'Helvetica', 'HelveticaBold', 'HelveticaBoldOblique', 'HelveticaOblique',
             'Symbol', 'TimesBold', 'TimesBoldItalic', 'TimesItalic', 'TimesRoman', 'ZapfDingbats')]
@@ -142,11 +142,11 @@ function Add-VellumPdfPageBarcode {
         [ValidateRange(3, 90)] [int]$Rows,
         [switch]$Compact,
         [ValidateRange(0, 8)] [int]$ErrorCorrectionLevel,
-        [ValidateRange(0.5, 20)] [double]$PreferredAspectRatio,
-        [ValidateRange(1, 20)] [double]$RowHeight,
+        [ValidateRange(0.5, 20.0)] [double]$PreferredAspectRatio,
+        [ValidateRange(1.0, 20.0)] [double]$RowHeight,
         [switch]$CheckDigit,
         [switch]$FullAscii,
-        [ValidateRange(2, 3)] [double]$WideNarrowRatio,
+        [ValidateRange(2.0, 3.0)] [double]$WideNarrowRatio,
         [string]$AddOn,
         [ValidateSet('Frame', 'Horizontal', 'None')] [string]$BearerBars,
         [ValidateScript({ -not [string]::IsNullOrWhiteSpace($_) }, ErrorMessage = '-AltText must not be empty or whitespace.')] [string]$AltText,
@@ -156,6 +156,7 @@ function Add-VellumPdfPageBarcode {
     process {
         try {
             Assert-VellumPdfDocumentOpen -Document $Document -CommandName 'Add-VellumPdfPageBarcode'
+            $Page = Resolve-VellumPdfPageNumber -Document $Document -Page $Page -Bound $PSBoundParameters.ContainsKey('Page') -CommandName 'Add-VellumPdfPageBarcode'
             Assert-VellumPdfCoordinate $X 'X' 'Add-VellumPdfPageBarcode'; Assert-VellumPdfCoordinate $Y 'Y' 'Add-VellumPdfPageBarcode'
             # Validates -Page up front (the canvas lookup below would do so too, but after building the symbol).
             [void](Get-VellumPdfPage -Document $Document -Page $Page -CommandName 'Add-VellumPdfPageBarcode')

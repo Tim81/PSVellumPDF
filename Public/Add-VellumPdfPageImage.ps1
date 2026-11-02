@@ -61,10 +61,10 @@ function Add-VellumPdfPageImage {
         [Parameter(Mandatory)] [double]$X,
         [Parameter(Mandatory)] [double]$Y,
 
-        [ValidateRange(0.01, 1000000)]
+        [ValidateRange(0.01, 1000000.0)]
         [double]$Width,
 
-        [ValidateRange(0.01, 1000000)]
+        [ValidateRange(0.01, 1000000.0)]
         [double]$Height,
 
         # Tagged documents: alternate text for the image, or -Decorative to mark it as an artifact.
@@ -77,6 +77,7 @@ function Add-VellumPdfPageImage {
     process {
         try {
             Assert-VellumPdfDocumentOpen -Document $Document -CommandName 'Add-VellumPdfPageImage'
+            $Page = Resolve-VellumPdfPageNumber -Document $Document -Page $Page -Bound $PSBoundParameters.ContainsKey('Page') -CommandName 'Add-VellumPdfPageImage'
             Assert-VellumPdfCoordinate $X 'X' 'Add-VellumPdfPageImage'; Assert-VellumPdfCoordinate $Y 'Y' 'Add-VellumPdfPageImage'
             $pdfPage = Get-VellumPdfPage -Document $Document -Page $Page -CommandName 'Add-VellumPdfPageImage'
             if ($Decorative -and $AltText) { throw 'Add-VellumPdfPageImage: -AltText and -Decorative cannot be combined.' }

@@ -38,11 +38,11 @@ function Add-VellumPdfPage {
         [string]$PageSize,
 
         [Parameter(Mandatory, ParameterSetName = 'Custom')]
-        [ValidateRange(1, 5080)]
+        [ValidateRange(1.0, 5080.0)]
         [double]$PageWidthMm,
 
         [Parameter(Mandatory, ParameterSetName = 'Custom')]
-        [ValidateRange(1, 5080)]
+        [ValidateRange(1.0, 5080.0)]
         [double]$PageHeightMm,
 
         [ValidateSet(0, 90, 180, 270)]

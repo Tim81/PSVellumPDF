@@ -38,7 +38,7 @@ function Use-VellumPdfClip {
         NonZero (default) or EvenOdd.
     .EXAMPLE
         $doc | Use-VellumPdfClip -X 72 -Y 500 -Width 200 -Height 100 -Ellipse -ScriptBlock {
-            $_ | Add-VellumPdfGradient -Direction Horizontal -X 72 -Y 500 -Width 200 -Height 100 -StartColor red -EndColor blue
+            $_ | Add-VellumPdfGradient -Direction LeftToRight -X 72 -Y 500 -Width 200 -Height 100 -StartColor red -EndColor blue
         }
     .OUTPUTS
         VellumPdf.Document.PdfDocument (the same instance, for chaining)
@@ -62,8 +62,8 @@ function Use-VellumPdfClip {
 
         [Parameter(Mandatory, ParameterSetName = 'Box')] [double]$X,
         [Parameter(Mandatory, ParameterSetName = 'Box')] [double]$Y,
-        [Parameter(Mandatory, ParameterSetName = 'Box')] [ValidateRange(0.01, 1000000)] [double]$Width,
-        [Parameter(Mandatory, ParameterSetName = 'Box')] [ValidateRange(0.01, 1000000)] [double]$Height,
+        [Parameter(Mandatory, ParameterSetName = 'Box')] [ValidateRange(0.01, 1000000.0)] [double]$Width,
+        [Parameter(Mandatory, ParameterSetName = 'Box')] [ValidateRange(0.01, 1000000.0)] [double]$Height,
         [Parameter(ParameterSetName = 'Box')] [switch]$Ellipse,
 
         [ValidateRange(1, 1000000)]
@@ -76,6 +76,7 @@ function Use-VellumPdfClip {
     process {
         try {
             Assert-VellumPdfDocumentOpen -Document $Document -CommandName 'Use-VellumPdfClip'
+            $Page = Resolve-VellumPdfPageNumber -Document $Document -Page $Page -Bound $PSBoundParameters.ContainsKey('Page') -CommandName 'Use-VellumPdfClip'
             switch ($PSCmdlet.ParameterSetName) {
                 'Data' { $ops = ConvertTo-VellumPdfPathOps -Data $Data -CommandName 'Use-VellumPdfClip' }
                 'Point' { $ops = ConvertTo-VellumPdfPathOps -Point $Point -Close -CommandName 'Use-VellumPdfClip' }
@@ -110,6 +111,7 @@ function Use-VellumPdfClip {
             }
             $canvas = Get-VellumPdfPageCanvas -Document $Document -Page $Page -CommandName 'Use-VellumPdfClip'
             [void]$canvas.SaveState()
+            Push-VellumPdfScopePage -Document $Document -Page $Page
             try {
                 Write-VellumPdfPathOps -Canvas $canvas -Ops $ops
                 if ($FillRule -eq 'EvenOdd') { [void]$canvas.ClipEvenOdd() } else { [void]$canvas.Clip() }
@@ -117,7 +119,7 @@ function Use-VellumPdfClip {
                 # Run in the caller's scope with the document as $_; the block's own output is dropped.
                 $null = $Document | ForEach-Object -Process $ScriptBlock
             }
-            finally { [void]$canvas.RestoreState() }
+            finally { Pop-VellumPdfScopePage -Document $Document; [void]$canvas.RestoreState() }
             $Document
         }
         catch {

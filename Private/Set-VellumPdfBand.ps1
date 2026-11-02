@@ -37,7 +37,8 @@ function Set-VellumPdfBand {
     $wantsSize  = $BoundParameters.ContainsKey('FontSize')
     $wantsColor = $BoundParameters.ContainsKey('Color')
     $style = $null
-    if ([bool]$Font -or $wantsSize -or $FontHandle -or $wantsColor) {
+    # Always an explicit style, so the band follows the document default font rather than Helvetica 12.
+    if ($true) {
         $default = Resolve-VellumPdfDefault -Document $Document
         $styleArgs = @{ FontSize = if ($wantsSize) { $FontSize } else { $default.FontSize } }
         if ($FontHandle) { $styleArgs['FontHandle'] = $FontHandle }

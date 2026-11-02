@@ -11,11 +11,14 @@ Import-Module (Join-Path $PSScriptRoot '..' 'PSVellumPDF.psd1') -Force
 
 $out = Join-Path $PSScriptRoot 'paths-and-text-boxes.pdf'
 
-# A circle of radius r as four Bezier curves (k is the usual circle constant).
+# A circle of radius r as four Bezier curves (k is the usual circle constant). Interpolation writes
+# numbers with a dot in every culture; -f would use a decimal comma in, for example, de-DE or nl-NL.
 function Get-CirclePath([double]$Cx, [double]$Cy, [double]$R) {
     $k = 0.5522847498 * $R
-    'M {0} {1} C {0} {2} {3} {4} {5} {4} C {6} {4} {7} {2} {7} {1} C {7} {8} {6} {9} {5} {9} C {3} {9} {0} {8} {0} {1} Z' -f
-        ($Cx + $R), $Cy, ($Cy + $k), ($Cx + $k), ($Cy + $R), $Cx, ($Cx - $k), ($Cx - $R), ($Cy - $k), ($Cy - $R)
+    "M $($Cx + $R) $Cy C $($Cx + $R) $($Cy + $k) $($Cx + $k) $($Cy + $R) $Cx $($Cy + $R) " +
+    "C $($Cx - $k) $($Cy + $R) $($Cx - $R) $($Cy + $k) $($Cx - $R) $Cy " +
+    "C $($Cx - $R) $($Cy - $k) $($Cx - $k) $($Cy - $R) $Cx $($Cy - $R) " +
+    "C $($Cx + $k) $($Cy - $R) $($Cx + $R) $($Cy - $k) $($Cx + $R) $Cy Z"
 }
 
 # A five-pointed star whose lines cross itself: the even-odd rule leaves the middle empty.

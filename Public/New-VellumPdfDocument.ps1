@@ -102,11 +102,11 @@ function New-VellumPdfDocument {
         # Custom page size in millimetres (max 5080 mm = 14400 pt, the PDF default
         # user-space limit). Use instead of -PageSize; swap the two for landscape.
         [Parameter(Mandatory, ParameterSetName = 'CustomPage')]
-        [ValidateRange(1, 5080)]
+        [ValidateRange(1.0, 5080.0)]
         [double]$PageWidthMm,
 
         [Parameter(Mandatory, ParameterSetName = 'CustomPage')]
-        [ValidateRange(1, 5080)]
+        [ValidateRange(1.0, 5080.0)]
         [double]$PageHeightMm,
 
         [ValidateSet('Courier', 'CourierBold', 'CourierBoldOblique', 'CourierOblique',
@@ -114,7 +114,7 @@ function New-VellumPdfDocument {
             'Symbol', 'TimesBold', 'TimesBoldItalic', 'TimesItalic', 'TimesRoman', 'ZapfDingbats')]
         [string]$DefaultFont = 'Helvetica',
 
-        [ValidateRange(1, 1000)]
+        [ValidateRange(1.0, 1000.0)]
         [double]$DefaultFontSize = 11,
 
         [switch]$Tagged,
@@ -123,19 +123,19 @@ function New-VellumPdfDocument {
         # Relevant for tagged PDF and PDF/A accessibility. Requires VellumPdf 1.1+.
         [string]$Language,
 
-        [ValidateRange(0, 10000)]
+        [ValidateRange(0.0, 10000.0)]
         [double]$Margin,
 
-        [ValidateRange(0, 10000)]
+        [ValidateRange(0.0, 10000.0)]
         [double]$MarginTop,
 
-        [ValidateRange(0, 10000)]
+        [ValidateRange(0.0, 10000.0)]
         [double]$MarginRight,
 
-        [ValidateRange(0, 10000)]
+        [ValidateRange(0.0, 10000.0)]
         [double]$MarginBottom,
 
-        [ValidateRange(0, 10000)]
+        [ValidateRange(0.0, 10000.0)]
         [double]$MarginLeft,
 
         [switch]$UseObjectStreams

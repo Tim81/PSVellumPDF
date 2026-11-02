@@ -4,7 +4,9 @@ function Add-VellumPdfPath {
         Draws a free-form path (lines and Bezier curves) on a page of a page-based document.
     .DESCRIPTION
         Describe the outline with -Data, a small subset of SVG path syntax in PDF points
-        (72 pt = 1 inch, origin at the page's bottom-left):
+        (72 pt = 1 inch, origin at the page's bottom-left). Numbers use a dot as the decimal
+        mark, whatever the culture; build the string with interpolation ("$x") rather than -f or
+        .ToString(), which use the current culture's decimal comma:
 
             M x y                        move to (starts a sub-path)
             L x y                        straight line to
@@ -70,10 +72,17 @@ function Add-VellumPdfPath {
     .EXAMPLE
         $doc | Add-VellumPdfPath -Data 'M 100 100 L 200 100 L 150 180 Z' -FillColor '#f4b400' -StrokeColor black
     .EXAMPLE
-        # A ring: two circles, the inner one cut out by the even-odd rule.
-        $k = 0.5522847498
-        $ring = 'M 250 400 C 250 {0} {1} 450 200 450 C {2} 450 150 {0} 150 400 C 150 {3} {2} 350 200 350 C {1} 350 250 {3} 250 400' -f 400+$k*50, 200+$k*50, 200-$k*50, 400-$k*50
-        $doc | Add-VellumPdfPath -Data $ring -FillRule EvenOdd -FillColor navy
+        # A ring: two circles, the inner one cut out by the even-odd rule. String interpolation always
+        # writes numbers with a dot; -f and .ToString() would use a decimal comma in some cultures.
+        $circle = {
+            param($cx, $cy, $r)
+            $k = 0.5522847498 * $r
+            "M $($cx + $r) $cy C $($cx + $r) $($cy + $k) $($cx + $k) $($cy + $r) $cx $($cy + $r) " +
+            "C $($cx - $k) $($cy + $r) $($cx - $r) $($cy + $k) $($cx - $r) $cy " +
+            "C $($cx - $r) $($cy - $k) $($cx - $k) $($cy - $r) $cx $($cy - $r) " +
+            "C $($cx + $k) $($cy - $r) $($cx + $r) $($cy - $k) $($cx + $r) $cy Z"
+        }
+        $doc | Add-VellumPdfPath -Data ((& $circle 200 400 50) + ' ' + (& $circle 200 400 25)) -FillRule EvenOdd -FillColor navy
     .OUTPUTS
         VellumPdf.Document.PdfDocument (the same instance, for chaining)
     #>
@@ -101,18 +110,18 @@ function Add-VellumPdfPath {
         [string]$FillRule = 'NonZero',
 
         [string]$IccProfilePath,
-        [ValidateRange(0, 1)] [double[]]$FillIcc,
-        [ValidateRange(0, 1)] [double[]]$StrokeIcc,
+        [ValidateRange(0.0, 1.0)] [double[]]$FillIcc,
+        [ValidateRange(0.0, 1.0)] [double[]]$StrokeIcc,
 
         [object]$FillColor,
-        [ValidateCount(4, 4)] [ValidateRange(0, 1)] [double[]]$FillCmyk,
+        [ValidateCount(4, 4)] [ValidateRange(0.0, 1.0)] [double[]]$FillCmyk,
         [object]$StrokeColor,
-        [ValidateCount(4, 4)] [ValidateRange(0, 1)] [double[]]$StrokeCmyk,
+        [ValidateCount(4, 4)] [ValidateRange(0.0, 1.0)] [double[]]$StrokeCmyk,
 
-        [ValidateRange(0, 10000)]
+        [ValidateRange(0.0, 10000.0)]
         [double]$StrokeWidth = 1,
 
-        [ValidateRange(0.01, 10000)]
+        [ValidateRange(0.01, 10000.0)]
         [double[]]$Dash,
 
         [ValidateSet('Butt', 'Round', 'Square')]
@@ -121,13 +130,13 @@ function Add-VellumPdfPath {
         [ValidateSet('Miter', 'Round', 'Bevel')]
         [string]$LineJoin,
 
-        [ValidateRange(1, 100)]
+        [ValidateRange(1.0, 100.0)]
         [double]$MiterLimit,
 
-        [ValidateRange(0, 1)]
+        [ValidateRange(0.0, 1.0)]
         [double]$Opacity,
 
-        [ValidateRange(0, 1)]
+        [ValidateRange(0.0, 1.0)]
         [double]$StrokeOpacity,
 
         [ValidateScript({ -not [string]::IsNullOrWhiteSpace($_) }, ErrorMessage = '-AltText must not be empty or whitespace.')]
@@ -137,6 +146,7 @@ function Add-VellumPdfPath {
     process {
         try {
             Assert-VellumPdfDocumentOpen -Document $Document -CommandName 'Add-VellumPdfPath'
+            $Page = Resolve-VellumPdfPageNumber -Document $Document -Page $Page -Bound $PSBoundParameters.ContainsKey('Page') -CommandName 'Add-VellumPdfPath'
             $bound = $PSBoundParameters
             $hasIcc = $bound.ContainsKey('FillIcc') -or $bound.ContainsKey('StrokeIcc')
             if ($hasIcc -ne $bound.ContainsKey('IccProfilePath')) {

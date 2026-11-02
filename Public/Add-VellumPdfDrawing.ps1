@@ -59,7 +59,7 @@ function Add-VellumPdfDrawing {
         [VellumPdf.Layout.Document]$Document,
 
         [Parameter(Mandatory)]
-        [ValidateRange(1, 100000)]
+        [ValidateRange(1.0, 100000.0)]
         [double]$Height,
 
         [Parameter(Mandatory, Position = 0)]
@@ -71,10 +71,10 @@ function Add-VellumPdfDrawing {
 
         [switch]$Decorative,
 
-        [ValidateRange(0, 10000)]
+        [ValidateRange(0.0, 10000.0)]
         [double]$MarginTop,
 
-        [ValidateRange(0, 10000)]
+        [ValidateRange(0.0, 10000.0)]
         [double]$MarginBottom
     )
 

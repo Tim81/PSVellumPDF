@@ -49,16 +49,16 @@ function Add-VellumPdfLineSeparator {
         [Parameter(Mandatory, ValueFromPipeline)]
         [VellumPdf.Layout.Document]$Document,
 
-        [ValidateRange(0.1, 50)]
+        [ValidateRange(0.1, 50.0)]
         [double]$LineWidth,
 
         # RGB triple (0..1), a hex string ('#3366cc'/'#36c'), or a colour name.
         [object]$Color,
 
-        [ValidateRange(0, 10000)]
+        [ValidateRange(0.0, 10000.0)]
         [double]$MarginTop,
 
-        [ValidateRange(0, 10000)]
+        [ValidateRange(0.0, 10000.0)]
         [double]$MarginBottom
     )
 

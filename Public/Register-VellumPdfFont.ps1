@@ -38,7 +38,7 @@ function Register-VellumPdfFont {
                Add-VellumPdfParagraph -Text 'Body with embedded font.' -FontHandle $handle |
                Save-VellumPdfDocument -Path ./output.pdf
     .EXAMPLE
-        $bytes = [System.IO.File]::ReadAllBytes('./DejaVuSans.ttf')
+        $bytes = [System.IO.File]::ReadAllBytes((Resolve-Path ./DejaVuSans.ttf).ProviderPath)
         $handle = Register-VellumPdfFont -Document $doc -FontBytes $bytes
     .OUTPUTS
         VellumPdf.Fonts.EmbeddedFontHandle

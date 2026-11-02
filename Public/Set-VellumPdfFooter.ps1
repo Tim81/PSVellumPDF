@@ -63,7 +63,7 @@ function Set-VellumPdfFooter {
             'Symbol', 'TimesBold', 'TimesBoldItalic', 'TimesItalic', 'TimesRoman', 'ZapfDingbats')]
         [string]$Font,
 
-        [ValidateRange(1, 1000)]
+        [ValidateRange(1.0, 1000.0)]
         [double]$FontSize,
 
         # An embedded TrueType font from Register-VellumPdfFont (takes precedence
@@ -75,7 +75,7 @@ function Set-VellumPdfFooter {
 
         # Band height in points (default: line height + 4). Text wider than the
         # page is truncated at a word boundary and reported when saving.
-        [ValidateRange(0.1, 10000)]
+        [ValidateRange(0.1, 10000.0)]
         [double]$Height,
 
         [ValidateSet('Left', 'Center', 'Right', 'Justify')]

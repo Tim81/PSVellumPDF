@@ -89,7 +89,7 @@ function Add-VellumPdfList {
         [ValidateSet('Unordered', 'OrderedDecimal', 'OrderedAlpha', 'OrderedRoman')]
         [string]$Style = 'Unordered',
 
-        [ValidateRange(0, 1000)]
+        [ValidateRange(0.0, 1000.0)]
         [double]$Indent,
 
         [ValidateSet('Courier', 'CourierBold', 'CourierBoldOblique', 'CourierOblique',
@@ -97,7 +97,7 @@ function Add-VellumPdfList {
             'Symbol', 'TimesBold', 'TimesBoldItalic', 'TimesItalic', 'TimesRoman', 'ZapfDingbats')]
         [string]$Font,
 
-        [ValidateRange(1, 1000)]
+        [ValidateRange(1.0, 1000.0)]
         [double]$FontSize,
 
         # An embedded TrueType font from Register-VellumPdfFont (takes precedence
@@ -107,17 +107,17 @@ function Add-VellumPdfList {
         # Text colour for every item: R,G,B in 0..1, '#rrggbb', or a colour name.
         [object]$Color,
 
-        [ValidateRange(0, 1000)]
+        [ValidateRange(0.0, 1000.0)]
         [double]$Leading,
 
         # BCP 47 language tag applied to every item (tagged documents only).
         [ValidateNotNullOrEmpty()]
         [string]$Language,
 
-        [ValidateRange(0, 10000)]
+        [ValidateRange(0.0, 10000.0)]
         [double]$MarginTop,
 
-        [ValidateRange(0, 10000)]
+        [ValidateRange(0.0, 10000.0)]
         [double]$MarginBottom
     )
 
@@ -205,7 +205,8 @@ function Add-VellumPdfList {
                 $over = @('Font', 'FontSize', 'FontHandle', 'Color', 'Leading') | Where-Object {
                     $spec -is [System.Collections.IDictionary] -and $null -ne $spec[$_]
                 }
-                if (-not $listWantsStyle -and -not $over) { return $null }
+                # Always an explicit style: a TextStyle without a font would draw in the library-global
+                # Helvetica instead of the document's default font.
 
                 $handle = $FontHandle
                 if ($spec -is [System.Collections.IDictionary] -and $spec['FontHandle']) {

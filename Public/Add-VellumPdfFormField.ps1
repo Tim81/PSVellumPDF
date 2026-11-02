@@ -91,8 +91,8 @@ function Add-VellumPdfFormField {
         [int]$Page = 1,
 
         [double]$X, [double]$Y,
-        [ValidateRange(0.01, 1000000)] [double]$Width,
-        [ValidateRange(0.01, 1000000)] [double]$Height,
+        [ValidateRange(0.01, 1000000.0)] [double]$Width,
+        [ValidateRange(0.01, 1000000.0)] [double]$Height,
 
         [string]$Value = '',
         [switch]$Checked,
@@ -111,6 +111,7 @@ function Add-VellumPdfFormField {
     process {
         try {
             Assert-VellumPdfDocumentOpen -Document $Document -CommandName 'Add-VellumPdfFormField'
+            $Page = Resolve-VellumPdfPageNumber -Document $Document -Page $Page -Bound $PSBoundParameters.ContainsKey('Page') -CommandName 'Add-VellumPdfFormField'
             $bound = $PSBoundParameters
 
             if ($Document.Conformance -ne [VellumPdf.Document.PdfConformance]::None) {

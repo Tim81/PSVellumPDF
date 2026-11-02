@@ -156,10 +156,10 @@ function Add-VellumPdfBarcode {
         [ValidateRange(0, 899)]
         [int]$FileId,
 
-        [ValidateRange(0.01, 1000)]
+        [ValidateRange(0.01, 1000.0)]
         [double]$ModuleSize,
 
-        [ValidateRange(1, 100000)]
+        [ValidateRange(1.0, 100000.0)]
         [double]$TargetWidth,
 
         [object]$Foreground,
@@ -174,12 +174,12 @@ function Add-VellumPdfBarcode {
         [string]$AltText,
         [switch]$Decorative,
 
-        [ValidateRange(1, 10000)]
+        [ValidateRange(1.0, 10000.0)]
         [double]$BarHeight,
 
         [bool]$ShowText,
 
-        [ValidateRange(0, 1000)]
+        [ValidateRange(0.0, 1000.0)]
         [double]$TextSize,
 
         [ValidateSet('Courier', 'CourierBold', 'CourierBoldOblique', 'CourierOblique',
@@ -227,10 +227,10 @@ function Add-VellumPdfBarcode {
         [ValidateRange(0, 8)]
         [int]$ErrorCorrectionLevel,
 
-        [ValidateRange(0.5, 20)]
+        [ValidateRange(0.5, 20.0)]
         [double]$PreferredAspectRatio,
 
-        [ValidateRange(1, 20)]
+        [ValidateRange(1.0, 20.0)]
         [double]$RowHeight,
 
         [string]$MacroFileName,
@@ -245,7 +245,7 @@ function Add-VellumPdfBarcode {
         [switch]$CheckDigit,
         [switch]$FullAscii,
 
-        [ValidateRange(2, 3)]
+        [ValidateRange(2.0, 3.0)]
         [double]$WideNarrowRatio,
 
         [string]$AddOn,
@@ -253,16 +253,16 @@ function Add-VellumPdfBarcode {
         [ValidateSet('Frame', 'Horizontal', 'None')]
         [string]$BearerBars,
 
-        [ValidateRange(0, 10000)]
+        [ValidateRange(0.0, 10000.0)]
         [double]$MarginTop,
 
-        [ValidateRange(0, 10000)]
+        [ValidateRange(0.0, 10000.0)]
         [double]$MarginBottom,
 
-        [ValidateRange(0, 10000)]
+        [ValidateRange(0.0, 10000.0)]
         [double]$MarginLeft,
 
-        [ValidateRange(0, 10000)]
+        [ValidateRange(0.0, 10000.0)]
         [double]$MarginRight
     )
 

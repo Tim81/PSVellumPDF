@@ -47,8 +47,8 @@ function Add-VellumPdfGradient {
 
         [Parameter(Mandatory)] [double]$X,
         [Parameter(Mandatory)] [double]$Y,
-        [Parameter(Mandatory)] [ValidateRange(0.01, 1000000)] [double]$Width,
-        [Parameter(Mandatory)] [ValidateRange(0.01, 1000000)] [double]$Height,
+        [Parameter(Mandatory)] [ValidateRange(0.01, 1000000.0)] [double]$Width,
+        [Parameter(Mandatory)] [ValidateRange(0.01, 1000000.0)] [double]$Height,
         [Parameter(Mandatory)] [object]$StartColor,
         [Parameter(Mandatory)] [object]$EndColor,
 
@@ -65,6 +65,7 @@ function Add-VellumPdfGradient {
     process {
         try {
             Assert-VellumPdfDocumentOpen -Document $Document -CommandName 'Add-VellumPdfGradient'
+            $Page = Resolve-VellumPdfPageNumber -Document $Document -Page $Page -Bound $PSBoundParameters.ContainsKey('Page') -CommandName 'Add-VellumPdfGradient'
             Assert-VellumPdfCoordinate $X 'X' 'Add-VellumPdfGradient'; Assert-VellumPdfCoordinate $Y 'Y' 'Add-VellumPdfGradient'; Assert-VellumPdfCoordinate $Width 'Width' 'Add-VellumPdfGradient'; Assert-VellumPdfCoordinate $Height 'Height' 'Add-VellumPdfGradient'
             if ($Type -eq 'Radial' -and $PSBoundParameters.ContainsKey('Direction')) {
                 throw 'Add-VellumPdfGradient: -Direction applies to an Axial gradient only.'

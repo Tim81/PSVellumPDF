@@ -150,10 +150,10 @@ function Add-VellumPdfImage {
         # refused by the engine.
         [switch]$DecodeToRaster,
 
-        [ValidateRange(1, 100000)]
+        [ValidateRange(1.0, 100000.0)]
         [double]$Width,
 
-        [ValidateRange(1, 100000)]
+        [ValidateRange(1.0, 100000.0)]
         [double]$Height,
 
         [ValidateSet('Left', 'Center', 'Right', 'Justify')]
@@ -163,16 +163,16 @@ function Add-VellumPdfImage {
 
         [string]$AltText,
 
-        [ValidateRange(0, 10000)]
+        [ValidateRange(0.0, 10000.0)]
         [double]$MarginTop,
 
-        [ValidateRange(0, 10000)]
+        [ValidateRange(0.0, 10000.0)]
         [double]$MarginBottom,
 
-        [ValidateRange(0, 10000)]
+        [ValidateRange(0.0, 10000.0)]
         [double]$MarginLeft,
 
-        [ValidateRange(0, 10000)]
+        [ValidateRange(0.0, 10000.0)]
         [double]$MarginRight
     )
 

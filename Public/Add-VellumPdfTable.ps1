@@ -128,10 +128,10 @@ function Add-VellumPdfTable {
         [Parameter(Mandatory)]
         [object[]]$Row,
 
-        [ValidateRange(0, 100000)]
+        [ValidateRange(0.0, 100000.0)]
         [double[]]$ColumnWidth,
 
-        [ValidateRange(0, 100)]
+        [ValidateRange(0.0, 100.0)]
         [double]$BorderWidth,
 
         # RGB triple (0..1), hex ('#3366cc'/'#36c'), or a colour name.
@@ -155,7 +155,7 @@ function Add-VellumPdfTable {
             'Symbol', 'TimesBold', 'TimesBoldItalic', 'TimesItalic', 'TimesRoman', 'ZapfDingbats')]
         [string]$Font,
 
-        [ValidateRange(1, 1000)]
+        [ValidateRange(1.0, 1000.0)]
         [double]$FontSize,
 
         # An embedded TrueType font from Register-VellumPdfFont. Takes precedence
@@ -170,10 +170,10 @@ function Add-VellumPdfTable {
         [ValidateSet('Left', 'Center', 'Right', 'Justify')]
         [string]$Alignment = 'Left',
 
-        [ValidateRange(0, 10000)]
+        [ValidateRange(0.0, 10000.0)]
         [double]$MarginTop,
 
-        [ValidateRange(0, 10000)]
+        [ValidateRange(0.0, 10000.0)]
         [double]$MarginBottom
     )
 
@@ -284,7 +284,7 @@ function Add-VellumPdfTable {
             if ($FontHandle) {
                 $table.DefaultCellStyle = New-VellumTextStyle -FontHandle $FontHandle -FontSize $effSize
             }
-            elseif ([bool]$Font -or $PSBoundParameters.ContainsKey('FontSize')) {
+            else {
                 $table.DefaultCellStyle = New-VellumTextStyle -Font $effFont -FontSize $effSize
             }
 
@@ -393,8 +393,32 @@ function Add-VellumPdfTable {
             }
 
             # Apply column widths.
+            # Spans: a cell advances the grid column by its ColSpan, and a RowSpan reserves its columns
+            # in the rows below, so -ColumnAlignment and the -ColumnWidth count follow the grid, not the cell count.
+            $spanOf = {
+                param($cellSpec, $key)
+                if ($cellSpec -is [System.Collections.IDictionary] -and $null -ne $cellSpec[$key]) { [Math]::Max(1, [int]$cellSpec[$key]) } else { 1 }
+            }
+            $gridTaken = @{}
+            $gridState = @{ Row = 0 }
+            $placeRow = {
+                param($rowSpecs)
+                $column = 0
+                $placed = foreach ($cellSpec in $rowSpecs) {
+                    while ($gridTaken.ContainsKey("$($gridState.Row),$column")) { $column++ }
+                    $column
+                    $colSpan = & $spanOf $cellSpec 'ColSpan'
+                    $rowSpan = & $spanOf $cellSpec 'RowSpan'
+                    for ($dr = 0; $dr -lt $rowSpan; $dr++) { for ($dc = 0; $dc -lt $colSpan; $dc++) { $gridTaken["$($gridState.Row + $dr),$($column + $dc)"] = $true } }
+                    $column += $colSpan
+                }
+                $gridState.Row++
+                , @($placed)
+            }
             if ($ColumnWidth) {
-                $columnCount = if ($headerRowSpecs.Count) { $headerRowSpecs[0].Count } elseif ($specRows.Count) { $specRows[0].Count } else { 0 }
+                $firstRow = if ($headerRowSpecs.Count) { $headerRowSpecs[0] } elseif ($specRows.Count) { $specRows[0] } else { @() }
+                $columnCount = 0
+                foreach ($cellSpec in $firstRow) { $columnCount += (& $spanOf $cellSpec 'ColSpan') }
                 if ($ColumnWidth.Count -ne $columnCount) {
                     Write-Warning ("Add-VellumPdfTable: -ColumnWidth has $($ColumnWidth.Count) value(s) " +
                         "but the table has $columnCount column(s); extra widths are ignored and " +
@@ -407,9 +431,10 @@ function Add-VellumPdfTable {
             foreach ($specsOfRow in $headerRowSpecs) {
                 $headerRow = $table.AddHeaderRow()
                 if ($headerBg) { $headerRow.Background = $headerBg }
+                $gridColumns = & $placeRow $specsOfRow
                 $hi = 0
                 foreach ($headerSpec in $specsOfRow) {
-                    [void]$headerRow.AddCell((& $buildCell $headerSpec $hi))
+                    [void]$headerRow.AddCell((& $buildCell $headerSpec $gridColumns[$hi]))
                     $hi++
                 }
             }
@@ -419,9 +444,10 @@ function Add-VellumPdfTable {
             foreach ($specRow in $specRows) {
                 $tableRow = $table.AddRow($false)
                 if ($altBg -and ($rowIndex % 2 -eq 1)) { $tableRow.Background = $altBg }
+                $gridColumns = & $placeRow $specRow
                 $colIndex = 0
                 foreach ($spec in $specRow) {
-                    [void]$tableRow.AddCell((& $buildCell $spec $colIndex))
+                    [void]$tableRow.AddCell((& $buildCell $spec $gridColumns[$colIndex]))
                     $colIndex++
                 }
                 $rowIndex++

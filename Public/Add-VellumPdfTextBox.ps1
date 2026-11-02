@@ -80,10 +80,10 @@ function Add-VellumPdfTextBox {
         [Parameter(Mandatory)] [double]$Y,
 
         [Parameter(Mandatory)]
-        [ValidateRange(1, 1000000)]
+        [ValidateRange(1.0, 1000000.0)]
         [double]$Width,
 
-        [ValidateRange(1, 1000)]
+        [ValidateRange(1.0, 1000.0)]
         [double]$FontSize = 12,
 
         [ValidateSet('Courier', 'CourierBold', 'CourierBoldOblique', 'CourierOblique',
@@ -98,10 +98,10 @@ function Add-VellumPdfTextBox {
         [ValidateSet('Left', 'Center', 'Right', 'Justify')]
         [string]$Align = 'Left',
 
-        [ValidateRange(0.1, 10000)]
+        [ValidateRange(0.1, 10000.0)]
         [double]$Leading,
 
-        [ValidateRange(0.1, 1000000)]
+        [ValidateRange(0.1, 1000000.0)]
         [double]$MaxHeight,
 
         [ValidateSet('P', 'H1', 'H2', 'H3', 'H4', 'H5', 'H6', 'Span', 'Caption')]
@@ -116,6 +116,7 @@ function Add-VellumPdfTextBox {
     process {
         try {
             Assert-VellumPdfDocumentOpen -Document $Document -CommandName 'Add-VellumPdfTextBox'
+            $Page = Resolve-VellumPdfPageNumber -Document $Document -Page $Page -Bound $PSBoundParameters.ContainsKey('Page') -CommandName 'Add-VellumPdfTextBox'
             Assert-VellumPdfLanguageTag -Value $Language -CommandName 'Add-VellumPdfTextBox'
             Assert-VellumPdfCoordinate $X 'X' 'Add-VellumPdfTextBox'; Assert-VellumPdfCoordinate $Y 'Y' 'Add-VellumPdfTextBox'; Assert-VellumPdfCoordinate $Width 'Width' 'Add-VellumPdfTextBox'
             $bound = $PSBoundParameters
@@ -136,7 +137,7 @@ function Add-VellumPdfTextBox {
             # Greedy line breaking. Each line remembers whether it ends its paragraph (not justified then).
             $lines = [System.Collections.Generic.List[object]]::new()
             foreach ($paragraph in ($Text -split '\r?\n')) {
-                $words = @($paragraph -split '\s+' | Where-Object { $_ -ne '' })
+                $words = @($paragraph -split '[ \t]+' | Where-Object { $_ -ne '' })
                 if ($words.Count -eq 0) { $lines.Add([pscustomobject]@{ Words = @(); Last = $true }); continue }
                 $current = [System.Collections.Generic.List[string]]::new()
                 foreach ($word in $words) {
@@ -165,8 +166,9 @@ function Add-VellumPdfTextBox {
             }
 
             $allowed = $lines.Count
+            $hadWords = [bool]($lines | Where-Object { $_.Words.Count -gt 0 })
             if ($bound.ContainsKey('MaxHeight')) {
-                $allowed = [Math]::Max(1, [int][Math]::Floor($MaxHeight / $Leading))
+                $allowed = [int][Math]::Floor($MaxHeight / $Leading + 1e-9)
                 if ($lines.Count -gt $allowed) {
                     Write-Warning "Add-VellumPdfTextBox: the text needs $($lines.Count) lines but -MaxHeight $MaxHeight fits $allowed; the rest was dropped."
                     $lines.RemoveRange($allowed, $lines.Count - $allowed)
@@ -176,6 +178,11 @@ function Add-VellumPdfTextBox {
 
             # A box without any word draws nothing: an empty tagged paragraph or heading is not valid structure.
             if (-not ($lines | Where-Object { $_.Words.Count -gt 0 })) {
+                if ($hadWords) {
+                    # The -MaxHeight limit dropped every line that had words; there is nothing left to draw.
+                    if ($PassThru) { return [pscustomobject]@{ Document = $Document; LineCount = $lines.Count; Height = $height; Bottom = $Y - $height } }
+                    return $Document
+                }
                 if ($Document.Tagged -and $Role -match '^H[1-6]$') {
                     throw "Add-VellumPdfTextBox: -Text has no words, so a $Role heading would be empty. Give it text or leave the box out."
                 }

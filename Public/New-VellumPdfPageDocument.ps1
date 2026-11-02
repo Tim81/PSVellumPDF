@@ -83,11 +83,11 @@ function New-VellumPdfPageDocument {
         [string]$PageSize = 'A4',
 
         [Parameter(Mandatory, ParameterSetName = 'CustomPage')]
-        [ValidateRange(1, 5080)]
+        [ValidateRange(1.0, 5080.0)]
         [double]$PageWidthMm,
 
         [Parameter(Mandatory, ParameterSetName = 'CustomPage')]
-        [ValidateRange(1, 5080)]
+        [ValidateRange(1.0, 5080.0)]
         [double]$PageHeightMm,
 
         [string]$Language,

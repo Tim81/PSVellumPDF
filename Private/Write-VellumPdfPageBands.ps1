@@ -16,6 +16,7 @@ function Write-VellumPdfPageBands {
     $prop.Value.Clear()
     $count = $Document.Pages.Count
     $rotatedWarned = $false
+    $overflowWarned = [System.Collections.Generic.HashSet[object]]::new()
     for ($i = 1; $i -le $count; $i++) {
         $pdfPage = $Document.Pages[$i - 1]
         if ($pdfPage.Rotate -ne 0 -and -not $rotatedWarned) {
@@ -36,6 +37,15 @@ function Write-VellumPdfPageBands {
                 default { $x = $left + $width / 2; $alignment = [VellumPdf.Canvas.TextAlignment]::Center }
             }
             $resolved = $band.Resolved
+            $available = $width - 2 * $band.Inset
+            if ($overflowWarned.Add($band)) {
+                $bandWidth = Measure-VellumPdfTextWidth -Resolved $resolved -Text $text -FontSize $band.FontSize
+                if ($bandWidth -gt $available) {
+                    Write-Warning ("Set-VellumPdfPageBand: the $($band.Position.ToLower()) text '$text' is $([math]::Round($bandWidth, 1)) pt wide, " +
+                        "wider than the $([math]::Round($available, 1)) pt between the page insets, so it runs off the page. " +
+                        'Shorten it, use a smaller -FontSize or reduce -Inset.')
+                }
+            }
             [void]$canvas.SaveState()
             try {
                 if ($band.Rgb) { [void]$canvas.SetFillColorRgb($band.Rgb[0], $band.Rgb[1], $band.Rgb[2]) }

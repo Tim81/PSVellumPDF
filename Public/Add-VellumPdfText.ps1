@@ -65,7 +65,7 @@ function Add-VellumPdfText {
         [Parameter(Mandatory)] [double]$X,
         [Parameter(Mandatory)] [double]$Y,
 
-        [ValidateRange(1, 1000)]
+        [ValidateRange(1.0, 1000.0)]
         [double]$FontSize = 12,
 
         [ValidateSet('Courier', 'CourierBold', 'CourierBoldOblique', 'CourierOblique',
@@ -81,19 +81,19 @@ function Add-VellumPdfText {
         [string]$Align = 'Left',
 
         # Extra space after every character, in points (negative tightens).
-        [ValidateRange(-100, 100)]
+        [ValidateRange(-100.0, 100.0)]
         [double]$CharSpacing,
 
         # Extra space after every space character, in points.
-        [ValidateRange(-100, 100)]
+        [ValidateRange(-100.0, 100.0)]
         [double]$WordSpacing,
 
         # Baseline shift in points: positive raises (superscript), negative lowers.
-        [ValidateRange(-1000, 1000)]
+        [ValidateRange(-1000.0, 1000.0)]
         [double]$Rise,
 
         # Horizontal scaling in percent (100 = normal).
-        [ValidateRange(1, 1000)]
+        [ValidateRange(1.0, 1000.0)]
         [double]$HorizontalScale,
 
         # Structure role in a tagged document: P (default), H1-H6, Span or Caption.
@@ -108,6 +108,7 @@ function Add-VellumPdfText {
     process {
         try {
             Assert-VellumPdfDocumentOpen -Document $Document -CommandName 'Add-VellumPdfText'
+            $Page = Resolve-VellumPdfPageNumber -Document $Document -Page $Page -Bound $PSBoundParameters.ContainsKey('Page') -CommandName 'Add-VellumPdfText'
             Assert-VellumPdfLanguageTag -Value $Language -CommandName 'Add-VellumPdfText'
             Assert-VellumPdfCoordinate $X 'X' 'Add-VellumPdfText'; Assert-VellumPdfCoordinate $Y 'Y' 'Add-VellumPdfText'
             if ($Text -match '[\r\n]') { throw 'Add-VellumPdfText: -Text must be a single line; use New-VellumPdfDocument for wrapped text.' }
@@ -130,13 +131,17 @@ function Add-VellumPdfText {
             $hasSpacing = $bound.ContainsKey('CharSpacing') -or $bound.ContainsKey('WordSpacing') -or $bound.ContainsKey('HorizontalScale')
             $startX = $X
             $showAlignment = [VellumPdf.Canvas.TextAlignment]::$Align
+            $tc = if ($bound.ContainsKey('CharSpacing')) { $CharSpacing } else { 0.0 }
+            $tw = if ($bound.ContainsKey('WordSpacing')) { $WordSpacing } else { 0.0 }
+            $th = if ($bound.ContainsKey('HorizontalScale')) { $HorizontalScale } else { 100.0 }
             if ($hasSpacing -and $Align -ne 'Left') {
-                $base = if ($resolved.Handle) { $resolved.Handle.MeasureString($Text, $FontSize) } else { $resolved.Resource.MeasureString($Text, $FontSize) }
-                $spaces = ($Text.ToCharArray() | Where-Object { $_ -eq ' ' } | Measure-Object).Count
-                $width = ($base + $CharSpacing * $Text.Length + $WordSpacing * $spaces) * $(if ($bound.ContainsKey('HorizontalScale')) { $HorizontalScale / 100 } else { 1 })
+                $width = Measure-VellumPdfTextWidth -Resolved $resolved -Text $Text -FontSize $FontSize -CharSpacing $tc -WordSpacing $tw -HorizontalScale $th
                 $startX = if ($Align -eq 'Center') { $X - $width / 2 } else { $X - $width }
                 $showAlignment = [VellumPdf.Canvas.TextAlignment]::Left
             }
+            # Word spacing (Tw) only applies to the single-byte space code. An embedded font is drawn with
+            # two-byte glyph ids, so viewers ignore it; place the words one by one instead.
+            $placeWords = [bool]($resolved.Handle -and $bound.ContainsKey('WordSpacing'))
 
             [void]$canvas.SaveState()
             try {
@@ -147,13 +152,26 @@ function Add-VellumPdfText {
                 Invoke-VellumPdfTagged -Document $Document -Canvas $canvas -PdfPage $pdfPage -Kind Structure -StructType $Role -Language $Language -Draw {
                     [void]$canvas.BeginText()
                     if ($bound.ContainsKey('CharSpacing')) { [void]$canvas.SetCharSpacing($CharSpacing) }
-                    if ($bound.ContainsKey('WordSpacing')) { [void]$canvas.SetWordSpacing($WordSpacing) }
+                    if ($bound.ContainsKey('WordSpacing') -and -not $placeWords) { [void]$canvas.SetWordSpacing($WordSpacing) }
                     if ($bound.ContainsKey('Rise')) { [void]$canvas.SetTextRise($Rise) }
                     if ($bound.ContainsKey('HorizontalScale')) { [void]$canvas.SetHorizScaling($HorizontalScale) }
                     if ($resolved.Handle) {
                         $Document.RegisterEmbeddedFontUsage($pdfPage, $resolved.Handle)
                         [void]$canvas.SetFontByName($resolved.Handle.ResourceName, $FontSize)
-                        [void][PSVellumPDF.Interop.CanvasHelpers]::ShowEmbeddedText($canvas, $resolved.Handle, $Text, $FontSize, $startX, $Y, $showAlignment)
+                        if ($placeWords) {
+                            # Each word keeps its trailing space glyph, so extracted text still has its spaces.
+                            $cursor = $startX
+                            foreach ($m in [regex]::Matches($Text, '[^ ]*(?: |$)')) {
+                                $piece = $m.Value
+                                if ($piece.Length -eq 0) { continue }
+                                [void][PSVellumPDF.Interop.CanvasHelpers]::ShowEmbeddedText($canvas, $resolved.Handle, $piece, $FontSize, $cursor, $Y, [VellumPdf.Canvas.TextAlignment]::Left)
+                                $trailing = if ($piece.EndsWith(' ')) { $tw } else { 0.0 }
+                                $cursor += Measure-VellumPdfTextWidth -Resolved $resolved -Text $piece -FontSize $FontSize -CharSpacing $tc -WordSpacing $trailing -HorizontalScale $th
+                            }
+                        }
+                        else {
+                            [void][PSVellumPDF.Interop.CanvasHelpers]::ShowEmbeddedText($canvas, $resolved.Handle, $Text, $FontSize, $startX, $Y, $showAlignment)
+                        }
                     }
                     else {
                         [void]$canvas.SetFont($resolved.Resource, $FontSize)

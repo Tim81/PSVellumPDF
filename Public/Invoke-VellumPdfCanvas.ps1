@@ -56,8 +56,12 @@ function Invoke-VellumPdfCanvas {
     process {
         try {
             Assert-VellumPdfDocumentOpen -Document $Document -CommandName 'Invoke-VellumPdfCanvas'
+            $Page = Resolve-VellumPdfPageNumber -Document $Document -Page $Page -Bound $PSBoundParameters.ContainsKey('Page') -CommandName 'Invoke-VellumPdfCanvas'
             $canvas = Get-VellumPdfPageCanvas -Document $Document -Page $Page -CommandName 'Invoke-VellumPdfCanvas'
             $pdfPage = $Document.Pages[$Page - 1]
+            if (-not $Document.PSObject.Properties['PSVellumRawCanvas']) {
+                $Document.PSObject.Properties.Add([psnoteproperty]::new('PSVellumRawCanvas', $true))
+            }
             [void]$canvas.SaveState()
             try {
                 if ($NoMarkedContent) { & $ScriptBlock $canvas $pdfPage $Document | Out-Null }

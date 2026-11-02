@@ -99,29 +99,29 @@ function Add-VellumPdfShape {
         [double]$Height,
         [double]$X2,
         [double]$Y2,
-        [ValidateRange(0.01, 1000000)] [double]$Radius,
+        [ValidateRange(0.01, 1000000.0)] [double]$Radius,
         [double]$StartAngle,
         [double]$EndAngle,
 
         [string]$IccProfilePath,
-        [ValidateRange(0, 1)] [double[]]$FillIcc,
-        [ValidateRange(0, 1)] [double[]]$StrokeIcc,
+        [ValidateRange(0.0, 1.0)] [double[]]$FillIcc,
+        [ValidateRange(0.0, 1.0)] [double[]]$StrokeIcc,
 
         [object]$FillColor,
-        [ValidateCount(4, 4)] [ValidateRange(0, 1)] [double[]]$FillCmyk,
+        [ValidateCount(4, 4)] [ValidateRange(0.0, 1.0)] [double[]]$FillCmyk,
         [object]$StrokeColor,
-        [ValidateCount(4, 4)] [ValidateRange(0, 1)] [double[]]$StrokeCmyk,
+        [ValidateCount(4, 4)] [ValidateRange(0.0, 1.0)] [double[]]$StrokeCmyk,
 
-        [ValidateRange(0, 10000)]
+        [ValidateRange(0.0, 10000.0)]
         [double]$StrokeWidth = 1,
 
-        [ValidateRange(0.01, 10000)]
+        [ValidateRange(0.01, 10000.0)]
         [double[]]$Dash,
 
-        [ValidateRange(0, 1)]
+        [ValidateRange(0.0, 1.0)]
         [double]$Opacity,
 
-        [ValidateRange(0, 1)]
+        [ValidateRange(0.0, 1.0)]
         [double]$StrokeOpacity,
 
         [ValidateSet('Butt', 'Round', 'Square')]
@@ -130,7 +130,7 @@ function Add-VellumPdfShape {
         [ValidateSet('Miter', 'Round', 'Bevel')]
         [string]$LineJoin,
 
-        [ValidateRange(1, 100)]
+        [ValidateRange(1.0, 100.0)]
         [double]$MiterLimit,
 
         # Alternate text: in a tagged document the shape becomes a Figure instead of an artifact.
@@ -141,6 +141,7 @@ function Add-VellumPdfShape {
     process {
         try {
             Assert-VellumPdfDocumentOpen -Document $Document -CommandName 'Add-VellumPdfShape'
+            $Page = Resolve-VellumPdfPageNumber -Document $Document -Page $Page -Bound $PSBoundParameters.ContainsKey('Page') -CommandName 'Add-VellumPdfShape'
             $bound = $PSBoundParameters
             foreach ($pair in @('X', $X), @('Y', $Y), @('Width', $Width), @('Height', $Height), @('X2', $X2), @('Y2', $Y2), @('Radius', $Radius)) {
                 Assert-VellumPdfCoordinate $pair[1] $pair[0] 'Add-VellumPdfShape'

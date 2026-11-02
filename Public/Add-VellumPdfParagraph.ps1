@@ -91,7 +91,7 @@ function Add-VellumPdfParagraph {
         [string]$Font,
 
         [Parameter(ParameterSetName = 'Text')]
-        [ValidateRange(1, 1000)]
+        [ValidateRange(1.0, 1000.0)]
         [double]$FontSize,
 
         [Parameter(ParameterSetName = 'Text')]
@@ -105,7 +105,7 @@ function Add-VellumPdfParagraph {
         [string]$LinkUri,
 
         [Parameter(ParameterSetName = 'Text')]
-        [ValidateRange(0, 1000)]
+        [ValidateRange(0.0, 1000.0)]
         [double]$Leading,
 
         # --- Runs parameter set ---
@@ -120,10 +120,10 @@ function Add-VellumPdfParagraph {
         [ValidateNotNullOrEmpty()]
         [string]$Language,
 
-        [ValidateRange(0, 10000)]
+        [ValidateRange(0.0, 10000.0)]
         [double]$MarginTop,
 
-        [ValidateRange(0, 10000)]
+        [ValidateRange(0.0, 10000.0)]
         [double]$MarginBottom
     )
 
@@ -140,8 +140,29 @@ function Add-VellumPdfParagraph {
                 if ($Run | Where-Object { $_.Style.LinkUri }) {
                     Write-VellumPdfLinkConformanceWarning -Document $Document -CommandName 'Add-VellumPdfParagraph'
                 }
-                $paragraph = [VellumPdf.Layout.Elements.Paragraph]::new(
-                    [System.Collections.Generic.List[VellumPdf.Layout.Elements.TextRun]]$Run)
+                # A run built by New-VellumPdfTextRun without its own font or size takes the document default
+                # (otherwise the engine would draw it in Helvetica 12).
+                $default = Resolve-VellumPdfDefault -Document $Document
+                $filled = [System.Collections.Generic.List[VellumPdf.Layout.Elements.TextRun]]::new()
+                foreach ($r in $Run) {
+                    $stamp = $r.PSObject.Properties['PSVellumRunBound']
+                    if ($stamp -and ((-not ($stamp.Value -contains 'Font' -or $stamp.Value -contains 'FontHandle')) -or $stamp.Value -notcontains 'FontSize')) {
+                        $merged = [VellumPdf.Layout.Core.TextStyle]::new()
+                        $merged.FontRef = $r.Style.FontRef
+                        $merged.Font = $r.Style.Font
+                        $merged.FontSize = $r.Style.FontSize
+                        $merged.Leading = $r.Style.Leading
+                        $merged.Color = $r.Style.Color
+                        $merged.LinkUri = $r.Style.LinkUri
+                        if (-not ($stamp.Value -contains 'Font' -or $stamp.Value -contains 'FontHandle')) {
+                            $merged.Font = [VellumPdf.Fonts.Standard14]::($default.Font)
+                        }
+                        if ($stamp.Value -notcontains 'FontSize') { $merged.FontSize = $default.FontSize }
+                        $r = [VellumPdf.Layout.Elements.TextRun]::new($r.Text, $merged)
+                    }
+                    $filled.Add($r)
+                }
+                $paragraph = [VellumPdf.Layout.Elements.Paragraph]::new($filled)
                 $paragraph.Alignment = [VellumPdf.Layout.Core.HorizontalAlignment]::$Alignment
                 if ($Language) { $paragraph.Language = $Language }
                 Set-VellumPdfElementMargin -Element $paragraph -Top $MarginTop -Bottom $MarginBottom `

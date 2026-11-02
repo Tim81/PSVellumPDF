@@ -89,18 +89,18 @@ function Add-VellumPdfPieChart {
         [Parameter(ParameterSetName = 'Data')]
         [string]$LabelProperty,
 
-        [ValidateRange(1, 100000)]
+        [ValidateRange(1.0, 100000.0)]
         [double]$Diameter = 200,
 
         [object]$StrokeColor,
 
-        [ValidateRange(0, 100)]
+        [ValidateRange(0.0, 100.0)]
         [double]$StrokeWidth = 0.5,
 
         [ValidateSet('Left', 'Center', 'Right')]
         [string]$Alignment = 'Center',
 
-        [ValidateRange(-360, 360)]
+        [ValidateRange(-360.0, 360.0)]
         [double]$StartAngle = 90,
 
         [switch]$CounterClockwise,
@@ -115,10 +115,10 @@ function Add-VellumPdfPieChart {
 
         [VellumPdf.Fonts.EmbeddedFontHandle]$FontHandle,
 
-        [ValidateRange(0, 10000)]
+        [ValidateRange(0.0, 10000.0)]
         [double]$MarginTop,
 
-        [ValidateRange(0, 10000)]
+        [ValidateRange(0.0, 10000.0)]
         [double]$MarginBottom
     )
 

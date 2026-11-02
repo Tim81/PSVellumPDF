@@ -71,7 +71,7 @@ function Add-VellumPdfHeading {
             'Symbol', 'TimesBold', 'TimesBoldItalic', 'TimesItalic', 'TimesRoman', 'ZapfDingbats')]
         [string]$Font = 'HelveticaBold',
 
-        [ValidateRange(1, 1000)]
+        [ValidateRange(1.0, 1000.0)]
         [double]$FontSize = 16,
 
         [ValidateSet('Left', 'Center', 'Right', 'Justify')]
@@ -84,17 +84,17 @@ function Add-VellumPdfHeading {
         # RGB triple (0..1), a hex string ('#3366cc'/'#36c'), or a colour name.
         [object]$Color,
 
-        [ValidateRange(0, 1000)]
+        [ValidateRange(0.0, 1000.0)]
         [double]$Leading,
 
         # BCP 47 language tag for this heading (tagged documents only).
         [ValidateNotNullOrEmpty()]
         [string]$Language,
 
-        [ValidateRange(0, 10000)]
+        [ValidateRange(0.0, 10000.0)]
         [double]$MarginTop,
 
-        [ValidateRange(0, 10000)]
+        [ValidateRange(0.0, 10000.0)]
         [double]$MarginBottom
     )
 

@@ -77,7 +77,7 @@ function Set-VellumPdfPageBand {
         [string]$Align = 'Center',
 
         [Parameter(ParameterSetName = 'Set')]
-        [ValidateRange(1, 1000)]
+        [ValidateRange(1.0, 1000.0)]
         [double]$FontSize = 9,
 
         [Parameter(ParameterSetName = 'Set')]
@@ -93,11 +93,11 @@ function Set-VellumPdfPageBand {
         [object]$Color,
 
         [Parameter(ParameterSetName = 'Set')]
-        [ValidateRange(0, 10000)]
+        [ValidateRange(0.0, 10000.0)]
         [double]$Inset = 36,
 
         [Parameter(ParameterSetName = 'Set')]
-        [ValidateRange(0, 10000)]
+        [ValidateRange(0.0, 10000.0)]
         [double]$Offset = 30,
 
         [Parameter(ParameterSetName = 'Set')]

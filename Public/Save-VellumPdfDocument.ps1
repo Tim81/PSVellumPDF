@@ -76,6 +76,7 @@ function Save-VellumPdfDocument {
     [CmdletBinding(SupportsShouldProcess, DefaultParameterSetName = 'Path')]
     [OutputType([System.IO.FileInfo], ParameterSetName = 'Path')]
     [OutputType([byte[]], ParameterSetName = 'Bytes')]
+    [OutputType([VellumPdf.Layout.Document], [VellumPdf.Document.PdfDocument])]
     param(
         [Parameter(Mandatory, ValueFromPipeline)]
         [object]$Document,

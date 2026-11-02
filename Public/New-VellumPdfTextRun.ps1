@@ -62,7 +62,7 @@ function New-VellumPdfTextRun {
             'Symbol', 'TimesBold', 'TimesBoldItalic', 'TimesItalic', 'TimesRoman', 'ZapfDingbats')]
         [string]$Font,
 
-        [ValidateRange(1, 1000)]
+        [ValidateRange(1.0, 1000.0)]
         [double]$FontSize,
 
         [VellumPdf.Fonts.EmbeddedFontHandle]$FontHandle,
@@ -72,7 +72,7 @@ function New-VellumPdfTextRun {
 
         [string]$LinkUri,
 
-        [ValidateRange(0, 1000)]
+        [ValidateRange(0.0, 1000.0)]
         [double]$Leading
     )
 
@@ -106,7 +106,11 @@ function New-VellumPdfTextRun {
             $style = [VellumPdf.Layout.Core.TextStyle]::new()
         }
 
-        [VellumPdf.Layout.Elements.TextRun]::new($Text, $style)
+        $run = [VellumPdf.Layout.Elements.TextRun]::new($Text, $style)
+        # Remember which style values the caller chose, so Add-VellumPdfParagraph -Run can fill the rest
+        # from the document's default font.
+        $run.PSObject.Properties.Add([psnoteproperty]::new('PSVellumRunBound', [string[]]@($styleParams.Keys)))
+        $run
     }
     catch {
         $PSCmdlet.ThrowTerminatingError($_)
