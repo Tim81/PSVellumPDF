@@ -4,7 +4,7 @@ external help file: PSVellumPDF-Help.xml
 HelpUri: ''
 Locale: en-US
 Module Name: PSVellumPDF
-ms.date: 06-13-2026
+ms.date: 11/02/2026
 PlatyPS schema version: 2024-05-01
 title: Set-VellumPdfHeader
 ---
@@ -21,7 +21,8 @@ Sets a running header band on a VellumPdf document.
 
 ```
 Set-VellumPdfHeader [-Document] <Document> [-Template] <string> [[-Font] <string>]
- [[-FontSize] <double>] [[-Alignment] <string>] [<CommonParameters>]
+ [[-FontSize] <double>] [[-FontHandle] <EmbeddedFontHandle>] [[-Color] <Object>]
+ [[-Height] <double>] [[-Alignment] <string>] [<CommonParameters>]
 ```
 
 ## DESCRIPTION
@@ -67,7 +68,30 @@ SupportsWildcards: false
 Aliases: []
 ParameterSets:
 - Name: (All)
-  Position: 4
+  Position: 7
+  IsRequired: false
+  ValueFromPipeline: false
+  ValueFromPipelineByPropertyName: false
+  ValueFromRemainingArguments: false
+DontShow: false
+AcceptedValues: []
+HelpMessage: ''
+```
+
+### -Color
+
+Text colour: an R,G,B triple in 0..1, a hex string ('#3366cc'), or a colour
+name.
+Honoured by VellumPdf 2.x.
+
+```yaml
+Type: System.Object
+DefaultValue: ''
+SupportsWildcards: false
+Aliases: []
+ParameterSets:
+- Name: (All)
+  Position: 5
   IsRequired: false
   ValueFromPipeline: false
   ValueFromPipelineByPropertyName: false
@@ -123,6 +147,30 @@ AcceptedValues: []
 HelpMessage: ''
 ```
 
+### -FontHandle
+
+An embedded TrueType font from Register-VellumPdfFont, used for the header
+text (takes precedence over -Font).
+Needed for text outside Windows-1252 and
+for PDF/A documents.
+
+```yaml
+Type: VellumPdf.Fonts.EmbeddedFontHandle
+DefaultValue: ''
+SupportsWildcards: false
+Aliases: []
+ParameterSets:
+- Name: (All)
+  Position: 4
+  IsRequired: false
+  ValueFromPipeline: false
+  ValueFromPipelineByPropertyName: false
+  ValueFromRemainingArguments: false
+DontShow: false
+AcceptedValues: []
+HelpMessage: ''
+```
+
 ### -FontSize
 
 Font size in points for the header text, between 1 and 1000.
@@ -137,6 +185,32 @@ Aliases: []
 ParameterSets:
 - Name: (All)
   Position: 3
+  IsRequired: false
+  ValueFromPipeline: false
+  ValueFromPipelineByPropertyName: false
+  ValueFromRemainingArguments: false
+DontShow: false
+AcceptedValues: []
+HelpMessage: ''
+```
+
+### -Height
+
+The header band height in points.
+Defaults to the line height plus 4.
+A
+header wider than the page is truncated at a word boundary; Save-VellumPdfDocument
+warns when that happens.
+A link style is ignored in bands.
+
+```yaml
+Type: System.Double
+DefaultValue: 0
+SupportsWildcards: false
+Aliases: []
+ParameterSets:
+- Name: (All)
+  Position: 6
   IsRequired: false
   ValueFromPipeline: false
   ValueFromPipelineByPropertyName: false

@@ -4,7 +4,7 @@ external help file: PSVellumPDF-Help.xml
 HelpUri: ''
 Locale: en-US
 Module Name: PSVellumPDF
-ms.date: 06-13-2026
+ms.date: 11/02/2026
 PlatyPS schema version: 2024-05-01
 title: New-VellumPdfDocument
 ---
@@ -17,13 +17,22 @@ Creates a new VellumPdf layout document.
 
 ## SYNTAX
 
-### __AllParameterSets
+### NamedPage (Default)
 
 ```
-New-VellumPdfDocument [[-Conformance] <string>] [[-PageSize] <string>] [[-DefaultFont] <string>]
- [[-DefaultFontSize] <double>] [[-Language] <string>] [[-Margin] <double>] [[-MarginTop] <double>]
- [[-MarginRight] <double>] [[-MarginBottom] <double>] [[-MarginLeft] <double>] [-Tagged]
- [-UseObjectStreams] [<CommonParameters>]
+New-VellumPdfDocument [-Conformance <string>] [-PageSize <string>] [-DefaultFont <string>]
+ [-DefaultFontSize <double>] [-Tagged] [-Language <string>] [-Margin <double>] [-MarginTop <double>]
+ [-MarginRight <double>] [-MarginBottom <double>] [-MarginLeft <double>] [-UseObjectStreams]
+ [<CommonParameters>]
+```
+
+### CustomPage
+
+```
+New-VellumPdfDocument -PageWidthMm <double> -PageHeightMm <double> [-Conformance <string>]
+ [-DefaultFont <string>] [-DefaultFontSize <double>] [-Tagged] [-Language <string>]
+ [-Margin <double>] [-MarginTop <double>] [-MarginRight <double>] [-MarginBottom <double>]
+ [-MarginLeft <double>] [-UseObjectStreams] [<CommonParameters>]
 ```
 
 ## DESCRIPTION
@@ -67,13 +76,23 @@ New-VellumPdfDocument -Margin 30 -MarginLeft 50
 
 ### -Conformance
 
-The PDF/A conformance level for the document.
-Use PdfA2b, PdfA2u, or
-PdfA2a to produce an ISO 19005-2 compliant archive file; None (default)
-produces a standard PDF without conformance requirements.
-Note that PDF/A
-forbids encryption, so -Conformance is incompatible with
-Protect-VellumPdfDocument.
+The conformance level for the document.
+Use PdfA2b, PdfA2u, or PdfA2a to
+produce an ISO 19005-2 compliant archive file, or PdfUA1 for ISO 14289-1
+(PDF/UA-1) accessibility; None (default) produces a standard PDF without
+conformance requirements.
+PDF/UA-1 forces a tagged document.
+To pass the
+preflight (Test-VellumPdfConformance, or Save-VellumPdfDocument -Validate)
+also set -Language, give the document a title with Set-VellumPdfDocumentInfo
+-Title, embed a TrueType font (Register-VellumPdfFont + -FontHandle on
+every text element; base-14 fonts are not embedded), and give images,
+charts and barcodes alternate text.
+PDF/A likewise requires embedded fonts.
+Hyperlinks (-LinkUri) are not tagged by
+VellumPdf, so a PDF/UA document containing them is not fully conformant.
+Note that PDF/A forbids encryption, so PDF/A is incompatible with
+Protect-VellumPdfDocument; PDF/UA-1 may be encrypted if Extract is kept.
 
 ```yaml
 Type: System.String
@@ -82,7 +101,7 @@ SupportsWildcards: false
 Aliases: []
 ParameterSets:
 - Name: (All)
-  Position: 0
+  Position: Named
   IsRequired: false
   ValueFromPipeline: false
   ValueFromPipelineByPropertyName: false
@@ -107,7 +126,7 @@ SupportsWildcards: false
 Aliases: []
 ParameterSets:
 - Name: (All)
-  Position: 2
+  Position: Named
   IsRequired: false
   ValueFromPipeline: false
   ValueFromPipelineByPropertyName: false
@@ -132,7 +151,7 @@ SupportsWildcards: false
 Aliases: []
 ParameterSets:
 - Name: (All)
-  Position: 3
+  Position: Named
   IsRequired: false
   ValueFromPipeline: false
   ValueFromPipelineByPropertyName: false
@@ -156,7 +175,7 @@ SupportsWildcards: false
 Aliases: []
 ParameterSets:
 - Name: (All)
-  Position: 4
+  Position: Named
   IsRequired: false
   ValueFromPipeline: false
   ValueFromPipelineByPropertyName: false
@@ -181,7 +200,7 @@ SupportsWildcards: false
 Aliases: []
 ParameterSets:
 - Name: (All)
-  Position: 5
+  Position: Named
   IsRequired: false
   ValueFromPipeline: false
   ValueFromPipelineByPropertyName: false
@@ -204,7 +223,7 @@ SupportsWildcards: false
 Aliases: []
 ParameterSets:
 - Name: (All)
-  Position: 8
+  Position: Named
   IsRequired: false
   ValueFromPipeline: false
   ValueFromPipelineByPropertyName: false
@@ -227,7 +246,7 @@ SupportsWildcards: false
 Aliases: []
 ParameterSets:
 - Name: (All)
-  Position: 9
+  Position: Named
   IsRequired: false
   ValueFromPipeline: false
   ValueFromPipelineByPropertyName: false
@@ -250,7 +269,7 @@ SupportsWildcards: false
 Aliases: []
 ParameterSets:
 - Name: (All)
-  Position: 7
+  Position: Named
   IsRequired: false
   ValueFromPipeline: false
   ValueFromPipelineByPropertyName: false
@@ -273,8 +292,29 @@ SupportsWildcards: false
 Aliases: []
 ParameterSets:
 - Name: (All)
-  Position: 6
+  Position: Named
   IsRequired: false
+  ValueFromPipeline: false
+  ValueFromPipelineByPropertyName: false
+  ValueFromRemainingArguments: false
+DontShow: false
+AcceptedValues: []
+HelpMessage: ''
+```
+
+### -PageHeightMm
+
+Custom page height in millimetres (1..5080); see -PageWidthMm.
+
+```yaml
+Type: System.Double
+DefaultValue: 0
+SupportsWildcards: false
+Aliases: []
+ParameterSets:
+- Name: CustomPage
+  Position: Named
+  IsRequired: true
   ValueFromPipeline: false
   ValueFromPipelineByPropertyName: false
   ValueFromRemainingArguments: false
@@ -296,9 +336,33 @@ DefaultValue: A4
 SupportsWildcards: false
 Aliases: []
 ParameterSets:
-- Name: (All)
-  Position: 1
+- Name: NamedPage
+  Position: Named
   IsRequired: false
+  ValueFromPipeline: false
+  ValueFromPipelineByPropertyName: false
+  ValueFromRemainingArguments: false
+DontShow: false
+AcceptedValues: []
+HelpMessage: ''
+```
+
+### -PageWidthMm
+
+Custom page width in millimetres (1..5080), used together with
+-PageHeightMm instead of -PageSize.
+For a landscape page make the width
+the larger value.
+
+```yaml
+Type: System.Double
+DefaultValue: 0
+SupportsWildcards: false
+Aliases: []
+ParameterSets:
+- Name: CustomPage
+  Position: Named
+  IsRequired: true
   ValueFromPipeline: false
   ValueFromPipelineByPropertyName: false
   ValueFromRemainingArguments: false

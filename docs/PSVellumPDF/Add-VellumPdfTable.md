@@ -4,7 +4,7 @@ external help file: PSVellumPDF-Help.xml
 HelpUri: ''
 Locale: en-US
 Module Name: PSVellumPDF
-ms.date: 06-13-2026
+ms.date: 11/02/2026
 PlatyPS schema version: 2024-05-01
 title: Add-VellumPdfTable
 ---
@@ -20,10 +20,11 @@ Adds a table to a VellumPdf document.
 ### __AllParameterSets
 
 ```
-Add-VellumPdfTable [-Document] <Document> [[-Header] <string[]>] [-Row] <Object[]>
+Add-VellumPdfTable [-Document] <Document> [[-Header] <Object[]>] [-Row] <Object[]>
  [[-ColumnWidth] <double[]>] [[-BorderWidth] <double>] [[-BorderColor] <Object>]
  [[-HeaderBackground] <Object>] [[-AlternateRowBackground] <Object>] [[-ColumnAlignment] <string[]>]
- [[-Font] <string>] [[-FontSize] <double>] [[-Alignment] <string>] [[-MarginTop] <double>]
+ [[-Font] <string>] [[-FontSize] <double>] [[-FontHandle] <EmbeddedFontHandle>]
+ [[-CellPadding] <Object>] [[-Alignment] <string>] [[-MarginTop] <double>]
  [[-MarginBottom] <double>] [<CommonParameters>]
 ```
 
@@ -48,6 +49,12 @@ Each element is a scalar (added as
          Background = '#eeeeee'; Font = 'HelveticaBold'; FontSize = 11;
          Color = 'navy' }
     Text is required; the rest are optional.
+More keys: FontHandle (an
+    embedded font for this cell), Leading, Padding (1, 2 or 4 numbers),
+    and Language (BCP 47 tag, tagged documents only).
+A LinkUri key is
+    refused because VellumPdf ignores hyperlinks in table cells.
+  - The same keys work in -Header entries.
 
 Colour parameters (-BorderColor, -HeaderBackground, -AlternateRowBackground,
 and a cell's Background/Color) accept an R,G,B triple in 0..1, a hex string
@@ -100,7 +107,7 @@ SupportsWildcards: false
 Aliases: []
 ParameterSets:
 - Name: (All)
-  Position: 11
+  Position: 13
   IsRequired: false
   ValueFromPipeline: false
   ValueFromPipelineByPropertyName: false
@@ -178,6 +185,31 @@ AcceptedValues: []
 HelpMessage: ''
 ```
 
+### -CellPadding
+
+Default padding for every cell, in points: one number (all sides), two
+(top/bottom, left/right) or four (top, right, bottom, left).
+A cell's own
+Padding key wins.
+When omitted the engine default (4, 6, 4, 6) applies.
+
+```yaml
+Type: System.Object
+DefaultValue: ''
+SupportsWildcards: false
+Aliases: []
+ParameterSets:
+- Name: (All)
+  Position: 12
+  IsRequired: false
+  ValueFromPipeline: false
+  ValueFromPipelineByPropertyName: false
+  ValueFromRemainingArguments: false
+DontShow: false
+AcceptedValues: []
+HelpMessage: ''
+```
+
 ### -ColumnAlignment
 
 Per-column horizontal alignment by column index (Left/Center/Right/
@@ -204,7 +236,9 @@ HelpMessage: ''
 
 ### -ColumnWidth
 
-Column widths in points, each between 0.01 and 100000.
+Column widths in points, each between 0 and 100000.
+A width of 0 means
+"auto": the column shares the remaining space.
 The count should
 match the number of columns determined by the -Header or first -Row; a
 mismatch emits a warning and extra widths are ignored.
@@ -272,6 +306,33 @@ AcceptedValues: []
 HelpMessage: ''
 ```
 
+### -FontHandle
+
+An embedded TrueType font from Register-VellumPdfFont, used as the table's
+default cell font.
+Takes precedence over -Font.
+Needed for text outside
+Windows-1252 and for PDF/A documents.
+A cell may override it with its own
+FontHandle key.
+
+```yaml
+Type: VellumPdf.Fonts.EmbeddedFontHandle
+DefaultValue: ''
+SupportsWildcards: false
+Aliases: []
+ParameterSets:
+- Name: (All)
+  Position: 11
+  IsRequired: false
+  ValueFromPipeline: false
+  ValueFromPipelineByPropertyName: false
+  ValueFromRemainingArguments: false
+DontShow: false
+AcceptedValues: []
+HelpMessage: ''
+```
+
 ### -FontSize
 
 Font size in points for all data cells, between 1 and 1000.
@@ -297,15 +358,18 @@ HelpMessage: ''
 
 ### -Header
 
-An optional string array of column header labels.
-When supplied, a
-styled header row is prepended to the table via AddHeaderRow().
-The
-count of header cells determines the expected column count for
--ColumnWidth mismatch warnings.
+Optional column header entries: strings, or rich-cell hashtables with the
+same keys as a data cell.
+For several header rows pass an array per row, e.g.
+-Header @('Region', @{ Text = 'Sales'; ColSpan = 2 }), @('', 'Q1', 'Q2'); the
+leading header rows repeat on every page.
+When supplied, a header row is prepended to the
+table via AddHeaderRow().
+The count of header cells determines the
+expected column count for -ColumnWidth mismatch warnings.
 
 ```yaml
-Type: System.String[]
+Type: System.Object[]
 DefaultValue: ''
 SupportsWildcards: false
 Aliases: []
@@ -357,7 +421,7 @@ SupportsWildcards: false
 Aliases: []
 ParameterSets:
 - Name: (All)
-  Position: 13
+  Position: 15
   IsRequired: false
   ValueFromPipeline: false
   ValueFromPipelineByPropertyName: false
@@ -380,7 +444,7 @@ SupportsWildcards: false
 Aliases: []
 ParameterSets:
 - Name: (All)
-  Position: 12
+  Position: 14
   IsRequired: false
   ValueFromPipeline: false
   ValueFromPipelineByPropertyName: false

@@ -4,7 +4,7 @@ external help file: PSVellumPDF-Help.xml
 HelpUri: ''
 Locale: en-US
 Module Name: PSVellumPDF
-ms.date: 06-13-2026
+ms.date: 11/02/2026
 PlatyPS schema version: 2024-05-01
 title: Add-VellumPdfList
 ---
@@ -21,7 +21,8 @@ Adds an ordered or unordered list to a VellumPdf document.
 
 ```
 Add-VellumPdfList [-Document] <Document> [-Item] <Object[]> [[-Style] <string>] [[-Indent] <double>]
- [[-Font] <string>] [[-FontSize] <double>] [[-MarginTop] <double>] [[-MarginBottom] <double>]
+ [[-Font] <string>] [[-FontSize] <double>] [[-FontHandle] <EmbeddedFontHandle>] [[-Color] <Object>]
+ [[-Leading] <double>] [[-Language] <string>] [[-MarginTop] <double>] [[-MarginBottom] <double>]
  [<CommonParameters>]
 ```
 
@@ -65,6 +66,28 @@ $doc | Add-VellumPdfList -Item @(
 
 ## PARAMETERS
 
+### -Color
+
+Text colour for every item: an R,G,B triple in 0..1, a hex string
+('#3366cc'), or a colour name.
+
+```yaml
+Type: System.Object
+DefaultValue: ''
+SupportsWildcards: false
+Aliases: []
+ParameterSets:
+- Name: (All)
+  Position: 7
+  IsRequired: false
+  ValueFromPipeline: false
+  ValueFromPipelineByPropertyName: false
+  ValueFromRemainingArguments: false
+DontShow: false
+AcceptedValues: []
+HelpMessage: ''
+```
+
 ### -Document
 
 The live VellumPdf document flowing through the pipeline.
@@ -102,6 +125,31 @@ Aliases: []
 ParameterSets:
 - Name: (All)
   Position: 4
+  IsRequired: false
+  ValueFromPipeline: false
+  ValueFromPipelineByPropertyName: false
+  ValueFromRemainingArguments: false
+DontShow: false
+AcceptedValues: []
+HelpMessage: ''
+```
+
+### -FontHandle
+
+An embedded TrueType font from Register-VellumPdfFont, applied to every
+item (takes precedence over -Font).
+Needed for text outside Windows-1252
+and for PDF/A documents.
+An item may override it with its own FontHandle key.
+
+```yaml
+Type: VellumPdf.Fonts.EmbeddedFontHandle
+DefaultValue: ''
+SupportsWildcards: false
+Aliases: []
+ParameterSets:
+- Name: (All)
+  Position: 6
   IsRequired: false
   ValueFromPipeline: false
   ValueFromPipelineByPropertyName: false
@@ -162,9 +210,16 @@ HelpMessage: ''
 The list items.
 Each element is either a string (a leaf item) or a
 hashtable describing a nested item:
-    @{ Text = 'Parent'; Children = @('Child A', @{ Text = 'Child B';
-       Children = @('Grandchild') }) }
-Children nest to any depth via ListItem.AddChild.
+    @{ Text = 'Parent'; Children = @('Child A', @{ Text = 'Child B' }) }
+One level of children is supported: VellumPdf.Layout draws a child's own
+children nowhere (a grandchild's text would silently vanish), so deeper
+nesting is refused with an error.
+Flatten deeper trees or add separate
+lists.
+An item hashtable may also set Font, FontSize, FontHandle, Color,
+Leading and Language for that item alone.
+A nested item in an Unordered list is marked with U+25E6, which
+the base-14 fonts cannot encode (it shows as '?').
 Empty strings are
 permitted.
 Mandatory.
@@ -186,6 +241,51 @@ AcceptedValues: []
 HelpMessage: ''
 ```
 
+### -Language
+
+A BCP 47 language tag written for every item (e.g.
+'fr'); only used in tagged
+documents.
+An item hashtable may carry its own Language key.
+
+```yaml
+Type: System.String
+DefaultValue: ''
+SupportsWildcards: false
+Aliases: []
+ParameterSets:
+- Name: (All)
+  Position: 9
+  IsRequired: false
+  ValueFromPipeline: false
+  ValueFromPipelineByPropertyName: false
+  ValueFromRemainingArguments: false
+DontShow: false
+AcceptedValues: []
+HelpMessage: ''
+```
+
+### -Leading
+
+Line height in points for every item; 0 (the default) means 1.2 x the font size.
+
+```yaml
+Type: System.Double
+DefaultValue: 0
+SupportsWildcards: false
+Aliases: []
+ParameterSets:
+- Name: (All)
+  Position: 8
+  IsRequired: false
+  ValueFromPipeline: false
+  ValueFromPipelineByPropertyName: false
+  ValueFromRemainingArguments: false
+DontShow: false
+AcceptedValues: []
+HelpMessage: ''
+```
+
 ### -MarginBottom
 
 Extra spacing in points below the list element.
@@ -199,7 +299,7 @@ SupportsWildcards: false
 Aliases: []
 ParameterSets:
 - Name: (All)
-  Position: 7
+  Position: 11
   IsRequired: false
   ValueFromPipeline: false
   ValueFromPipelineByPropertyName: false
@@ -222,7 +322,7 @@ SupportsWildcards: false
 Aliases: []
 ParameterSets:
 - Name: (All)
-  Position: 6
+  Position: 10
   IsRequired: false
   ValueFromPipeline: false
   ValueFromPipelineByPropertyName: false

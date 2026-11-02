@@ -4,7 +4,7 @@ external help file: PSVellumPDF-Help.xml
 HelpUri: ''
 Locale: en-US
 Module Name: PSVellumPDF
-ms.date: 06-13-2026
+ms.date: 11/02/2026
 PlatyPS schema version: 2024-05-01
 title: Protect-VellumPdfDocument
 ---
@@ -20,7 +20,7 @@ Applies password protection and usage permissions to a VellumPdf document.
 ### __AllParameterSets
 
 ```
-Protect-VellumPdfDocument [-Document] <Document> [[-UserPassword] <securestring>]
+Protect-VellumPdfDocument [-Document] <Object> [[-UserPassword] <securestring>]
  [[-OwnerPassword] <securestring>] [[-Permission] <string[]>] [-EncryptMetadata]
  [<CommonParameters>]
 ```
@@ -46,6 +46,14 @@ PdfA2b, PdfA2u,
 PdfA2a) this cmdlet throws a clear terminating error before calling Encrypt().
 The VellumPdf library also enforces this constraint at Save() time, so the
 fail-fast check here gives an earlier, more actionable message.
+A PDF/UA-1
+document, in contrast, may be encrypted as long as -Permission includes
+Extract, so assistive technology can still read the content.
+
+OTHER CONSTRAINTS (VellumPdf 2.x): an empty -OwnerPassword beside a
+non-empty -UserPassword is refused (such a file would open with full owner
+access and no password), and encryption cannot be combined with
+New-VellumPdfDocument -UseObjectStreams.
 
 SIGNING CONSTRAINT: encryption and digital signatures cannot be combined
 (the library rejects the pair at save time).
@@ -94,7 +102,7 @@ The VellumPdf document to protect.
 Accepts pipeline input.
 
 ```yaml
-Type: VellumPdf.Layout.Document
+Type: System.Object
 DefaultValue: ''
 SupportsWildcards: false
 Aliases: []
@@ -228,7 +236,7 @@ This cmdlet supports the common parameters: -Debug, -ErrorAction, -ErrorVariable
 
 ## INPUTS
 
-### VellumPdf.Layout.Document
+### System.Object
 
 
 ## OUTPUTS
@@ -237,6 +245,9 @@ This cmdlet supports the common parameters: -Debug, -ErrorAction, -ErrorVariable
 
 
 ### VellumPdf.Layout.Document
+
+
+### VellumPdf.Document.PdfDocument
 
 
 ## NOTES

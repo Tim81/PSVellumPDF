@@ -4,7 +4,7 @@ external help file: PSVellumPDF-Help.xml
 HelpUri: ''
 Locale: en-US
 Module Name: PSVellumPDF
-ms.date: 06-13-2026
+ms.date: 11/02/2026
 PlatyPS schema version: 2024-05-01
 title: Set-VellumPdfDocumentInfo
 ---
@@ -20,7 +20,7 @@ Sets PDF document metadata (Info dictionary) on a VellumPdf document.
 ### __AllParameterSets
 
 ```
-Set-VellumPdfDocumentInfo [-Document] <Document> [[-Title] <string>] [[-Author] <string>]
+Set-VellumPdfDocumentInfo [-Document] <Object> [[-Title] <string>] [[-Author] <string>]
  [[-Subject] <string>] [[-Keywords] <string>] [[-Creator] <string>] [[-Producer] <string>]
  [<CommonParameters>]
 ```
@@ -101,7 +101,7 @@ The same
 instance is returned after the metadata is set, enabling chaining.
 
 ```yaml
-Type: VellumPdf.Layout.Document
+Type: System.Object
 DefaultValue: ''
 SupportsWildcards: false
 Aliases: []
@@ -215,7 +215,7 @@ This cmdlet supports the common parameters: -Debug, -ErrorAction, -ErrorVariable
 
 ## INPUTS
 
-### VellumPdf.Layout.Document
+### System.Object
 
 
 ## OUTPUTS
@@ -224,6 +224,9 @@ This cmdlet supports the common parameters: -Debug, -ErrorAction, -ErrorVariable
 
 
 ### VellumPdf.Layout.Document
+
+
+### VellumPdf.Document.PdfDocument
 
 
 ## NOTES

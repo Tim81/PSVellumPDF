@@ -175,7 +175,9 @@ function Invoke-DocBuild {
     Import-Module (Join-Path $root 'PSVellumPDF.psd1') -Force
 
     $docsDir = Join-Path $root 'docs'
-    if (Test-Path $docsDir) { Remove-Item $docsDir -Recurse -Force }
+    # PlatyPS writes to <docs>/<module>; leave hand-written files (docs/plans) alone.
+    $generatedDir = Join-Path $docsDir 'PSVellumPDF'
+    if (Test-Path $generatedDir) { Remove-Item $generatedDir -Recurse -Force }
 
     Write-Host '==> Generating markdown command help...' -ForegroundColor Cyan
     $module = Get-Module PSVellumPDF
@@ -190,7 +192,7 @@ function Invoke-DocBuild {
     # Post-process generator artifacts: machine locale and template placeholders
     # (comment-based help has no field that fills the INPUTS/OUTPUTS type
     # descriptions or RELATED LINKS, so PlatyPS leaves {{ Fill ... }} stubs).
-    foreach ($md in Get-ChildItem $docsDir -Recurse -Filter '*.md') {
+    foreach ($md in Get-ChildItem $generatedDir -Recurse -Filter '*.md') {
         $text = Get-Content $md.FullName -Raw
         $text = $text -replace 'Locale: [a-z]{2}-[A-Z]{2}', 'Locale: en-US'
         $text = $text -replace '(?s)## ALIASES\r?\n.*?\{\{Insert list of aliases\}\}\r?\n\r?\n', ''

@@ -4,7 +4,7 @@ external help file: PSVellumPDF-Help.xml
 HelpUri: ''
 Locale: en-US
 Module Name: PSVellumPDF
-ms.date: 06-13-2026
+ms.date: 11/02/2026
 PlatyPS schema version: 2024-05-01
 title: Register-VellumPdfFont
 ---
@@ -20,13 +20,13 @@ Registers a TrueType font file with a VellumPdf document for embedding.
 ### Path (Default)
 
 ```
-Register-VellumPdfFont [-Path] <string> -Document <Document> [<CommonParameters>]
+Register-VellumPdfFont [-Path] <string> -Document <Object> [<CommonParameters>]
 ```
 
 ### Bytes
 
 ```
-Register-VellumPdfFont -Document <Document> -FontBytes <byte[]> [<CommonParameters>]
+Register-VellumPdfFont -Document <Object> -FontBytes <byte[]> [<CommonParameters>]
 ```
 
 ## DESCRIPTION
@@ -64,7 +64,7 @@ $doc | Add-VellumPdfHeading -Text 'Unicode Heading' -FontHandle $handle |
 
 ### EXAMPLE 2
 
-$bytes = [System.IO.File]::ReadAllBytes('./DejaVuSans.ttf')
+$bytes = [System.IO.File]::ReadAllBytes((Resolve-Path ./DejaVuSans.ttf).ProviderPath)
 $handle = Register-VellumPdfFont -Document $doc -FontBytes $bytes
 
 ## PARAMETERS
@@ -76,7 +76,7 @@ Accepts pipeline input.
 The returned handle is only valid for this specific document instance.
 
 ```yaml
-Type: VellumPdf.Layout.Document
+Type: System.Object
 DefaultValue: ''
 SupportsWildcards: false
 Aliases: []
@@ -152,7 +152,7 @@ This cmdlet supports the common parameters: -Debug, -ErrorAction, -ErrorVariable
 
 ## INPUTS
 
-### VellumPdf.Layout.Document
+### System.Object
 
 
 ## OUTPUTS

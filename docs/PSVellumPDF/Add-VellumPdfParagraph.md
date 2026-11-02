@@ -4,7 +4,7 @@ external help file: PSVellumPDF-Help.xml
 HelpUri: ''
 Locale: en-US
 Module Name: PSVellumPDF
-ms.date: 06-13-2026
+ms.date: 11/02/2026
 PlatyPS schema version: 2024-05-01
 title: Add-VellumPdfParagraph
 ---
@@ -22,14 +22,15 @@ Adds a paragraph of text to a VellumPdf document.
 ```
 Add-VellumPdfParagraph [-Text] <string> -Document <Document> [-Font <string>] [-FontSize <double>]
  [-FontHandle <EmbeddedFontHandle>] [-Color <Object>] [-LinkUri <string>] [-Leading <double>]
- [-Alignment <string>] [-MarginTop <double>] [-MarginBottom <double>] [<CommonParameters>]
+ [-Alignment <string>] [-Language <string>] [-MarginTop <double>] [-MarginBottom <double>]
+ [<CommonParameters>]
 ```
 
 ### Runs
 
 ```
 Add-VellumPdfParagraph [-Run] <TextRun[]> -Document <Document> [-Alignment <string>]
- [-MarginTop <double>] [-MarginBottom <double>] [<CommonParameters>]
+ [-Language <string>] [-MarginTop <double>] [-MarginBottom <double>] [<CommonParameters>]
 ```
 
 ## DESCRIPTION
@@ -208,6 +209,30 @@ SupportsWildcards: false
 Aliases: []
 ParameterSets:
 - Name: Text
+  Position: Named
+  IsRequired: false
+  ValueFromPipeline: false
+  ValueFromPipelineByPropertyName: false
+  ValueFromRemainingArguments: false
+DontShow: false
+AcceptedValues: []
+HelpMessage: ''
+```
+
+### -Language
+
+A BCP 47 language tag (e.g.
+'fr') written for this paragraph; only used in
+tagged documents.
+VellumPdf does not validate the tag.
+
+```yaml
+Type: System.String
+DefaultValue: ''
+SupportsWildcards: false
+Aliases: []
+ParameterSets:
+- Name: (All)
   Position: Named
   IsRequired: false
   ValueFromPipeline: false
