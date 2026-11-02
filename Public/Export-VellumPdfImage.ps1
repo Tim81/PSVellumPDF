@@ -8,9 +8,15 @@ function Export-VellumPdfImage {
         Extracts every image XObject (and, by default, inline images and images in
         annotation appearances) and writes each to -DestinationPath. Images the
         reader can re-encode (Flate/raw samples, with their soft mask as alpha) are
-        written as PNG. JPEG, JPEG 2000, JBIG2 and CCITT images are written as
-        their original codestream with the matching extension (.jpg, .jp2, .jb2,
-        .tif), which keeps them lossless; use those files directly.
+        written as PNG. Compressed images keep their original data, which keeps them
+        lossless: JPEG (.jpg) and JPEG 2000 (.jp2, .j2k) are written as they are;
+        CCITT fax images are wrapped in a single-strip TIFF (.tif); JBIG2 images are
+        joined with their shared "global" segments into a standalone sequential JBIG2
+        file (.jb2). A CCITT image with byte-aligned Group 4 rows (which TIFF cannot
+        describe) and any other image that cannot be written as a PNG (for example CMYK
+        or indexed samples) are skipped with a warning.
+        Each file object carries Page, Encoding, Width, Height, BitsPerComponent,
+        ColorSpace, ComponentCount, IsInline, IsStencilMask and HasSoftMask.
 
         Files are named <pdf name>-p<page>-i<n>.<ext>. An existing file is not
         overwritten unless -Force is given.
@@ -45,7 +51,7 @@ function Export-VellumPdfImage {
     .EXAMPLE
         Export-VellumPdfImage ./brochure.pdf -DestinationPath ./images
     .OUTPUTS
-        System.IO.FileInfo for each file written.
+        System.IO.FileInfo for each file written, with the image's details as note properties.
     #>
     [CmdletBinding(SupportsShouldProcess, DefaultParameterSetName = 'Path')]
     [OutputType([System.IO.FileInfo])]
@@ -128,13 +134,44 @@ function Export-VellumPdfImage {
 
                         [byte[]]$png = $null
                         $data = $null
-                        $ext = $image.FileExtension
+                        $ext = $null
                         if ($image.TryEncodePngWithAlpha([ref]$png) -or $image.TryEncodePng([ref]$png)) {
                             $data = $png
                             $ext = 'png'
                         }
                         else {
-                            $data = $image.Data.ToArray()
+                            switch ($image.Encoding) {
+                                'Jpeg' { $data = $image.Data.ToArray(); $ext = 'jpg' }
+                                'Jpx' { $data = $image.Data.ToArray(); $ext = $image.FileExtension.TrimStart('.') }
+                                'CcittFax' {
+                                    # A PDF stores bare CCITT data. Wrap it in a single-strip TIFF so that any viewer opens it.
+                                    $fax = $image.CcittFax
+                                    $decode = @($image.Decode)
+                                    $inverted = $decode.Count -ge 2 -and $decode[0] -gt $decode[1]
+                                    $columns = if ($fax.Columns -gt 0) { $fax.Columns } else { $image.Width }
+                                    $data = [PSVellumPDF.Interop.ImageContainers]::BuildCcittTiff(
+                                        $columns, $image.Height, $fax.K, ($fax.BlackIs1 -xor $inverted), $fax.EncodedByteAlign, $image.Data.ToArray())
+                                    $ext = 'tif'
+                                    if ($null -eq $data) {
+                                        Write-Warning ("Export-VellumPdfImage: the CCITT image on page $pageNumber uses Group 4 coding with byte-aligned rows, " +
+                                            'which a TIFF cannot describe; it was skipped.')
+                                    }
+                                }
+                                'Jbig2' {
+                                    # A PDF stores JBIG2 segments without a file header and keeps shared ("global") segments in a
+                                    # separate stream; join them into a standalone sequential file.
+                                    $data = [PSVellumPDF.Interop.ImageContainers]::BuildJbig2File($image.Data.ToArray(), $image.Jbig2.Globals.ToArray())
+                                    $ext = 'jb2'
+                                    if ($null -eq $data) {
+                                        Write-Warning "Export-VellumPdfImage: the JBIG2 data of the image on page $pageNumber could not be parsed; it was skipped."
+                                    }
+                                }
+                                default {
+                                    Write-Warning ("Export-VellumPdfImage: the $($image.ColorSpace.Family) image on page $pageNumber ($($image.Width) x $($image.Height), " +
+                                        "$($image.BitsPerComponent) bits per component) cannot be written as a PNG and has no file format of its own; it was skipped.")
+                                }
+                            }
+                            if ($null -eq $data) { $counter[$pageNumber] = $counter[$pageNumber] - 1; continue }
                         }
                         $name = '{0}-p{1}-i{2}.{3}' -f $prefix, $pageNumber, $counter[$pageNumber], $ext.TrimStart('.')
                         $target = Join-Path $destination $name
@@ -148,7 +185,21 @@ function Export-VellumPdfImage {
                         if ($PSCmdlet.ShouldProcess($target, 'Write image')) {
                             [void][System.IO.Directory]::CreateDirectory($destination)
                             [System.IO.File]::WriteAllBytes($target, $data)
-                            Get-Item -LiteralPath $target
+                            $details = [ordered]@{
+                                Page             = $pageNumber
+                                Encoding         = [string]$image.Encoding
+                                Width            = $image.Width
+                                Height           = $image.Height
+                                BitsPerComponent = $image.BitsPerComponent
+                                ColorSpace       = [string]$image.ColorSpace.Family
+                                ComponentCount   = $image.ColorSpace.ComponentCount
+                                IsInline         = $image.IsInline
+                                IsStencilMask    = $image.IsStencilMask
+                                HasSoftMask      = $null -ne $image.SoftMask
+                            }
+                            $file = Get-Item -LiteralPath $target
+                            foreach ($key in $details.Keys) { $file | Add-Member -NotePropertyName $key -NotePropertyValue $details[$key] }
+                            $file
                         }
                     }
                 }
