@@ -72,7 +72,7 @@ function Add-VellumPdfPage {
             if ($PassThru) { $added.ToArray() } else { $Document }
         }
         catch {
-            $PSCmdlet.ThrowTerminatingError($_)
+            $PSCmdlet.ThrowTerminatingError((Resolve-VellumPdfErrorRecord -ErrorRecord $_ -CommandName 'Add-VellumPdfPage'))
         }
     }
 }

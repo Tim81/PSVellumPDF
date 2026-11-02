@@ -122,7 +122,7 @@ function Export-VellumPdfImage {
             $usedNames = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::OrdinalIgnoreCase)   # names given out by this call
         }
         catch {
-            $PSCmdlet.ThrowTerminatingError($_)
+            $PSCmdlet.ThrowTerminatingError((Resolve-VellumPdfErrorRecord -ErrorRecord $_ -CommandName 'Export-VellumPdfImage'))
         }
     }
 
@@ -232,13 +232,13 @@ function Export-VellumPdfImage {
                 }
                 catch {
                     if ($_.Exception -is [System.Management.Automation.ActionPreferenceStopException]) { throw }   # -ErrorAction Stop on an image-level error
-                    $PSCmdlet.WriteError((ConvertTo-VellumPdfFileError -ErrorRecord $_ -Target $source.Name -CommandName 'Export-VellumPdfImage'))
+                    Write-VellumPdfFileError -Cmdlet $PSCmdlet -ErrorRecord (ConvertTo-VellumPdfFileError -ErrorRecord $_ -Target $source.Name -CommandName 'Export-VellumPdfImage') -ErrorActionPreferenceValue $ErrorActionPreference
                 }
                 finally { $source.Data = $null }   # one file in memory at a time
             }
         }
         catch {
-            $PSCmdlet.ThrowTerminatingError($_)
+            $PSCmdlet.ThrowTerminatingError((Resolve-VellumPdfErrorRecord -ErrorRecord $_ -CommandName 'Export-VellumPdfImage'))
         }
     }
 }

@@ -80,7 +80,7 @@ function Test-VellumPdfConformance {
             $allOk = $true
         }
         catch {
-            $PSCmdlet.ThrowTerminatingError($_)
+            $PSCmdlet.ThrowTerminatingError((Resolve-VellumPdfErrorRecord -ErrorRecord $_ -CommandName 'Test-VellumPdfConformance'))
         }
     }
 
@@ -98,10 +98,10 @@ function Test-VellumPdfConformance {
                             $claimed = [VellumPdf.Conformance.PdfPreflight]::DetectClaimedProfiles($data, $plain)
                         }
                         catch [VellumPdf.Reader.PdfPasswordException] {
-                            throw "Test-VellumPdfConformance: '$name' is encrypted and needs a password. Pass -Password."
+                            throw (New-VellumPdfErrorRecord PasswordRequired "Test-VellumPdfConformance: '$name' is encrypted and needs a password. Pass -Password." -Target $name -InnerException $_.Exception)
                         }
                         catch [System.IO.InvalidDataException] {
-                            throw "Test-VellumPdfConformance: '$name' is not a well-formed PDF: $($_.Exception.Message)"
+                            throw (New-VellumPdfErrorRecord InvalidPdf "Test-VellumPdfConformance: '$name' is not a well-formed PDF: $($_.Exception.Message)" -Target $name -InnerException $_.Exception)
                         }
                         $profiles = @(foreach ($c in $claimed) {
                                 switch ($c) {
@@ -125,13 +125,13 @@ function Test-VellumPdfConformance {
                 }
                 catch {
                     $allOk = $false   # a file that could not be checked is not known to conform
-                    $PSCmdlet.WriteError((ConvertTo-VellumPdfFileError -ErrorRecord $_ -Target $source.Name -CommandName 'Test-VellumPdfConformance'))
+                    Write-VellumPdfFileError -Cmdlet $PSCmdlet -ErrorRecord (ConvertTo-VellumPdfFileError -ErrorRecord $_ -Target $source.Name -CommandName 'Test-VellumPdfConformance') -ErrorActionPreferenceValue $ErrorActionPreference
                 }
                 finally { $source.Data = $null; $data = $null }   # one file in memory at a time
             }
         }
         catch {
-            $PSCmdlet.ThrowTerminatingError($_)
+            $PSCmdlet.ThrowTerminatingError((Resolve-VellumPdfErrorRecord -ErrorRecord $_ -CommandName 'Test-VellumPdfConformance'))
         }
     }
 
@@ -140,7 +140,7 @@ function Test-VellumPdfConformance {
             if ($Quiet) { $allOk }
         }
         catch {
-            $PSCmdlet.ThrowTerminatingError($_)
+            $PSCmdlet.ThrowTerminatingError((Resolve-VellumPdfErrorRecord -ErrorRecord $_ -CommandName 'Test-VellumPdfConformance'))
         }
     }
 }

@@ -24,7 +24,7 @@ function ConvertTo-VellumInsets {
     $numbers = foreach ($v in @($Value)) {
         $n = $v -as [double]
         if ($null -eq $n -or -not [double]::IsFinite($n) -or $n -lt 0 -or $n -gt 1000) {
-            throw "${What} must be numbers between 0 and 1000 points; got '$v'."
+            throw (New-VellumPdfErrorRecord InvalidArgument "${What} must be numbers between 0 and 1000 points; got '$v'.")
         }
         $n
     }
@@ -33,6 +33,6 @@ function ConvertTo-VellumInsets {
         1 { return [VellumPdf.Layout.Core.EdgeInsets]::new($numbers[0]) }
         2 { return [VellumPdf.Layout.Core.EdgeInsets]::new($numbers[0], $numbers[1]) }
         4 { return [VellumPdf.Layout.Core.EdgeInsets]::new($numbers[0], $numbers[1], $numbers[2], $numbers[3]) }
-        default { throw "${What} takes 1 (all sides), 2 (top/bottom, left/right) or 4 (top, right, bottom, left) numbers; got $($numbers.Count)." }
+        default { throw (New-VellumPdfErrorRecord InvalidArgument "${What} takes 1 (all sides), 2 (top/bottom, left/right) or 4 (top, right, bottom, left) numbers; got $($numbers.Count).") }
     }
 }

@@ -61,41 +61,41 @@ function New-VellumPdfBarcodeSet {
         }
         foreach ($name in $allowed.Keys) {
             if ($bound.ContainsKey($name) -and $Type -notin $allowed[$name]) {
-                throw ("Add-VellumPdfBarcode: -$name does not apply to -Type $Type (it applies to: " +
-                    "$($allowed[$name] -join ', ')).")
+                throw (New-VellumPdfErrorRecord InvalidArgument ("Add-VellumPdfBarcode: -$name does not apply to -Type $Type (it applies to: " +
+                    "$($allowed[$name] -join ', '))."))
             }
         }
         foreach ($name in 'BarHeight', 'ShowText', 'TextSize', 'TextFont') {
             if ($bound.ContainsKey($name) -and -not $is1D) {
-                throw "Add-VellumPdfBarcode: -$name only applies to linear (1-D) barcodes, not -Type $Type."
+                throw (New-VellumPdfErrorRecord InvalidArgument "Add-VellumPdfBarcode: -$name only applies to linear (1-D) barcodes, not -Type $Type.")
             }
         }
         if ($bound.ContainsKey('Bytes') -and $Type -ne 'QrCode') {
-            throw 'Add-VellumPdfBarcode: -Bytes is supported for -Type QrCode only; use -Content for other symbologies.'
+            throw (New-VellumPdfErrorRecord InvalidArgument 'Add-VellumPdfBarcode: -Bytes is supported for -Type QrCode only; use -Content for other symbologies.')
         }
         if ($bound.ContainsKey('SplitInto') -and $Type -notin @('QrCode', 'Pdf417')) {
-            throw 'Add-VellumPdfBarcode: -SplitInto applies to QrCode (Structured Append) and Pdf417 (Macro PDF417) only.'
+            throw (New-VellumPdfErrorRecord InvalidArgument 'Add-VellumPdfBarcode: -SplitInto applies to QrCode (Structured Append) and Pdf417 (Macro PDF417) only.')
         }
         if ($bound.ContainsKey('SplitInto') -and $bound.ContainsKey('Bytes')) {
-            throw 'Add-VellumPdfBarcode: -SplitInto needs -Content text, not -Bytes.'
+            throw (New-VellumPdfErrorRecord InvalidArgument 'Add-VellumPdfBarcode: -SplitInto needs -Content text, not -Bytes.')
         }
         $macroKeys = 'MacroFileName', 'MacroSender', 'MacroAddressee', 'MacroTimestamp', 'MacroFileSize', 'MacroChecksum'
         if (-not $bound.ContainsKey('SplitInto') -and ($macroKeys | Where-Object { $bound.ContainsKey($_) })) {
-            throw 'Add-VellumPdfBarcode: the -Macro* options describe a Macro PDF417 set and need -SplitInto.'
+            throw (New-VellumPdfErrorRecord InvalidArgument 'Add-VellumPdfBarcode: the -Macro* options describe a Macro PDF417 set and need -SplitInto.')
         }
         if ($bound.ContainsKey('ModuleSize') -and $bound.ContainsKey('TargetWidth')) {
-            throw 'Add-VellumPdfBarcode: -ModuleSize and -TargetWidth cannot be combined; choose one.'
+            throw (New-VellumPdfErrorRecord InvalidArgument 'Add-VellumPdfBarcode: -ModuleSize and -TargetWidth cannot be combined; choose one.')
         }
         if ($Decorative -and $AltText) {
-            throw 'Add-VellumPdfBarcode: -AltText and -Decorative cannot be combined.'
+            throw (New-VellumPdfErrorRecord InvalidArgument 'Add-VellumPdfBarcode: -AltText and -Decorative cannot be combined.')
         }
         $showTextValue = if ($bound.ContainsKey('ShowText')) { $ShowText } else { -not $isPdfA }
         if ($is1D -and $isPdfA -and $showTextValue) {
-            throw ('Add-VellumPdfBarcode: the human-readable line of a linear barcode uses a non-embedded base-14 ' +
-                'font, which PDF/A and PDF/UA forbid. Leave -ShowText off and use -Caption with an embedded -FontHandle instead.')
+            throw (New-VellumPdfErrorRecord InvalidArgument ('Add-VellumPdfBarcode: the human-readable line of a linear barcode uses a non-embedded base-14 ' +
+                'font, which PDF/A and PDF/UA forbid. Leave -ShowText off and use -Caption with an embedded -FontHandle instead.'))
         }
         if ($is1D -and $isPdfA -and $bound.ContainsKey('TextFont')) {
-            throw 'Add-VellumPdfBarcode: -TextFont uses a base-14 font, which PDF/A and PDF/UA forbid; use -Caption with -FontHandle.'
+            throw (New-VellumPdfErrorRecord InvalidArgument 'Add-VellumPdfBarcode: -TextFont uses a base-14 font, which PDF/A and PDF/UA forbid; use -Caption with -FontHandle.')
         }
 
         # --- build the symbol(s) ----------------------------------------------------

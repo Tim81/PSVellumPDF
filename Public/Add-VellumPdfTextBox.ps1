@@ -199,7 +199,7 @@ function Add-VellumPdfTextBox {
             else { $Document }
         }
         catch {
-            $PSCmdlet.ThrowTerminatingError($_)
+            $PSCmdlet.ThrowTerminatingError((Resolve-VellumPdfErrorRecord -ErrorRecord $_ -CommandName 'Add-VellumPdfTextBox'))
         }
     }
 }

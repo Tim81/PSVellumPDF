@@ -126,7 +126,7 @@ function Use-VellumPdfClip {
             $Document
         }
         catch {
-            $PSCmdlet.ThrowTerminatingError($_)
+            $PSCmdlet.ThrowTerminatingError((Resolve-VellumPdfErrorRecord -ErrorRecord $_ -CommandName 'Use-VellumPdfClip'))
         }
     }
 }

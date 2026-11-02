@@ -109,7 +109,7 @@ function Measure-VellumPdfText {
             }
         }
         catch {
-            $PSCmdlet.ThrowTerminatingError($_)
+            $PSCmdlet.ThrowTerminatingError((Resolve-VellumPdfErrorRecord -ErrorRecord $_ -CommandName 'Measure-VellumPdfText'))
         }
     }
 }

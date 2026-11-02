@@ -138,12 +138,12 @@ function Unprotect-VellumPdfDocument {
                 finally { $reader.Dispose() }
             }
             catch {
-                $PSCmdlet.WriteError((ConvertTo-VellumPdfFileError -ErrorRecord $_ -Target $source.Name -CommandName 'Unprotect-VellumPdfDocument'))
+                Write-VellumPdfFileError -Cmdlet $PSCmdlet -ErrorRecord (ConvertTo-VellumPdfFileError -ErrorRecord $_ -Target $source.Name -CommandName 'Unprotect-VellumPdfDocument') -ErrorActionPreferenceValue $ErrorActionPreference
             }
             finally { $source.Data = $null }
         }
         catch {
-            $PSCmdlet.ThrowTerminatingError($_)
+            $PSCmdlet.ThrowTerminatingError((Resolve-VellumPdfErrorRecord -ErrorRecord $_ -CommandName 'Unprotect-VellumPdfDocument'))
         }
     }
 }

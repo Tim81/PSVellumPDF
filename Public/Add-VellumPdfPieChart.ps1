@@ -248,7 +248,7 @@ function Add-VellumPdfPieChart {
             }
         }
         catch {
-            $PSCmdlet.ThrowTerminatingError($_)
+            $PSCmdlet.ThrowTerminatingError((Resolve-VellumPdfErrorRecord -ErrorRecord $_ -CommandName 'Add-VellumPdfPieChart'))
         }
     }
 
@@ -263,7 +263,7 @@ function Add-VellumPdfPieChart {
             }
         }
         catch {
-            $PSCmdlet.ThrowTerminatingError($_)
+            $PSCmdlet.ThrowTerminatingError((Resolve-VellumPdfErrorRecord -ErrorRecord $_ -CommandName 'Add-VellumPdfPieChart'))
         }
     }
 
@@ -279,7 +279,7 @@ function Add-VellumPdfPieChart {
             }
         }
         catch {
-            $PSCmdlet.ThrowTerminatingError($_)
+            $PSCmdlet.ThrowTerminatingError((Resolve-VellumPdfErrorRecord -ErrorRecord $_ -CommandName 'Add-VellumPdfPieChart'))
         }
     }
 }

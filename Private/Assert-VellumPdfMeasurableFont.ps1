@@ -14,6 +14,6 @@ function Assert-VellumPdfMeasurableFont {
         [string]$Reason = 'needs to measure text'
     )
     if ($Font -in 'Symbol', 'ZapfDingbats') {
-        throw "${CommandName}: -Font $Font has no width table in VellumPdf, so this cmdlet cannot measure it ($Reason). Use an embedded TrueType font (-FontHandle) or a text font."
+        throw (New-VellumPdfErrorRecord InvalidArgument "${CommandName}: -Font $Font has no width table in VellumPdf, so this cmdlet cannot measure it ($Reason). Use an embedded TrueType font (-FontHandle) or a text font.")
     }
 }

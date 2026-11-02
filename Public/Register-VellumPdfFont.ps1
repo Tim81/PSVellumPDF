@@ -66,7 +66,7 @@ function Register-VellumPdfFont {
             else {
                 $resolved = $ExecutionContext.SessionState.Path.GetUnresolvedProviderPathFromPSPath($Path)
                 if (-not [System.IO.File]::Exists($resolved)) {
-                    throw "Register-VellumPdfFont: font file not found: '$resolved'. Verify the path and try again."
+                    throw (New-VellumPdfErrorRecord FileNotFound "Register-VellumPdfFont: font file not found: '$resolved'. Verify the path and try again.")
                 }
                 if ($Document -is [VellumPdf.Layout.Document]) { $Document.LoadTrueTypeFont($resolved) }
                 else { $Document.UseTrueTypeFont([System.IO.File]::ReadAllBytes($resolved)) }
@@ -78,7 +78,7 @@ function Register-VellumPdfFont {
             $handle
         }
         catch {
-            $PSCmdlet.ThrowTerminatingError($_)
+            $PSCmdlet.ThrowTerminatingError((Resolve-VellumPdfErrorRecord -ErrorRecord $_ -CommandName 'Register-VellumPdfFont'))
         }
     }
 }

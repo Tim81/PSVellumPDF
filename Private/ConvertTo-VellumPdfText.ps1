@@ -28,7 +28,7 @@ function ConvertTo-VellumPdfText {
         catch {
             $failure = $_.Exception
             if ($failure -is [System.FormatException] -or $failure.InnerException -is [System.FormatException]) {
-                throw "${CommandName}: the format string '$Format' cannot format $What ($($raw.GetType().Name)): $($failure.InnerException?.Message ?? $failure.Message)"
+                throw (New-VellumPdfErrorRecord InvalidArgument "${CommandName}: the format string '$Format' cannot format $What ($($raw.GetType().Name)): $($failure.InnerException?.Message ?? $failure.Message)")
             }
             throw
         }

@@ -77,7 +77,7 @@ function Invoke-VellumPdfCanvas {
             $Document
         }
         catch {
-            $PSCmdlet.ThrowTerminatingError($_)
+            $PSCmdlet.ThrowTerminatingError((Resolve-VellumPdfErrorRecord -ErrorRecord $_ -CommandName 'Invoke-VellumPdfCanvas'))
         }
     }
 }

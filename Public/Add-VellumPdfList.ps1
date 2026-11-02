@@ -369,7 +369,7 @@ function Add-VellumPdfList {
             $Document
         }
         catch {
-            $PSCmdlet.ThrowTerminatingError($_)
+            $PSCmdlet.ThrowTerminatingError((Resolve-VellumPdfErrorRecord -ErrorRecord $_ -CommandName 'Add-VellumPdfList'))
         }
     }
 }

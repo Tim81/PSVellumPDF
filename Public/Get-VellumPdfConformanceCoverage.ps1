@@ -82,6 +82,6 @@ function Get-VellumPdfConformanceCoverage {
         }
     }
     catch {
-        $PSCmdlet.ThrowTerminatingError($_)
+        $PSCmdlet.ThrowTerminatingError((Resolve-VellumPdfErrorRecord -ErrorRecord $_ -CommandName 'Get-VellumPdfConformanceCoverage'))
     }
 }

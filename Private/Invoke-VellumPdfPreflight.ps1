@@ -30,14 +30,14 @@ function Invoke-VellumPdfPreflight {
         $result = [VellumPdf.Conformance.PdfPreflight]::Validate($Bytes, $engineProfile, $Password)
     }
     catch [VellumPdf.Reader.PdfPasswordException] {
-        throw ("Test-VellumPdfConformance: '$Source' is encrypted and needs a password. " +
-            'Pass -Password (an empty user password is tried automatically).')
+        throw (New-VellumPdfErrorRecord PasswordRequired ("Test-VellumPdfConformance: '$Source' is encrypted and needs a password. " +
+                'Pass -Password (an empty user password is tried automatically).') -Target $Source -InnerException $_.Exception)
     }
     catch [System.IO.InvalidDataException] {
-        throw "Test-VellumPdfConformance: '$Source' is not a well-formed PDF: $($_.Exception.Message)"
+        throw (New-VellumPdfErrorRecord InvalidPdf "Test-VellumPdfConformance: '$Source' is not a well-formed PDF: $($_.Exception.Message)" -Target $Source -InnerException $_.Exception)
     }
     catch [VellumPdf.Reader.UnsupportedPdfFeatureException] {
-        throw "Test-VellumPdfConformance: '$Source' uses a feature the preflight reader does not support yet: $($_.Exception.Message)"
+        throw (New-VellumPdfErrorRecord InputError "Test-VellumPdfConformance: '$Source' uses a feature the preflight reader does not support yet: $($_.Exception.Message)" -Target $Source -InnerException $_.Exception)
     }
 
     $assertions = @(foreach ($a in $result.Assertions) {

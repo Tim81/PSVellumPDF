@@ -189,7 +189,7 @@ function Add-VellumPdfImage {
             else {
                 $resolved = $ExecutionContext.SessionState.Path.GetUnresolvedProviderPathFromPSPath($Path)
                 if (-not [System.IO.File]::Exists($resolved)) {
-                    throw "Add-VellumPdfImage: file not found: '$resolved'. Verify the path and try again."
+                    throw (New-VellumPdfErrorRecord FileNotFound "Add-VellumPdfImage: file not found: '$resolved'. Verify the path and try again.")
                 }
                 $bytes = [System.IO.File]::ReadAllBytes($resolved)
                 $source = "'$resolved'"
@@ -258,7 +258,7 @@ function Add-VellumPdfImage {
             $Document
         }
         catch {
-            $PSCmdlet.ThrowTerminatingError($_)
+            $PSCmdlet.ThrowTerminatingError((Resolve-VellumPdfErrorRecord -ErrorRecord $_ -CommandName 'Add-VellumPdfImage'))
         }
     }
 }

@@ -17,6 +17,6 @@ function Assert-VellumPdfCoordinate {
     )
     $number = $Value -as [double]
     if ($null -eq $Value -or $null -eq $number -or -not [double]::IsFinite($number) -or [math]::Abs($number) -gt $Limit) {
-        throw "${CommandName}: -$Name must be a finite number between -$Limit and $Limit points; got '$Value'."
+        throw (New-VellumPdfErrorRecord InvalidArgument "${CommandName}: -$Name must be a finite number between -$Limit and $Limit points; got '$Value'.")
     }
 }

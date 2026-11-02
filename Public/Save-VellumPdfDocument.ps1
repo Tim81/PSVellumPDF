@@ -245,8 +245,8 @@ function Save-VellumPdfDocument {
                             $top = @($check.Assertions | Where-Object Severity -EQ 'Error' | Select-Object -First 5 |
                                     ForEach-Object { "  - $($_.RuleId): $($_.Message)" }) -join "`n"
                             $more = if ($check.ErrorCount -gt 5) { "`n  ... and $($check.ErrorCount - 5) more" } else { '' }
-                            throw ("Save-VellumPdfDocument: the rendered PDF is not $validateProfile compliant " +
-                                "($($check.ErrorCount) error(s)); nothing was written.`n$top$more")
+                            throw (New-VellumPdfErrorRecord NotConformant ("Save-VellumPdfDocument: the rendered PDF is not $validateProfile compliant " +
+                                "($($check.ErrorCount) error(s)); nothing was written.`n$top$more"))
                         }
                     }
 
@@ -274,7 +274,7 @@ function Save-VellumPdfDocument {
                             [void][System.IO.Directory]::CreateDirectory($parent)
                         }
                         if ($parent -and -not [System.IO.Directory]::Exists($parent)) {
-                            throw "Save-VellumPdfDocument: directory not found: '$parent'. Create it first or pass a path in an existing directory."
+                            throw (New-VellumPdfErrorRecord FileNotFound "Save-VellumPdfDocument: directory not found: '$parent'. Create it first or pass a path in an existing directory.")
                         }
 
                         # Render/sign to a temporary file beside the target, then move
@@ -349,7 +349,7 @@ function Save-VellumPdfDocument {
             }
         }
         catch {
-            $PSCmdlet.ThrowTerminatingError($_)
+            $PSCmdlet.ThrowTerminatingError((Resolve-VellumPdfErrorRecord -ErrorRecord $_ -CommandName 'Save-VellumPdfDocument'))
         }
     }
 }

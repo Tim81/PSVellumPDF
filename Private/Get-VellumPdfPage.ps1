@@ -14,7 +14,7 @@ function Get-VellumPdfPage {
         throw "${CommandName}: the document has no pages yet. Add one with Add-VellumPdfPage."
     }
     if ($Page -lt 1 -or $Page -gt $Document.Pages.Count) {
-        throw "${CommandName}: -Page $Page is out of range; the document has $($Document.Pages.Count) page(s)."
+        throw (New-VellumPdfErrorRecord InvalidArgument "${CommandName}: -Page $Page is out of range; the document has $($Document.Pages.Count) page(s).")
     }
     $Document.Pages[$Page - 1]
 }

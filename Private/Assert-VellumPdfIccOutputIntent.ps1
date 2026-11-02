@@ -16,10 +16,10 @@ function Assert-VellumPdfIccOutputIntent {
     if ($Bytes.Length -lt 128) { return }   # Get-VellumPdfIccComponentCount reports the malformed file
     $class = [System.Text.Encoding]::ASCII.GetString($Bytes, 12, 4)
     if ($class -notin 'prtr', 'mntr', 'scnr', 'spac') {
-        throw ("${CommandName}: the ICC profile has device class '$($class.Trim())', which PDF/A does not accept for an output intent " +
-            "(printer, display, scanner or colour-space-conversion profiles only: 'prtr', 'mntr', 'scnr', 'spac').")
+        throw (New-VellumPdfErrorRecord InvalidArgument ("${CommandName}: the ICC profile has device class '$($class.Trim())', which PDF/A does not accept for an output intent " +
+            "(printer, display, scanner or colour-space-conversion profiles only: 'prtr', 'mntr', 'scnr', 'spac')."))
     }
     if ($Bytes[8] -ge 5) {
-        throw "${CommandName}: the ICC profile is version $($Bytes[8]).x; PDF/A accepts output intent profiles up to version 4."
+        throw (New-VellumPdfErrorRecord InvalidArgument "${CommandName}: the ICC profile is version $($Bytes[8]).x; PDF/A accepts output intent profiles up to version 4.")
     }
 }

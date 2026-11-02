@@ -112,7 +112,7 @@ function Set-VellumPdfOutputIntent {
             else {
                 $resolved = $ExecutionContext.SessionState.Path.GetUnresolvedProviderPathFromPSPath($IccProfilePath)
                 if (-not [System.IO.File]::Exists($resolved)) {
-                    throw "Set-VellumPdfOutputIntent: ICC profile not found: '$resolved'."
+                    throw (New-VellumPdfErrorRecord FileNotFound "Set-VellumPdfOutputIntent: ICC profile not found: '$resolved'.")
                 }
                 $bytes = [System.IO.File]::ReadAllBytes($resolved)
                 $profileCount = Get-VellumPdfIccComponentCount -Bytes $bytes -CommandName 'Set-VellumPdfOutputIntent'
@@ -139,7 +139,7 @@ function Set-VellumPdfOutputIntent {
             $Document
         }
         catch {
-            $PSCmdlet.ThrowTerminatingError($_)
+            $PSCmdlet.ThrowTerminatingError((Resolve-VellumPdfErrorRecord -ErrorRecord $_ -CommandName 'Set-VellumPdfOutputIntent'))
         }
     }
 }

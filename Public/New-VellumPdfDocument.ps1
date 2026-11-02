@@ -224,6 +224,6 @@ function New-VellumPdfDocument {
         return $doc
     }
     catch {
-        $PSCmdlet.ThrowTerminatingError($_)
+        $PSCmdlet.ThrowTerminatingError((Resolve-VellumPdfErrorRecord -ErrorRecord $_ -CommandName 'New-VellumPdfDocument'))
     }
 }

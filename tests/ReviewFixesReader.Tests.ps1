@@ -75,7 +75,7 @@ Describe 'A bad input file is a non-terminating error for that file' {
         $r.Errors.Count | Should -Be 1
         $r.Errors[0].TargetObject | Should -Be $script:b
         $r.Errors[0].Exception.Message | Should -BeLike "${Name}: *b.pdf*not a well-formed PDF*"
-        $r.Errors[0].FullyQualifiedErrorId | Should -Match '^PdfInputError'
+        $r.Errors[0].FullyQualifiedErrorId | Should -BeLike 'PSVellumPDF.InvalidPdf*'
     }
 
     It '<Name> -ErrorAction Stop stops at the first bad file' -ForEach @(
@@ -95,7 +95,8 @@ Describe 'A bad input file is a non-terminating error for that file' {
         $r.Output[0].Path | Should -Be $script:a
         $r.Errors.Count | Should -Be 1
         $r.Errors[0].Exception.Message | Should -BeLike '*file not found*missing.pdf*'
-        $r.Errors[0].Exception | Should -BeOfType ([System.IO.FileNotFoundException])
+        $r.Errors[0].Exception | Should -BeOfType ([System.Management.Automation.ItemNotFoundException])
+        $r.Errors[0].FullyQualifiedErrorId | Should -BeLike 'PSVellumPDF.FileNotFound*'
         $r.Errors[0].CategoryInfo.Category | Should -Be 'ObjectNotFound'
     }
 

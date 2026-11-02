@@ -99,7 +99,7 @@ function Add-VellumPdfPageImage {
             }
             else {
                 $resolved = $ExecutionContext.SessionState.Path.GetUnresolvedProviderPathFromPSPath($Path)
-                if (-not [System.IO.File]::Exists($resolved)) { throw "Add-VellumPdfPageImage: file not found: '$resolved'." }
+                if (-not [System.IO.File]::Exists($resolved)) { throw (New-VellumPdfErrorRecord FileNotFound "Add-VellumPdfPageImage: file not found: '$resolved'.") }
                 $bytes = [System.IO.File]::ReadAllBytes($resolved)
                 $source = "'$resolved'"
                 $key = Get-VellumPdfImageFormat -Extension ([System.IO.Path]::GetExtension($resolved)) -CommandName 'Add-VellumPdfPageImage'
@@ -140,7 +140,7 @@ function Add-VellumPdfPageImage {
             $Document
         }
         catch {
-            $PSCmdlet.ThrowTerminatingError($_)
+            $PSCmdlet.ThrowTerminatingError((Resolve-VellumPdfErrorRecord -ErrorRecord $_ -CommandName 'Add-VellumPdfPageImage'))
         }
     }
 }

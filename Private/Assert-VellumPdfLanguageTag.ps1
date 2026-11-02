@@ -16,6 +16,6 @@ function Assert-VellumPdfLanguageTag {
     )
     if ([string]::IsNullOrEmpty($Value)) { return }
     if ($Value -notmatch '^(?:[A-Za-z]{2,8}|[xXiI])(?:-[A-Za-z0-9]{1,8})*$') {
-        throw "${CommandName}: -$Name '$Value' is not a BCP 47 language tag (for example en, en-US or nl-NL)."
+        throw (New-VellumPdfErrorRecord InvalidArgument "${CommandName}: -$Name '$Value' is not a BCP 47 language tag (for example en, en-US or nl-NL).")
     }
 }

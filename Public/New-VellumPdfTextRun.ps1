@@ -113,6 +113,6 @@ function New-VellumPdfTextRun {
         $run
     }
     catch {
-        $PSCmdlet.ThrowTerminatingError($_)
+        $PSCmdlet.ThrowTerminatingError((Resolve-VellumPdfErrorRecord -ErrorRecord $_ -CommandName 'New-VellumPdfTextRun'))
     }
 }

@@ -17,5 +17,5 @@ function ConvertTo-VellumPdfCulture {
     if ($Value -is [cultureinfo]) { return $Value }
     $name = [string]$Value
     try { [cultureinfo]::GetCultureInfo($name, $true) }
-    catch { throw "${CommandName}: -$ParameterName '$name' is not a known culture name (for example en-US, de-DE or nl-NL); pass a name or a [cultureinfo]." }
+    catch { throw (New-VellumPdfErrorRecord InvalidArgument "${CommandName}: -$ParameterName '$name' is not a known culture name (for example en-US, de-DE or nl-NL); pass a name or a [cultureinfo].") }
 }

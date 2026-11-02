@@ -30,13 +30,13 @@ function Open-VellumPdfReader {
         [VellumPdf.Reader.PdfReader]::Open($Bytes, $options)
     }
     catch [VellumPdf.Reader.PdfPasswordException] {
-        throw "${CommandName}: '$Source' is encrypted and needs a password (or the one given is wrong). Pass -Password."
+        throw (New-VellumPdfErrorRecord PasswordRequired "${CommandName}: '$Source' is encrypted and needs a password (or the one given is wrong). Pass -Password." -Target $Source -InnerException $_.Exception)
     }
     catch [System.IO.InvalidDataException] {
-        throw ("${CommandName}: '$Source' is not a well-formed PDF: $($_.Exception.Message)" +
-            $(if (-not $AllowReconstruction) { ' Try -AllowReconstruction to recover a damaged file.' }))
+        throw (New-VellumPdfErrorRecord InvalidPdf ("${CommandName}: '$Source' is not a well-formed PDF: $($_.Exception.Message)" +
+                $(if (-not $AllowReconstruction) { ' Try -AllowReconstruction to recover a damaged file.' })) -Target $Source -InnerException $_.Exception)
     }
     catch [VellumPdf.Reader.UnsupportedPdfFeatureException] {
-        throw "${CommandName}: '$Source' uses a PDF feature the reader does not support yet: $($_.Exception.Message)"
+        throw (New-VellumPdfErrorRecord InputError "${CommandName}: '$Source' uses a PDF feature the reader does not support yet: $($_.Exception.Message)" -Target $Source -InnerException $_.Exception)
     }
 }

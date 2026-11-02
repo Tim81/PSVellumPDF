@@ -21,8 +21,8 @@ function Test-VellumPdfLinkUri {
     $scheme = [regex]::Match($normalized, '^(?<s>[a-zA-Z][a-zA-Z0-9+.-]*):').Groups['s'].Value
     if ($scheme.ToLowerInvariant() -notin @('http', 'https', 'mailto')) {
         $what = if ($scheme) { "scheme '$scheme'" } else { 'a relative or scheme-less URI' }
-        throw ("$Name uses $what; only http, https, and mailto URLs are allowed in " +
-            "generated documents (got '$Uri').")
+        throw (New-VellumPdfErrorRecord InvalidArgument ("$Name uses $what; only http, https, and mailto URLs are allowed in " +
+            "generated documents (got '$Uri')."))
     }
     $normalized
 }

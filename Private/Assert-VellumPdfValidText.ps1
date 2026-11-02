@@ -17,8 +17,8 @@ function Assert-VellumPdfValidText {
         if ([string]::IsNullOrEmpty($t)) { continue }
         $m = [regex]::Match($t, '[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]')
         if ($m.Success) {
-            throw ("${CommandName}: the text contains an unpaired UTF-16 surrogate (U+{0:X4}) at position {1}, which is not a character. " -f [int][char]$m.Value, $m.Index) +
-                'Check how the string was built (for example a substring that cut an emoji in half).'
+            throw (New-VellumPdfErrorRecord InvalidArgument (("${CommandName}: the text contains an unpaired UTF-16 surrogate (U+{0:X4}) at position {1}, which is not a character. " -f [int][char]$m.Value, $m.Index) +
+                    'Check how the string was built (for example a substring that cut an emoji in half).'))
         }
     }
 }

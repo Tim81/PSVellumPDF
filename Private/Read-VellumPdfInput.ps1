@@ -6,7 +6,8 @@ function Read-VellumPdfInput {
         Fills the item's Data property (a -Bytes item already has it) and throws a clear
         error when the item could not be resolved, the file is missing, unreadable or empty.
         Callers catch that error per item and report it with ConvertTo-VellumPdfFileError, so one bad
-        file does not stop the others. A missing file raises FileNotFoundException.
+        file does not stop the others. A missing file raises PSVellumPDF.FileNotFound, an unreadable one
+        PSVellumPDF.FileReadError, an empty one PSVellumPDF.InvalidPdf (see New-VellumPdfErrorRecord).
     #>
     [CmdletBinding()]
     param(
@@ -16,16 +17,16 @@ function Read-VellumPdfInput {
 
     $command = $Source.Command
     if ($Source.Error) {
-        if ($Source.Name -eq '<bytes>') { throw $Source.Error }
-        throw [System.IO.FileNotFoundException]::new($Source.Error, $Source.Name)
+        if ($Source.Name -eq '<bytes>') { throw (New-VellumPdfErrorRecord InvalidPdf $Source.Error -Target $Source.Name) }
+        throw (New-VellumPdfErrorRecord FileNotFound $Source.Error -Target $Source.Name)
     }
     if ($null -ne $Source.Data) { return }
     $file = $Source.Name
     if (-not [System.IO.File]::Exists($file)) {
-        throw [System.IO.FileNotFoundException]::new("${command}: file not found: '$file'.", $file)
+        throw (New-VellumPdfErrorRecord FileNotFound "${command}: file not found: '$file'." -Target $file)
     }
     try { $data = [System.IO.File]::ReadAllBytes($file) }
-    catch { throw [System.IO.IOException]::new("${command}: could not read '$file': $($_.Exception.Message)", $_.Exception) }
-    if ($data.Length -eq 0) { throw "${command}: '$file' is empty, so it is not a PDF." }
+    catch { throw (New-VellumPdfErrorRecord FileReadError "${command}: could not read '$file': $($_.Exception.Message)" -Target $file -InnerException $_.Exception) }
+    if ($data.Length -eq 0) { throw (New-VellumPdfErrorRecord InvalidPdf "${command}: '$file' is empty, so it is not a PDF." -Target $file) }
     $Source.Data = $data
 }

@@ -100,7 +100,7 @@ function Get-VellumPdfBarcodeMatrix {
             $result
         }
         catch {
-            $PSCmdlet.ThrowTerminatingError($_)
+            $PSCmdlet.ThrowTerminatingError((Resolve-VellumPdfErrorRecord -ErrorRecord $_ -CommandName 'Get-VellumPdfBarcodeMatrix'))
         }
     }
 }

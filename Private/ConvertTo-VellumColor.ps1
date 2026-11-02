@@ -43,7 +43,7 @@ function ConvertTo-VellumColor {
     if ($Color -is [System.Array]) {
         $vals = @($Color)
         if ($vals.Count -ne 3) {
-            throw "ConvertTo-VellumColor: an RGB array must have exactly 3 components; got $($vals.Count)."
+            throw (New-VellumPdfErrorRecord InvalidArgument "ConvertTo-VellumColor: an RGB array must have exactly 3 components; got $($vals.Count).")
         }
         $triple = foreach ($v in $vals) {
             # Cast straight to [double] (PowerShell converts numbers and numeric
@@ -51,10 +51,10 @@ function ConvertTo-VellumColor {
             # through the current culture and misreads '0.2' as 2 where '.' is a
             # thousands separator.
             try { $d = [double]$v }
-            catch { throw "ConvertTo-VellumColor: RGB component '$v' is not a number." }
+            catch { throw (New-VellumPdfErrorRecord InvalidArgument "ConvertTo-VellumColor: RGB component '$v' is not a number.") }
             # IsFinite first: NaN fails both comparisons and would otherwise be written as 'NaN 0 0 rg'.
             if (-not [double]::IsFinite($d) -or $d -lt 0 -or $d -gt 1) {
-                throw "ConvertTo-VellumColor: RGB components must be finite numbers between 0 and 1; got $d."
+                throw (New-VellumPdfErrorRecord InvalidArgument "ConvertTo-VellumColor: RGB components must be finite numbers between 0 and 1; got $d.")
             }
             $d
         }
@@ -84,7 +84,7 @@ function ConvertTo-VellumColor {
                 [Convert]::ToInt32("$($hex[2])$($hex[2])", 16) / 255.0
             )
         }
-        throw "ConvertTo-VellumColor: '$Color' is not a valid hex colour. Use #RRGGBB or #RGB."
+        throw (New-VellumPdfErrorRecord InvalidArgument "ConvertTo-VellumColor: '$Color' is not a valid hex colour. Use #RRGGBB or #RGB.")
     }
 
     # Curated named colours (HTML basic 16 plus common aliases).
@@ -125,10 +125,10 @@ function ConvertTo-VellumColor {
             (($rgb -band 255) / 255.0))
     }
 
-    throw ("ConvertTo-VellumColor: unrecognised colour '$Color'. Use an R,G,B array of three " +
+    throw (New-VellumPdfErrorRecord InvalidArgument ("ConvertTo-VellumColor: unrecognised colour '$Color'. Use an R,G,B array of three " +
         "numbers in 0..1, a hex string like '#3366cc' or '#36c', or a known name " +
         '(black, white, red, lime, green, blue, yellow, cyan, magenta, silver, gray, ' +
         'maroon, olive, navy, teal, purple, orange, pink, brown, gold, coral, crimson, indigo, ' +
         'violet, turquoise, khaki, beige, ivory, lavender, tan, steelblue, skyblue, royalblue, ' +
-        'lightgray, darkgray, lightblue, lightgreen, darkgreen, darkblue, darkred, ... - any standard CSS name).')
+        'lightgray, darkgray, lightblue, lightgreen, darkgreen, darkblue, darkred, ... - any standard CSS name).'))
 }

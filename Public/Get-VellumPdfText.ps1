@@ -96,7 +96,7 @@ function Get-VellumPdfText {
             $plain = if ($Password) { [System.Net.NetworkCredential]::new('', $Password).Password }
         }
         catch {
-            $PSCmdlet.ThrowTerminatingError($_)
+            $PSCmdlet.ThrowTerminatingError((Resolve-VellumPdfErrorRecord -ErrorRecord $_ -CommandName 'Get-VellumPdfText'))
         }
     }
 
@@ -130,13 +130,13 @@ function Get-VellumPdfText {
                     finally { $reader.Dispose() }
                 }
                 catch {
-                    $PSCmdlet.WriteError((ConvertTo-VellumPdfFileError -ErrorRecord $_ -Target $source.Name -CommandName 'Get-VellumPdfText'))
+                    Write-VellumPdfFileError -Cmdlet $PSCmdlet -ErrorRecord (ConvertTo-VellumPdfFileError -ErrorRecord $_ -Target $source.Name -CommandName 'Get-VellumPdfText') -ErrorActionPreferenceValue $ErrorActionPreference
                 }
                 finally { $source.Data = $null }   # one file in memory at a time
             }
         }
         catch {
-            $PSCmdlet.ThrowTerminatingError($_)
+            $PSCmdlet.ThrowTerminatingError((Resolve-VellumPdfErrorRecord -ErrorRecord $_ -CommandName 'Get-VellumPdfText'))
         }
     }
 }
