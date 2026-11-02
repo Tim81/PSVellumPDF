@@ -16,7 +16,7 @@
     Test     - Restore (if lib is missing) then run Pester with code coverage (fails below target).
     Docs     - regenerate docs/ markdown reference from comment-based help (PlatyPS).
     Stage    - assemble the publishable module layout in out/PSVellumPDF
-               (manifest, psm1, Public/, Private/, lib/, LICENSE - no dev files).
+               (manifest, psm1, format data, Public/, Private/, lib/, LICENSE, README - no dev files).
     Clean    - remove ./lib, ./out, and dependencies build output.
 
 .EXAMPLE
@@ -41,7 +41,7 @@ $publishDir = Join-Path $root 'dependencies' 'bin' 'publish'
 
 # Code-coverage floor enforced by the Test task (and CI). Raise toward 100 as
 # feature cmdlets and their tests land (see issue #11).
-$script:CoverageTarget = 70
+$script:CoverageTarget = 85
 
 # Pinned tool versions: CI installs exactly these, so a freshly published (or
 # tampered) PSGallery release cannot silently enter the build.
@@ -211,10 +211,12 @@ function Invoke-Stage {
     # folder, so dev files (tests, build, dependencies, docs) must not be here.
     Copy-Item (Join-Path $root 'PSVellumPDF.psd1') $stageDir
     Copy-Item (Join-Path $root 'PSVellumPDF.psm1') $stageDir
+    Copy-Item (Join-Path $root 'PSVellumPDF.Format.ps1xml') $stageDir
     Copy-Item (Join-Path $root 'Public') $stageDir -Recurse
     Copy-Item (Join-Path $root 'Private') $stageDir -Recurse
     Copy-Item $libDir (Join-Path $stageDir 'lib') -Recurse
     Copy-Item (Join-Path $root 'LICENSE') $stageDir
+    Copy-Item (Join-Path $root 'README.md') $stageDir   # shown on the PowerShell Gallery package page
 
     $manifest = Test-ModuleManifest (Join-Path $stageDir 'PSVellumPDF.psd1') -ErrorAction Stop
     Write-Host "==> Staged $($manifest.Name) $($manifest.Version) -> $stageDir" -ForegroundColor Green

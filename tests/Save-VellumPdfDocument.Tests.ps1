@@ -1,6 +1,10 @@
 #requires -Version 7.6
 #requires -Modules @{ ModuleName = 'Pester'; ModuleVersion = '5.0' }
 
+# Tests build SecureStrings from known plaintext; suppress the rule that flags it in production code.
+[Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSAvoidUsingConvertToSecureStringWithPlainText', '')]
+param()
+
 BeforeAll {
     $manifest = Join-Path (Split-Path $PSScriptRoot -Parent) 'PSVellumPDF.psd1'
     Import-Module $manifest -Force

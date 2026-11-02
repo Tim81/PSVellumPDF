@@ -1,6 +1,10 @@
 #requires -Version 7.6
 #requires -Modules @{ ModuleName = 'Pester'; ModuleVersion = '5.0' }
 
+# Tests build SecureStrings from known plaintext; suppress the rule that flags it in production code.
+[Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSAvoidUsingConvertToSecureStringWithPlainText', '')]
+param()
+
 BeforeAll {
     $manifest = Join-Path (Split-Path $PSScriptRoot -Parent) 'PSVellumPDF.psd1'
     Import-Module $manifest -Force
@@ -21,7 +25,7 @@ AfterAll {
 
 Describe 'Test-VellumPdfConformance' {
     It 'passes a PDF/A-2b document with an embedded font and reads the claim from the file' {
-        $ctx = New-PdfADoc; $doc = $ctx.Doc; $handle = $ctx.Handle
+        $ctx = New-PdfADoc; $doc = $ctx.Doc
         $file = $doc | Save-VellumPdfDocument -Path (Join-Path $TestDrive 'ok.pdf')
         $r = $file | Test-VellumPdfConformance
         $r.Profile | Should -Be 'PdfA2b'
@@ -79,7 +83,7 @@ Describe 'Test-VellumPdfConformance' {
 
 Describe 'Module output against the preflight' {
     It 'a QR code, pie chart and drawing keep a PDF/A-2b document compliant' {
-        $ctx = New-PdfADoc; $doc = $ctx.Doc; $handle = $ctx.Handle
+        $ctx = New-PdfADoc; $doc = $ctx.Doc
         $doc | Add-VellumPdfBarcode QrCode 'https://example.com' -ModuleSize 2 -AltText 'Example' |
             Add-VellumPdfPieChart -Slice @(@{ Value = 1; Label = 'a' }, @{ Value = 2; Label = 'b' }) |
             Add-VellumPdfDrawing -Height 20 -ScriptBlock { param($canvas, $box) $canvas.Rectangle($box.X, $box.Y, 10, 10).Fill() | Out-Null } |
@@ -88,7 +92,7 @@ Describe 'Module output against the preflight' {
     }
 
     It 'PROOF: the human-readable line of a 1-D barcode (base-14 font) breaks PDF/A' {
-        $ctx = New-PdfADoc; $doc = $ctx.Doc; $handle = $ctx.Handle
+        $ctx = New-PdfADoc; $doc = $ctx.Doc
         $ean = [VellumPdf.Barcodes.EanBarcode]::new([VellumPdf.Barcodes.EanSymbology]::Ean13, '5901234123457')
         $ean.ShowText = $true
         $doc | Add-VellumPdfElement -Renderer ([VellumPdf.Barcodes.BarcodeRenderer]::new($ean)) |

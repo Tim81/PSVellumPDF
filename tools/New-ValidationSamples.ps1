@@ -10,9 +10,17 @@
                           (in-memory self-signed certificate)
       pdfa2b-jpx.pdf    - PDF/A-2b with an embedded JPEG 2000 image
       pdfa2b-jbig2.pdf  - PDF/A-2b with an embedded JBIG2 image
+      pdfa2b-charts.pdf - PDF/A-2b flow document with a pie chart, QR code,
+                          1-D barcode caption, table and list (embedded font)
+      pdfa2b-pages.pdf  - PDF/A-2b page-based document: shapes, text, gradient,
+                          image, barcode, links and nested outline
+      pdfua1.pdf        - PDF/UA-1 flow document (title, embedded font, alt text)
+      linearized.pdf    - page-based document written as "fast web view"
+      forms.pdf         - page-based document with AcroForm fields
       encrypted.pdf     - password-protected (user password: validate)
-    CI runs `qpdf --check` against all of them and veraPDF (--flavour 2b)
-    against pdfa2b.pdf, pdfa2b-signed.pdf, pdfa2b-jpx.pdf, and pdfa2b-jbig2.pdf.
+    CI runs `qpdf --check` against all of them (and --check-linearization on
+    linearized.pdf), veraPDF --flavour 2b against the PDF/A files and --flavour
+    ua1 against pdfua1.pdf.
 #>
 #requires -Version 7.6
 [CmdletBinding()]
@@ -110,6 +118,70 @@ $docJb2 |
     Add-VellumPdfParagraph -Text 'PDF/A-2b with an embedded JBIG2 image.' -FontHandle $jb2Font |
     Add-VellumPdfImage -Path $jb2 -Width 40 -AltText 'JBIG2 sample' |
     Save-VellumPdfDocument -Path (Join-Path $OutputPath 'pdfa2b-jbig2.pdf') | Out-Null
+
+# --- pdfa2b-charts.pdf: pie chart, barcodes, table and list under PDF/A ---------
+$charts = New-VellumPdfDocument -Conformance PdfA2b -Language 'en-US'
+$chartFont = Register-VellumPdfFont -Document $charts -Path $ttf
+$charts |
+    Set-VellumPdfDocumentInfo -Title 'Charts and Codes Archival Sample' -Author 'PSVellumPDF CI' |
+    Add-VellumPdfHeading -Text 'Charts and codes' -Level 1 -FontHandle $chartFont |
+    Add-VellumPdfPieChart -Legend -FontHandle $chartFont -AltText 'Share by region' -Slice @(
+        @{ Value = 45; Label = 'North' }, @{ Value = 30; Label = 'South' }, @{ Value = 25; Label = 'East' }) |
+    Add-VellumPdfBarcode -Type QrCode -Content 'https://github.com/Tim81/PSVellumPDF' -TargetWidth 80 -AltText 'Project link' |
+    Add-VellumPdfBarcode -Type Ean13 -Content '5901234123457' -Caption '5901234123457' -FontHandle $chartFont -AltText 'Product code' |
+    Add-VellumPdfTable -Header 'Name', 'Qty' -Row @(, @('Alpha', '1')) -FontHandle $chartFont |
+    Add-VellumPdfList -Item 'one', @{ Text = 'two'; Children = @('two-a') } -FontHandle $chartFont |
+    Add-VellumPdfDrawing -Height 30 -AltText 'A blue bar' -ScriptBlock {
+        param($canvas, $box)
+        [void]$canvas.SetFillColorRgb(0, 0.2, 0.7).Rectangle($box.X, $box.Y, 120, 20).Fill()
+    } |
+    Save-VellumPdfDocument -Path (Join-Path $OutputPath 'pdfa2b-charts.pdf') -Validate | Out-Null
+
+# --- pdfa2b-pages.pdf: page-based document under PDF/A --------------------------
+$pages = New-VellumPdfPageDocument -Conformance PdfA2b -Language 'en-US' | Add-VellumPdfPage -Count 2
+$pages |
+    Set-VellumPdfDocumentInfo -Title 'Page Document Archival Sample' -Author 'PSVellumPDF CI' |
+    Add-VellumPdfShape Rectangle -X 50 -Y 700 -Width 200 -Height 60 -FillColor navy -StrokeColor red -Opacity 0.6 |
+    Add-VellumPdfShape Ellipse -X 300 -Y 700 -Width 120 -Height 60 -FillColor orange |
+    Add-VellumPdfText 'Page document' -X 60 -Y 720 -FontSize 20 -Color white -Font HelveticaBold |
+    Add-VellumPdfGradient -X 50 -Y 600 -Width 250 -Height 60 -StartColor navy -EndColor white |
+    Add-VellumPdfPageImage $pngPath -X 320 -Y 600 -Width 40 |
+    Add-VellumPdfPageBarcode QrCode 'https://github.com/Tim81/PSVellumPDF' -X 50 -Y 450 -TargetWidth 90 |
+    Add-VellumPdfLink -X 50 -Y 560 -Width 120 -Height 14 -Uri 'https://github.com/Tim81/PSVellumPDF' |
+    Add-VellumPdfLink -X 200 -Y 560 -Width 80 -Height 14 -TargetPage 2 |
+    Add-VellumPdfOutlineEntry 'Overview' -TargetPage 1 |
+    Add-VellumPdfOutlineEntry 'Details' -TargetPage 2 -Level 2 |
+    Save-VellumPdfDocument -Path (Join-Path $OutputPath 'pdfa2b-pages.pdf') -Validate | Out-Null
+
+# --- pdfua1.pdf: accessible flow document --------------------------------------
+$ua = New-VellumPdfDocument -Conformance PdfUA1 -Language 'en-US'
+$uaFont = Register-VellumPdfFont -Document $ua -Path $ttf
+$ua |
+    Set-VellumPdfDocumentInfo -Title 'Accessibility Validation Sample' -Author 'PSVellumPDF CI' |
+    Add-VellumPdfHeading -Text 'Accessible report' -Level 1 -FontHandle $uaFont |
+    Add-VellumPdfParagraph -Text 'Body text in an embedded font.' -FontHandle $uaFont |
+    Add-VellumPdfList -Item 'one', 'two' -FontHandle $uaFont |
+    Add-VellumPdfTable -Header 'A', 'B' -Row @(, @('1', '2')) -FontHandle $uaFont |
+    Add-VellumPdfPieChart -Slice @(@{ Value = 1; Label = 'a' }, @{ Value = 2; Label = 'b' }) -AltText 'Two slices' |
+    Add-VellumPdfBarcode -Type QrCode -Content 'https://github.com/Tim81/PSVellumPDF' -TargetWidth 70 -AltText 'Project link' |
+    Save-VellumPdfDocument -Path (Join-Path $OutputPath 'pdfua1.pdf') -Validate | Out-Null
+
+# --- linearized.pdf / forms.pdf: page documents ---------------------------------
+New-VellumPdfPageDocument -Linearize -Language 'en-US' | Add-VellumPdfPage -Count 3 |
+    Add-VellumPdfText 'Fast web view' -X 72 -Y 700 -FontSize 18 |
+    Add-VellumPdfOutlineEntry 'First' -TargetPage 1 |
+    Save-VellumPdfDocument -Path (Join-Path $OutputPath 'linearized.pdf') | Out-Null
+
+New-VellumPdfPageDocument -Language 'en-US' | Add-VellumPdfPage |
+    Add-VellumPdfText 'Form sample' -X 72 -Y 740 -FontSize 18 |
+    Add-VellumPdfFormField Text -Name name -X 72 -Y 690 -Width 220 -Height 22 -Value 'Your name' |
+    Add-VellumPdfFormField CheckBox -Name agree -X 72 -Y 655 -Width 14 -Height 14 -Checked |
+    Add-VellumPdfFormField Choice -Name plan -X 72 -Y 620 -Width 150 -Height 22 -Option basic, pro -Selected pro |
+    Add-VellumPdfFormField Radio -Name size -Selected m -RadioOption @(
+        @{ X = 72; Y = 580; Width = 14; Height = 14; ExportValue = 's' },
+        @{ X = 110; Y = 580; Width = 14; Height = 14; ExportValue = 'm' }) |
+    Add-VellumPdfFormField PushButton -Name send -X 72 -Y 540 -Width 80 -Height 24 -Caption 'Send' |
+    Save-VellumPdfDocument -Path (Join-Path $OutputPath 'forms.pdf') | Out-Null
 
 # --- encrypted.pdf ------------------------------------------------------------
 $pw = ConvertTo-SecureString 'validate' -AsPlainText -Force

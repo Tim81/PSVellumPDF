@@ -143,7 +143,8 @@ function Add-VellumPdfPageBarcode {
     process {
         Assert-VellumPdfDocumentOpen -Document $Document -CommandName 'Add-VellumPdfPageBarcode'
         if (-not [double]::IsFinite($X) -or -not [double]::IsFinite($Y)) { throw 'Add-VellumPdfPageBarcode: -X and -Y must be finite.' }
-        $pdfPage = Get-VellumPdfPage -Document $Document -Page $Page -CommandName 'Add-VellumPdfPageBarcode'
+        # Validates -Page up front (the canvas lookup below would do so too, but after building the symbol).
+        [void](Get-VellumPdfPage -Document $Document -Page $Page -CommandName 'Add-VellumPdfPageBarcode')
         $isPdfA = $Document.Conformance -in @([VellumPdf.Document.PdfConformance]::PdfA2b, [VellumPdf.Document.PdfConformance]::PdfA2u,
             [VellumPdf.Document.PdfConformance]::PdfA2a)
 

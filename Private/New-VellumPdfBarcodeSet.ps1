@@ -9,6 +9,8 @@ function New-VellumPdfBarcodeSet {
         the page-width check, adding to a document - stay with the callers. Error
         messages start with 'Add-VellumPdfBarcode:'; callers re-prefix them.
     #>
+    [Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSUseShouldProcessForStateChangingFunctions', '',
+        Justification = 'Builds new in-memory barcode objects; performs no external/system state change.')]
     [CmdletBinding()]
     param(
         [Parameter(Mandatory)] [hashtable]$Parameters,

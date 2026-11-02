@@ -6,6 +6,116 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [2.0.0] - 2026-11-02
+
+Built on **VellumPdf 2.3.3** (was 1.5.4). A major release: the engine changed how
+a few things render and validate, and several long-standing wrapper bugs are fixed
+in ways that change output. Upgrade notes are in the README.
+
+### Breaking
+- **Heading levels**: `Add-VellumPdfHeading -Level 1` is now tagged `H1` and is a
+  top-level outline entry. The engine counts levels from zero and the module passed
+  1..6 straight through, so level 1 was tagged `H2` (and so on).
+- **`-MarginBottom`** now adds space before the next element on paragraphs, headings,
+  lists and tables. VellumPdf's bottom margin only limits the element's own box, so
+  the parameter had no visible effect. The space is carried to the next element's
+  top margin and consumed once.
+- **Lists** nested deeper than one child level are refused (`Add-VellumPdfList`).
+  The engine renders one level and silently dropped the text of deeper items; the
+  module previously accepted 64 levels.
+- **A document can be saved once.** Layout runs inside the save, a second save is
+  refused by the engine, and a save that failed can leave state that makes a retry
+  write a different file. `Save-VellumPdfDocument` now says so plainly for a second
+  save (with `-KeepOpen`) and after a failure.
+- **Encoding warnings** follow Windows-1252. The base-14 fonts now encode
+  `€ ‚ ƒ „ … † ‡ ˆ ‰ Š ‹ Œ Ž ‘ ’ “ ” • – — ˜ ™ š › œ ž Ÿ`, which no longer warn; text
+  widths changed with the new encoding, so lines can wrap differently.
+- **Encryption** (`Protect-VellumPdfDocument`): an empty `-OwnerPassword` beside a
+  user password is refused (such a file opened with full owner access and no
+  password), as is encryption with `-UseObjectStreams`. Encrypted files differ at
+  the byte level: the `/P` permission value always sets the reserved bits, and
+  `-EncryptMetadata:$false` now really leaves the XMP metadata unencrypted.
+- **Signing**: PAdES signatures no longer carry a CMS `signing-time` attribute (the
+  claimed time stays in the signature dictionary's `/M`), and only the two defined
+  sub-filters are accepted.
+- **Engine rendering changes** visible in existing documents: table margins are no
+  longer applied twice (tables with a left/top margin move), the column count comes
+  from the widest row, header/footer text wider than the page is cut at a word
+  boundary and honours its colour, and links are written with the Print flag.
+- **Installation**: the module loads `VellumPdf.Kernel/Layout/Reader/Signing/
+  Barcodes/Conformance/Fonts.Standard14` and `PSVellumPDF.Interop`. The loader
+  checks their identity (version 2.0.0.0, strong-name token `b2757187a6d18ae5`),
+  so a stale 1.x `lib/` fails at import with the fix instead of a type-load error.
+
+### Added
+- **New flow-document cmdlets**: `Add-VellumPdfPieChart` (slices or pipeline data,
+  colour-blind-safe palette, legend, alternate text), `Add-VellumPdfBarcode`
+  (QR, Micro QR, Data Matrix, Aztec, PDF417, Code 128, Code 39, EAN-13/8, UPC-A/E,
+  ITF-14; GS1; Structured Append and Macro PDF417 via `-SplitInto`),
+  `Add-VellumPdfDrawing` (a script block receives the VellumPdf canvas) and
+  `Add-VellumPdfElement` (any `IRenderer`).
+- **Page-based documents**: `New-VellumPdfPageDocument`, `Add-VellumPdfPage`,
+  `Add-VellumPdfShape`, `Add-VellumPdfText`, `Add-VellumPdfGradient`,
+  `Add-VellumPdfPageImage`, `Add-VellumPdfPageBarcode`, `Invoke-VellumPdfCanvas`,
+  `Add-VellumPdfFormField`, `Add-VellumPdfLink`, `Add-VellumPdfOutlineEntry`.
+  Includes AcroForm fields, links to other pages, collapsible bookmarks, page
+  rotation, linearized ("fast web view") output and byte-for-byte reproducible
+  files (`-DocumentId`, `-Timestamp`). `Set-VellumPdfDocumentInfo`,
+  `Set-VellumPdfOutputIntent`, `Register-VellumPdfFont`, `Protect-VellumPdfDocument`,
+  `Set-VellumPdfSignature` and `Save-VellumPdfDocument` work on both kinds.
+- **Conformance**: `Test-VellumPdfConformance` validates any PDF against PDF/A-2b/2u/2a
+  or PDF/UA-1 in-process, and `Save-VellumPdfDocument -Validate` refuses to write a
+  non-compliant file. New-VellumPdfDocument gains `-Conformance PdfUA1`.
+- **Signing**: `Set-VellumPdfSignature -Level B-B|B-T|B-LT|B-LTA`, `-TimestampClient`,
+  `-RevocationClient`/`-RevocationTimeout`, `-SignaturePage`, `-SubFilter`,
+  `-EstimatedSignatureSize`, `-ExternalPrivateKey` and `-ExternalSigner` (cloud
+  KMS / HSM).
+- **Experimental readers** (VellumPdf.Reader is a preview package): `Get-VellumPdfInfo`,
+  `Get-VellumPdfText`, `Export-VellumPdfImage`, `Unprotect-VellumPdfDocument`.
+- **Embedded fonts everywhere**: `-FontHandle` on `Add-VellumPdfTable`,
+  `Add-VellumPdfList`, `Set-VellumPdfHeader`/`Footer`, so tables, lists and bands
+  can be Unicode and PDF/A. Table cells also take `FontHandle`, `Leading`,
+  `Padding` and `Language`; `-Header` accepts rich cells; `-CellPadding`.
+- **Text options**: `Add-VellumPdfHeading -Color -Leading -Language`,
+  `Add-VellumPdfParagraph -Language`, `Add-VellumPdfList -Color -Leading -Language`
+  and per-item style keys, `Set-VellumPdfHeader`/`Footer -Color -Height`.
+- **Document**: custom page sizes (`-PageWidthMm`/`-PageHeightMm`, up to 5080 mm).
+- **Save**: `Save-VellumPdfDocument -Stream`, `-AsByteArray`, `-PassThru`, `-Force`,
+  `-Validate`. After a save the engine's own diagnostics are reported (characters
+  replaced by `?`, truncated header/footer text) and attached to the returned file
+  as `TextEncodingWarnings` and `BandTruncations`.
+- **Images**: `Add-VellumPdfImage -Format Ccitt` (raw fax data with `-Columns`/`-Rows`
+  and options), `-ReduceToEightBit`, `-DecodeToRaster`, `-MarginLeft`/`-MarginRight`.
+- About 35 more CSS colour names; `-ColumnWidth 0` means auto.
+- `PSVellumPDF.Interop`: a small C# shim for what PowerShell cannot call directly
+  (span-taking canvas operators) and the renderer behind `Add-VellumPdfDrawing`.
+  Display formats for preflight results and PDF info.
+- Examples 05-08, new validation samples (charts, page documents, PDF/UA,
+  linearized, forms), veraPDF PDF/UA-1 and qpdf linearization checks in CI, and an
+  engine-surface test that fails by name when a VellumPdf upgrade removes anything
+  the module uses. `tools/Get-VellumPdfApiSurface.py` diffs two engine releases.
+
+### Fixed
+- Table without `-Header`: the column-count check no longer counts a phantom header.
+
+### Security
+- VellumPdf 2.2 fixed `OwnerPassword = ""` with a user password producing a file that
+  opens without any password; the module now refuses the combination up front and
+  you should re-encrypt such files made with 1.x.
+- NuGet reports advisories for `System.Security.Cryptography.Pkcs` 10.0.12, which
+  VellumPdf.Signing 2.3.3 requires. The module does not ship that assembly (it uses
+  the one in PowerShell), but be aware when restoring the dependency project.
+
+### Notes
+- VellumPdf.Layout draws no labels on pie charts and does not tag hyperlinks:
+  `-Legend` adds a table, and a PDF/UA document containing `-LinkUri` is not fully
+  conformant (the module warns once).
+- PDF/UA-1 and PDF/A-2a require a tagged structure that page documents do not
+  write; use flow documents for those levels.
+- The in-process preflight does not look at fonts used only by form fields.
+- `docs/PSVellumPDF/` is generated by `./build.ps1 Docs` (PlatyPS, from the
+  PowerShell Gallery) and should be regenerated before publishing.
+
 ## [1.3.1] - 2026-06-14
 
 Hardening of the 1.3.0 features. No new parameters.
