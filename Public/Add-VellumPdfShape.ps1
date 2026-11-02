@@ -194,26 +194,14 @@ function Add-VellumPdfShape {
         $canvas = Get-VellumPdfPageCanvas -Document $Document -Page $Page -CommandName 'Add-VellumPdfShape'
         $iccName = $null
         if ($hasIcc) {
-            $iccPath = $ExecutionContext.SessionState.Path.GetUnresolvedProviderPathFromPSPath($IccProfilePath)
-            if (-not [System.IO.File]::Exists($iccPath)) { throw "Add-VellumPdfShape: ICC profile not found: '$iccPath'." }
-            $iccBytes = [System.IO.File]::ReadAllBytes($iccPath)
-            $iccCount = Get-VellumPdfIccComponentCount -Profile $iccBytes -CommandName 'Add-VellumPdfShape'
+            $icc = Register-VellumPdfIccSpace -Document $Document -Page $Page -IccProfilePath $IccProfilePath -CommandName 'Add-VellumPdfShape'
+            $iccCount = $icc.Count
+            $iccName = $icc.Name
             foreach ($pair in @(@('FillIcc', $FillIcc), @('StrokeIcc', $StrokeIcc))) {
                 if ($bound.ContainsKey($pair[0]) -and @($pair[1]).Count -ne $iccCount) {
                     throw "Add-VellumPdfShape: -$($pair[0]) needs $iccCount value(s) for this profile; got $(@($pair[1]).Count)."
                 }
             }
-            # Embed the profile once per page; later shapes reuse the colour space.
-            $cacheProp = $Document.PSObject.Properties['PSVellumIccSpaces']
-            if (-not $cacheProp) {
-                $Document.PSObject.Properties.Add([psnoteproperty]::new('PSVellumIccSpaces', @{}))
-                $cacheProp = $Document.PSObject.Properties['PSVellumIccSpaces']
-            }
-            $cacheKey = "$Page|$iccPath"
-            if (-not $cacheProp.Value.ContainsKey($cacheKey)) {
-                $cacheProp.Value[$cacheKey] = $Document.RegisterIccBasedColorSpace($Document.Pages[$Page - 1], $iccBytes, $iccCount, "VICC$($cacheProp.Value.Count + 1)")
-            }
-            $iccName = $cacheProp.Value[$cacheKey]
         }
         $hasFill = $bound.ContainsKey('FillColor') -or $bound.ContainsKey('FillCmyk') -or $bound.ContainsKey('FillIcc')
         # Any stroke option asks for an outline (black unless a colour is given), even beside a fill.
