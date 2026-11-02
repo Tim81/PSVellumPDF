@@ -173,7 +173,17 @@ function Save-VellumPdfDocument {
                 $render = {
                     param([System.IO.Stream]$Target)
                     try {
-                        if ($signature) {
+                        if ($signature -and $signature.Value.ExternalSigner) {
+                            # An external signer only supports the asynchronous path. Layout then runs on
+                            # a thread-pool thread, which cannot execute Add-VellumPdfDrawing script blocks.
+                            if ($Document.PSObject.Properties['PSVellumHasDrawing']) {
+                                throw ('an external signer signs asynchronously, which cannot run the script blocks of ' +
+                                    'Add-VellumPdfDrawing elements in this document')
+                            }
+                            [VellumPdf.Signing.SigningExtensions]::SignAsync(
+                                $Document, $Target, $signature.Value, [System.Threading.CancellationToken]::None).GetAwaiter().GetResult()
+                        }
+                        elseif ($signature) {
                             [VellumPdf.Signing.SigningExtensions]::Sign($Document, $Target, $signature.Value)
                         }
                         else {
@@ -192,6 +202,13 @@ function Save-VellumPdfDocument {
                             if ($signature.Value.TimestampClient) {
                                 $hint = 'Check that the signing certificate is valid and holds its private key, ' +
                                     'and that the timestamp authority (-TimestampUrl) is reachable.'
+                            }
+                            if ($signature.Value.Level -ge [VellumPdf.Signing.PadesLevel]::B_LT) {
+                                $hint += ' B-LT/B-LTA also need the OCSP/CRL servers named in the certificate chain to be reachable;' +
+                                    ' if the signature does not fit, raise -EstimatedSignatureSize.'
+                            }
+                            if ($signature.Value.SignaturePage -gt 0) {
+                                $hint += " -SignaturePage $($signature.Value.SignaturePage + 1) must not exceed the document's page count."
                             }
                             throw "Save-VellumPdfDocument: failed to sign '$resolved': $reason $hint"
                         }

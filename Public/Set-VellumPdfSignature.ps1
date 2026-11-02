@@ -23,17 +23,31 @@ function Set-VellumPdfSignature {
         Calling Set-VellumPdfSignature again before saving replaces the staged
         signature settings, consistent with Set-* semantics.
 
+        LEVELS: -Level selects the PAdES baseline level. B-B (default without a
+        timestamp) and B-T (default with one) are described above. B-LT also embeds
+        the certificate chain and the OCSP/CRL evidence for it in a /DSS dictionary
+        so the signature stays verifiable after the certificates expire; B-LTA adds
+        a final document timestamp so the evidence itself is protected. B-LT/B-LTA
+        need a timestamp and fetch revocation data over the network at save time
+        (from the OCSP/CRL addresses in the certificate chain), unless you pass
+        your own -RevocationClient. They reserve 32 KB for the signature; raise
+        -EstimatedSignatureSize if a long chain does not fit.
+
         CERTIFICATE: any [X509Certificate2] with a private key works - from
         Get-PfxCertificate, the cert: drive (Cert:\CurrentUser\My\<thumbprint>),
-        or X509CertificateLoader/X509Certificate2 .NET APIs. Long-term validation
-        (LTV: embedded OCSP/CRL) is not yet provided by the library and is out of
-        scope here.
+        or X509CertificateLoader/X509Certificate2 .NET APIs. When the key lives
+        elsewhere, pass the public certificate and either -ExternalPrivateKey (a
+        key object you can use in-process, such as a CNG or PKCS#11 key) or
+        -ExternalSigner (a remote service such as a cloud KMS or HSM). An external
+        signer is asynchronous: implement IExternalSigner in a compiled type
+        (Add-Type) and do not combine it with Add-VellumPdfDrawing.
     .PARAMETER Document
         The live VellumPdf document flowing through the pipeline. The same
         instance is returned after the signature settings are staged, enabling
         chaining.
     .PARAMETER Certificate
-        The signing certificate. Must include a private key (HasPrivateKey).
+        The signing certificate. Must include a private key (HasPrivateKey) unless
+        -ExternalPrivateKey or -ExternalSigner is given.
         Typical sources: Get-PfxCertificate -FilePath ./signer.pfx, or
         Get-Item Cert:\CurrentUser\My\<thumbprint>.
     .PARAMETER Reason
@@ -65,6 +79,37 @@ function Set-VellumPdfSignature {
         token. Defaults to $true, which is what most verifiers need to validate
         the timestamp offline. Set to $false only for a TSA that rejects the
         request. Only meaningful with -TimestampUrl.
+    .PARAMETER Level
+        PAdES level: B-B, B-T, B-LT or B-LTA (see above). Default: B-T when a
+        timestamp is configured, otherwise B-B. B-T and above require -TimestampUrl
+        or -TimestampClient.
+    .PARAMETER TimestampClient
+        A custom RFC 3161 client (VellumPdf.Signing.ITimestampClient) instead of
+        -TimestampUrl, for example one that talks to an internal TSA or a test double.
+    .PARAMETER RevocationClient
+        A custom OCSP/CRL source (VellumPdf.Signing.IRevocationClient) for B-LT/B-LTA.
+        Default: the built-in HttpRevocationClient.
+    .PARAMETER RevocationTimeout
+        Timeout of the built-in revocation client. B-LT/B-LTA only.
+    .PARAMETER SignaturePage
+        The 1-based page that carries the invisible signature widget. Default 1. A
+        page past the end of the document makes the save fail.
+    .PARAMETER SubFilter
+        Pades (default) writes ETSI.CAdES.detached, the PAdES profile. Pkcs7 writes
+        the legacy adbe.pkcs7.detached, which makes no ETSI claim and keeps a CMS
+        signing-time attribute that PAdES omits.
+    .PARAMETER EstimatedSignatureSize
+        Bytes reserved for the signature (1024..4194304). Default 8192, or 32768
+        for B-LT/B-LTA.
+    .PARAMETER ExternalPrivateKey
+        A private key object (AsymmetricAlgorithm) that signs in-process while
+        -Certificate carries only the public part.
+    .PARAMETER ExternalSigner
+        A VellumPdf.Signing.IExternalSigner that signs the digest remotely
+        (cloud KMS, HSM). Runs asynchronously.
+    .EXAMPLE
+        # Long-term validation with a timestamp
+        $doc | Set-VellumPdfSignature -Certificate $cert -TimestampUrl https://tsa.example.com -Level B-LT
     .EXAMPLE
         $cert = Get-PfxCertificate -FilePath ./signer.pfx
         New-VellumPdfDocument |
@@ -116,7 +161,41 @@ function Set-VellumPdfSignature {
 
         [System.Nullable[timespan]]$TimestampTimeout,
 
-        [bool]$TimestampRequestCertificate = $true
+        [bool]$TimestampRequestCertificate = $true,
+
+        # PAdES level. Default: B-T when a timestamp is configured, otherwise B-B.
+        [ValidateSet('B-B', 'B-T', 'B-LT', 'B-LTA')]
+        [string]$Level,
+
+        # A custom RFC 3161 client (VellumPdf.Signing.ITimestampClient), instead of -TimestampUrl.
+        [VellumPdf.Signing.ITimestampClient]$TimestampClient,
+
+        # A custom OCSP/CRL source (VellumPdf.Signing.IRevocationClient) for B-LT/B-LTA.
+        # Default: HttpRevocationClient.
+        [VellumPdf.Signing.IRevocationClient]$RevocationClient,
+
+        [System.Nullable[timespan]]$RevocationTimeout,
+
+        # 1-based page that carries the (invisible) signature widget. Default 1.
+        [ValidateRange(1, 100000)]
+        [int]$SignaturePage,
+
+        # Pades = ETSI.CAdES.detached (default); Pkcs7 = adbe.pkcs7.detached (legacy, no ETSI profile).
+        [ValidateSet('Pades', 'Pkcs7')]
+        [string]$SubFilter,
+
+        # Size in bytes of the space reserved for the signature (engine default 8192;
+        # raised automatically to 32768 for B-LT/B-LTA, which embed chains and revocation data).
+        [ValidateRange(1024, 4194304)]
+        [int]$EstimatedSignatureSize,
+
+        # Sign with a key that is not in the certificate object (HSM, PKCS#11, CNG key),
+        # in-process. -Certificate then only needs its public part.
+        [System.Security.Cryptography.AsymmetricAlgorithm]$ExternalPrivateKey,
+
+        # Sign through a remote service (VellumPdf.Signing.IExternalSigner), e.g. a cloud KMS.
+        # Its SignAsync runs off the pipeline thread, so it must be a compiled type.
+        [VellumPdf.Signing.IExternalSigner]$ExternalSigner
     )
 
     process {
@@ -129,10 +208,18 @@ function Set-VellumPdfSignature {
                 'Remove the Protect-VellumPdfDocument call to sign this document.')
         }
 
-        if (-not $Certificate.HasPrivateKey) {
+        if ($ExternalPrivateKey -and $ExternalSigner) {
+            throw 'Set-VellumPdfSignature: -ExternalPrivateKey and -ExternalSigner cannot be combined; choose one.'
+        }
+        if ($ExternalSigner -and $Document.PSObject.Properties['PSVellumHasDrawing']) {
+            throw ('Set-VellumPdfSignature: -ExternalSigner signs asynchronously on other threads, which cannot run the ' +
+                'script blocks of Add-VellumPdfDrawing elements already in this document. Use -ExternalPrivateKey, or a certificate with its key.')
+        }
+        if (-not $Certificate.HasPrivateKey -and -not $ExternalPrivateKey -and -not $ExternalSigner) {
             throw ('Set-VellumPdfSignature: the certificate does not include a private key. ' +
                 'Signing requires the private key; load the certificate from a PFX ' +
-                '(Get-PfxCertificate) or a store entry that has the key.')
+                '(Get-PfxCertificate) or a store entry that has the key, or pass ' +
+                '-ExternalPrivateKey / -ExternalSigner for a key held elsewhere.')
         }
 
         $settings = [VellumPdf.Signing.PdfSignatureSettings]::new()
@@ -142,10 +229,56 @@ function Set-VellumPdfSignature {
         if ($PSBoundParameters.ContainsKey('ContactInfo')) { $settings.ContactInfo = $ContactInfo }
         if ($PSBoundParameters.ContainsKey('SignerName'))  { $settings.SignerName  = $SignerName }
         if ($PSBoundParameters.ContainsKey('SigningTime')) { $settings.SigningTime = $SigningTime }
+        if ($ExternalPrivateKey) { $settings.ExternalPrivateKey = $ExternalPrivateKey }
+        if ($ExternalSigner)     { $settings.ExternalSigner = $ExternalSigner }
+        if ($PSBoundParameters.ContainsKey('SignaturePage')) { $settings.SignaturePage = $SignaturePage - 1 }
+        if ($PSBoundParameters.ContainsKey('SubFilter')) {
+            $settings.SubFilter = if ($SubFilter -eq 'Pkcs7') {
+                [VellumPdf.Signing.PdfSignatureSettings]::SubFilterAdbePkcs7Detached
+            } else {
+                [VellumPdf.Signing.PdfSignatureSettings]::SubFilterEtsiCAdESDetached
+            }
+        }
 
         # Validate the timestamp parameters BEFORE mutating any document state
         # below, so a bad -TimestampUrl on a re-stage leaves the previously
         # staged signature (and its HttpClient) intact.
+        if ($TimestampClient -and $PSBoundParameters.ContainsKey('TimestampUrl')) {
+            throw 'Set-VellumPdfSignature: -TimestampUrl and -TimestampClient cannot be combined; choose one.'
+        }
+        $hasTimestamp = $TimestampClient -or $PSBoundParameters.ContainsKey('TimestampUrl')
+        $levelName = if ($Level) { $Level } elseif ($hasTimestamp) { 'B-T' } else { 'B-B' }
+        if ($levelName -ne 'B-B' -and -not $hasTimestamp) {
+            throw "Set-VellumPdfSignature: -Level $levelName needs a signature timestamp; add -TimestampUrl (or -TimestampClient)."
+        }
+        if ($Level -eq 'B-B' -and $hasTimestamp) {
+            throw 'Set-VellumPdfSignature: -Level B-B carries no timestamp; drop -TimestampUrl/-TimestampClient or use -Level B-T.'
+        }
+        if ($RevocationClient -or $PSBoundParameters.ContainsKey('RevocationTimeout')) {
+            if ($levelName -notin 'B-LT', 'B-LTA') {
+                throw 'Set-VellumPdfSignature: -RevocationClient/-RevocationTimeout apply to -Level B-LT or B-LTA only.'
+            }
+        }
+        if ($RevocationClient -and $PSBoundParameters.ContainsKey('RevocationTimeout')) {
+            throw 'Set-VellumPdfSignature: -RevocationTimeout configures the default client; it cannot be combined with -RevocationClient.'
+        }
+        $settings.Level = [VellumPdf.Signing.PadesLevel]::($levelName -replace '-', '_')
+        if ($PSBoundParameters.ContainsKey('EstimatedSignatureSize')) {
+            $settings.EstimatedSignatureSizeBytes = $EstimatedSignatureSize
+        }
+        elseif ($levelName -in 'B-LT', 'B-LTA') {
+            # Long-term levels embed the chain and revocation evidence in the signature.
+            $settings.EstimatedSignatureSizeBytes = 32768
+        }
+        if ($levelName -in 'B-LT', 'B-LTA') {
+            $settings.RevocationClient = if ($RevocationClient) { $RevocationClient }
+                elseif ($PSBoundParameters.ContainsKey('RevocationTimeout')) {
+                    [VellumPdf.Signing.HttpRevocationClient]::new($null, $RevocationTimeout)
+                }
+                else { [VellumPdf.Signing.HttpRevocationClient]::new() }
+        }
+        if ($TimestampClient) { $settings.TimestampClient = $TimestampClient }
+
         if ($PSBoundParameters.ContainsKey('TimestampUrl')) {
             if (-not $TimestampUrl.IsAbsoluteUri -or $TimestampUrl.Scheme -notin @('http', 'https')) {
                 throw ("Set-VellumPdfSignature: -TimestampUrl must be an absolute http or https URL; " +

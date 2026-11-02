@@ -81,6 +81,11 @@ function Add-VellumPdfDrawing {
         if ($Decorative -and $AltText) {
             throw 'Add-VellumPdfDrawing: -AltText and -Decorative cannot be combined.'
         }
+        $staged = $Document.PSObject.Properties['PSVellumSignature']
+        if ($staged -and $staged.Value.ExternalSigner) {
+            throw ('Add-VellumPdfDrawing: this document is staged for signing with an -ExternalSigner, which signs ' +
+                'asynchronously and cannot run drawing script blocks. Sign with the certificate or an -ExternalPrivateKey instead.')
+        }
 
         # Space deferred by the previous element's -MarginBottom goes above this block.
         $top = if ($PSBoundParameters.ContainsKey('MarginTop')) { $MarginTop } else { 0.0 }
