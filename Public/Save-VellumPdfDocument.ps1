@@ -41,6 +41,12 @@ function Save-VellumPdfDocument {
         File system path for the output PDF file. The parent directory must
         already exist; an existing file at this path is overwritten. Mandatory
         and positional (position 0).
+    .PARAMETER Stream
+        Write the PDF to this writable stream instead of a file (for example a
+        response or blob stream). The PDF is rendered in memory first, so a failure
+        never leaves a partial PDF in the stream. Nothing is returned.
+    .PARAMETER AsByteArray
+        Return the PDF as a byte[] instead of writing a file.
     .PARAMETER KeepOpen
         When specified, the document is not disposed after saving. The caller is
         responsible for calling $doc.Dispose() when finished. Useful when the
@@ -61,22 +67,34 @@ function Save-VellumPdfDocument {
         (CodePoint, Character) and BandTruncations (Band, PageNumber,
         DrawnCharacters, ResolvedCharacters, DroppedCharacters) properties.
     #>
-    [CmdletBinding(SupportsShouldProcess)]
-    [OutputType([System.IO.FileInfo])]
+    [CmdletBinding(SupportsShouldProcess, DefaultParameterSetName = 'Path')]
+    [OutputType([System.IO.FileInfo], ParameterSetName = 'Path')]
+    [OutputType([byte[]], ParameterSetName = 'Bytes')]
     param(
         [Parameter(Mandatory, ValueFromPipeline)]
         [VellumPdf.Layout.Document]$Document,
 
-        [Parameter(Mandatory, Position = 0)]
+        [Parameter(Mandatory, Position = 0, ParameterSetName = 'Path')]
         [string]$Path,
+
+        # Write the PDF to this writable stream instead of a file.
+        [Parameter(Mandatory, ParameterSetName = 'Stream')]
+        [System.IO.Stream]$Stream,
+
+        # Return the PDF as a byte array instead of writing a file.
+        [Parameter(Mandatory, ParameterSetName = 'Bytes')]
+        [switch]$AsByteArray,
 
         # Keep the document open after saving (caller must Dispose it).
         [switch]$KeepOpen,
 
         # Return the live document instead of the file. Implies -KeepOpen.
+        [Parameter(ParameterSetName = 'Path')]
+        [Parameter(ParameterSetName = 'Stream')]
         [switch]$PassThru,
 
         # Create the parent directory when it does not exist.
+        [Parameter(ParameterSetName = 'Path')]
         [switch]$Force
     )
 
@@ -95,7 +113,19 @@ function Save-VellumPdfDocument {
                 'document can be written only once; build a new document with New-VellumPdfDocument.')
         }
 
-        $resolved = $ExecutionContext.SessionState.Path.GetUnresolvedProviderPathFromPSPath($Path)
+        $toMemory = $PSCmdlet.ParameterSetName -ne 'Path'
+        $resolved = if ($toMemory) {
+            if ($PSCmdlet.ParameterSetName -eq 'Stream') {
+                if (-not $Stream.CanWrite) {
+                    throw 'Save-VellumPdfDocument: -Stream must be a writable stream.'
+                }
+                '<stream>'
+            }
+            else { '<bytes>' }
+        }
+        else {
+            $ExecutionContext.SessionState.Path.GetUnresolvedProviderPathFromPSPath($Path)
+        }
 
         # A signature staged by Set-VellumPdfSignature makes signing the write
         # step: VellumPdf signs at serialization time, so Sign() replaces Save().
@@ -111,33 +141,16 @@ function Save-VellumPdfDocument {
             if ($PSCmdlet.ShouldProcess($resolved, $action)) {
                 $attempted = $true
 
-                $parent = [System.IO.Path]::GetDirectoryName($resolved)
-                if ($parent -and $Force -and -not [System.IO.Directory]::Exists($parent)) {
-                    [void][System.IO.Directory]::CreateDirectory($parent)
-                }
-                if ($parent -and -not [System.IO.Directory]::Exists($parent)) {
-                    throw "Save-VellumPdfDocument: directory not found: '$parent'. Create it first or pass a path in an existing directory."
-                }
-
-                # Render/sign to a temporary file beside the target, then move
-                # it into place only once it is complete. File.Create and
-                # Document.Save both open the destination for writing before any
-                # content exists, so writing straight to -Path would truncate an
-                # existing good file the moment a render/sign failure occurred.
-                $temp = "$resolved.$([guid]::NewGuid().ToString('N')).tmp"
-                try {
+                # Renders (or signs) the document into an open stream, mapping engine
+                # failures to messages with context for this operation.
+                $render = {
+                    param([System.IO.Stream]$Target)
                     try {
                         if ($signature) {
-                            $stream = [System.IO.File]::Create($temp)
-                            try {
-                                [VellumPdf.Signing.SigningExtensions]::Sign($Document, $stream, $signature.Value)
-                            }
-                            finally {
-                                $stream.Dispose()
-                            }
+                            [VellumPdf.Signing.SigningExtensions]::Sign($Document, $Target, $signature.Value)
                         }
                         else {
-                            $Document.Save($temp)
+                            $Document.Save($Target)
                         }
                     }
                     catch {
@@ -158,22 +171,60 @@ function Save-VellumPdfDocument {
                         throw ("Save-VellumPdfDocument: failed to render '$resolved': $reason " +
                             'Check for extreme margin values or elements taller than the page.')
                     }
-
-                    # The rendered file is known good; replace the target now.
-                    try {
-                        [System.IO.File]::Move($temp, $resolved, $true)
-                    }
-                    catch {
-                        $reason = $_.Exception.Message
-                        throw ("Save-VellumPdfDocument: rendered the PDF but could not write it to '$resolved': $reason " +
-                            'Check that -Path is a writable file location (not a directory) and is not locked by another process.')
-                    }
                 }
-                finally {
-                    # Clean up the temp file if a failure left it behind; on
-                    # success it has already been moved onto the target.
-                    if (Test-Path -LiteralPath $temp) {
-                        Remove-Item -LiteralPath $temp -Force -ErrorAction SilentlyContinue
+
+                $bytesResult = $null
+                if ($toMemory) {
+                    # Render into memory first so a failure never leaves a partial
+                    # PDF in the caller's stream.
+                    $memory = [System.IO.MemoryStream]::new()
+                    try {
+                        & $render $memory
+                        if ($PSCmdlet.ParameterSetName -eq 'Stream') {
+                            try { $memory.WriteTo($Stream); $Stream.Flush() }
+                            catch {
+                                throw "Save-VellumPdfDocument: rendered the PDF but could not write it to -Stream: $($_.Exception.Message)"
+                            }
+                        }
+                        else { $bytesResult = $memory.ToArray() }
+                    }
+                    finally { $memory.Dispose() }
+                }
+                else {
+                    $parent = [System.IO.Path]::GetDirectoryName($resolved)
+                    if ($parent -and $Force -and -not [System.IO.Directory]::Exists($parent)) {
+                        [void][System.IO.Directory]::CreateDirectory($parent)
+                    }
+                    if ($parent -and -not [System.IO.Directory]::Exists($parent)) {
+                        throw "Save-VellumPdfDocument: directory not found: '$parent'. Create it first or pass a path in an existing directory."
+                    }
+
+                    # Render/sign to a temporary file beside the target, then move
+                    # it into place only once it is complete. Writing straight to
+                    # -Path would truncate an existing good file the moment a
+                    # render/sign failure occurred.
+                    $temp = "$resolved.$([guid]::NewGuid().ToString('N')).tmp"
+                    try {
+                        $fileStream = [System.IO.File]::Create($temp)
+                        try { & $render $fileStream }
+                        finally { $fileStream.Dispose() }
+
+                        # The rendered file is known good; replace the target now.
+                        try {
+                            [System.IO.File]::Move($temp, $resolved, $true)
+                        }
+                        catch {
+                            $reason = $_.Exception.Message
+                            throw ("Save-VellumPdfDocument: rendered the PDF but could not write it to '$resolved': $reason " +
+                                'Check that -Path is a writable file location (not a directory) and is not locked by another process.')
+                        }
+                    }
+                    finally {
+                        # Clean up the temp file if a failure left it behind; on
+                        # success it has already been moved onto the target.
+                        if (Test-Path -LiteralPath $temp) {
+                            Remove-Item -LiteralPath $temp -Force -ErrorAction SilentlyContinue
+                        }
                     }
                 }
 
@@ -181,6 +232,12 @@ function Save-VellumPdfDocument {
                 $diagnostics = Write-VellumPdfSaveDiagnostic -Document $Document
                 if ($PassThru) {
                     $Document
+                }
+                elseif ($PSCmdlet.ParameterSetName -eq 'Bytes') {
+                    , $bytesResult
+                }
+                elseif ($PSCmdlet.ParameterSetName -eq 'Stream') {
+                    # Nothing to return: the PDF is in the caller's stream. Diagnostics were warned above.
                 }
                 else {
                     $file = Get-Item -LiteralPath $resolved

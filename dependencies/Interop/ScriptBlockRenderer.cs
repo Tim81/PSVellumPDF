@@ -25,13 +25,22 @@ public sealed class ScriptBlockRenderer : IRenderer
     private readonly ScriptBlock _script;
     private readonly string? _altText;
     private readonly bool _decorative;
+    private readonly double _marginTop;
+    private readonly double _marginBottom;
     private LayoutBox _occupied;
 
-    public ScriptBlockRenderer(double height, ScriptBlock script, string? altText = null, bool decorative = false)
+    public ScriptBlockRenderer(double height, ScriptBlock script, string? altText = null, bool decorative = false,
+        double marginTop = 0, double marginBottom = 0)
     {
         if (!double.IsFinite(height) || height <= 0)
             throw new ArgumentOutOfRangeException(nameof(height), height, "Height must be a positive, finite number of points.");
+        if (!double.IsFinite(marginTop) || marginTop < 0)
+            throw new ArgumentOutOfRangeException(nameof(marginTop), marginTop, "Margins must be finite and not negative.");
+        if (!double.IsFinite(marginBottom) || marginBottom < 0)
+            throw new ArgumentOutOfRangeException(nameof(marginBottom), marginBottom, "Margins must be finite and not negative.");
         ArgumentNullException.ThrowIfNull(script);
+        _marginTop = marginTop;
+        _marginBottom = marginBottom;
         _height = height;
         _script = script;
         _altText = altText;
@@ -40,8 +49,9 @@ public sealed class ScriptBlockRenderer : IRenderer
 
     public LayoutResult Layout(LayoutContext ctx)
     {
-        if (_height > ctx.Area.Height) return LayoutResult.Nothing();
-        _occupied = ctx.Area.WithHeight(_height);
+        var total = _marginTop + _height + _marginBottom;
+        if (total > ctx.Area.Height) return LayoutResult.Nothing();
+        _occupied = ctx.Area.WithHeight(total);
         return LayoutResult.Full(_occupied);
     }
 
@@ -52,7 +62,8 @@ public sealed class ScriptBlockRenderer : IRenderer
                 "A drawing script block can only run during a synchronous save on the PowerShell pipeline thread. " +
                 "Do not use SaveAsync/SignAsync (or an external async signer) with Add-VellumPdfDrawing.");
 
-        var (x, y, w, h) = ctx.ToPdfRect(_occupied);
+        // Margins are reserved space; the script draws inside what is left.
+        var (x, y, w, h) = ctx.ToPdfRect(_occupied.Deflate(new EdgeInsets(_marginTop, 0, _marginBottom, 0)));
         var canvas = ctx.Canvas;
 
         var mcid = -1;

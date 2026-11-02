@@ -295,3 +295,14 @@ Describe 'Add-VellumPdfTable embedded fonts, padding and rich headers' {
         finally { $doc.Dispose() }
     }
 }
+
+Describe 'Add-VellumPdfTable without a header' {
+    It 'derives the column count from the first row, not from a phantom header cell' {
+        $doc = New-VellumPdfDocument
+        try {
+            $doc | Add-VellumPdfTable -Row @(, @('a', 'b', 'c')) -ColumnWidth 10, 0, 60 -WarningVariable wv | Out-Null
+            @($wv).Count | Should -Be 0
+        }
+        finally { $doc.Dispose() }
+    }
+}

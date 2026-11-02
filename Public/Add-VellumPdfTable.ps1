@@ -245,7 +245,7 @@ function Add-VellumPdfTable {
             }
         }
 
-        $headerSpecs = @(foreach ($h in @($headerLabels)) { & $toSpec $h })
+        $headerSpecs = if ($null -ne $headerLabels) { @(foreach ($h in @($headerLabels)) { & $toSpec $h }) } else { @() }
 
         # Encoding warning over every header and data cell's text, skipping cells
         # that render in an embedded font (the table's, or the cell's own).

@@ -91,3 +91,49 @@ Describe 'Save-VellumPdfDocument -PassThru and -Force' {
         Test-Path $path | Should -BeTrue
     }
 }
+
+Describe 'Save-VellumPdfDocument in-memory output' {
+    It '-AsByteArray returns the PDF bytes as one byte[]' {
+        $bytes = New-VellumPdfDocument | Add-VellumPdfParagraph -Text 'mem' | Save-VellumPdfDocument -AsByteArray
+        $bytes.GetType().FullName | Should -Be 'System.Byte[]'
+        [System.Text.Encoding]::ASCII.GetString($bytes[0..4]) | Should -Be '%PDF-'
+        [System.Text.Encoding]::ASCII.GetString($bytes[-6..-1]) | Should -Match '%%EOF'
+    }
+
+    It '-Stream writes the PDF to a stream, which stays open' {
+        $ms = [System.IO.MemoryStream]::new()
+        try {
+            $result = New-VellumPdfDocument | Add-VellumPdfParagraph -Text 'mem' | Save-VellumPdfDocument -Stream $ms
+            $result | Should -BeNullOrEmpty
+            $ms.CanWrite | Should -BeTrue
+            $ms.Length | Should -BeGreaterThan 300
+            [System.Text.Encoding]::ASCII.GetString($ms.ToArray()[0..4]) | Should -Be '%PDF-'
+        }
+        finally { $ms.Dispose() }
+    }
+
+    It 'rejects a read-only stream' {
+        $ro = [System.IO.MemoryStream]::new([byte[]]@(1), $false)
+        $doc = New-VellumPdfDocument | Add-VellumPdfParagraph -Text 'x'
+        try { { $doc | Save-VellumPdfDocument -Stream $ro -KeepOpen } | Should -Throw '*writable stream*' }
+        finally { $doc.Dispose(); $ro.Dispose() }
+    }
+
+    It 'reports the same diagnostics as a file save' {
+        $cjk = -join ([int[]](0x65E5, 0x672C) | ForEach-Object { [char]$_ })
+        $doc = New-VellumPdfDocument
+        $doc | Add-VellumPdfParagraph -Text $cjk -WarningAction SilentlyContinue | Out-Null
+        $null = $doc | Save-VellumPdfDocument -AsByteArray -WarningVariable wv -WarningAction SilentlyContinue
+        @($wv | Where-Object Message -Like '*written as ''?''*').Count | Should -Be 1
+    }
+
+    It 'a failed render leaves the stream untouched' {
+        $ms = [System.IO.MemoryStream]::new()
+        $doc = New-VellumPdfDocument   # no content
+        try {
+            { $doc | Save-VellumPdfDocument -Stream $ms -KeepOpen } | Should -Throw '*failed to render*'
+            $ms.Length | Should -Be 0
+        }
+        finally { $doc.Dispose(); $ms.Dispose() }
+    }
+}
