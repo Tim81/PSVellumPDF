@@ -14,6 +14,10 @@
                           1-D barcode caption, table and list (embedded font)
       pdfa2b-pages.pdf  - PDF/A-2b page-based document: shapes, text, gradient,
                           image, barcode, links and nested outline
+      pdfa2u-text.pdf   - PDF/A-2u flow document: embedded font, accented and non-Latin-1
+                          text (every glyph needs a Unicode mapping)
+      pdfa2a-pages.pdf  - tagged PDF/A-2a page-based document (headings, text, figure,
+                          barcode, artifacts, outline)
       pdfua1.pdf        - PDF/UA-1 flow document (title, embedded font, alt text)
       pdfua1-pages.pdf  - tagged PDF/UA-1 page-based document (headings, text, figure,
                           barcode, artifacts)
@@ -23,8 +27,9 @@
       forms.pdf         - page-based document with AcroForm fields
       encrypted.pdf     - password-protected (user password: validate)
     CI runs `qpdf --check` against all of them (and --check-linearization on
-    linearized.pdf), veraPDF --flavour 2b against the PDF/A files and --flavour
-    ua1 against pdfua1.pdf.
+    linearized.pdf), veraPDF --flavour 2b against the PDF/A-2b files, --flavour 2u
+    against pdfa2u-text.pdf, --flavour 2a against pdfa2a-pages.pdf and --flavour
+    ua1 against the pdfua1 files.
 #>
 #requires -Version 7.6
 [CmdletBinding()]
@@ -156,6 +161,31 @@ $pages |
     Add-VellumPdfOutlineEntry 'Overview' -TargetPage 1 |
     Add-VellumPdfOutlineEntry 'Details' -TargetPage 2 -Level 2 |
     Save-VellumPdfDocument -Path (Join-Path $OutputPath 'pdfa2b-pages.pdf') -Validate | Out-Null
+
+# --- pdfa2u-text.pdf: Unicode-mapped text under PDF/A-2u -------------------------
+# PDF/A-2u (like 2a) requires a Unicode mapping for every glyph; accented and non-Latin-1 characters
+# exercise the ToUnicode map of the embedded font.
+$a2uText = "Caf$([char]0xE9) na$([char]0xEF)ve r$([char]0xE9)sum$([char]0xE9), Za$([char]0x17C)$([char]0xF3)$([char]0x142)$([char]0x107), $([char]0x3A9)mega"
+$a2u = New-VellumPdfDocument -Conformance PdfA2u -Language 'en-US'
+$a2uFont = Register-VellumPdfFont -Document $a2u -Path $ttf
+$a2u |
+    Set-VellumPdfDocumentInfo -Title 'Unicode Archival Validation Sample' -Author 'PSVellumPDF CI' |
+    Add-VellumPdfHeading -Text 'Unicode archival sample' -Level 1 -FontHandle $a2uFont |
+    Add-VellumPdfParagraph -Text $a2uText -FontHandle $a2uFont |
+    Save-VellumPdfDocument -Path (Join-Path $OutputPath 'pdfa2u-text.pdf') -Validate | Out-Null
+
+# --- pdfa2a-pages.pdf: tagged page-based document under PDF/A-2a ----------------
+# PDF/A-2a = PDF/A-2u plus a logical structure tree. A page document tags its content (roles, figure
+# alternate text, artifacts), so it can claim 2a; the flow documents cannot yet.
+New-VellumPdfPageDocument -Conformance PdfA2a -Language 'en-US' | Add-VellumPdfPage -Count 2 |
+    Set-VellumPdfDocumentInfo -Title 'Tagged Archival Page Document Sample' -Author 'PSVellumPDF CI' |
+    Add-VellumPdfText 'Tagged archival page document' -X 72 -Y 760 -FontSize 22 -Font HelveticaBold -Role H1 |
+    Add-VellumPdfText 'Text, figures and decoration are tagged or marked as artifacts.' -X 72 -Y 730 |
+    Add-VellumPdfShape Rectangle -X 72 -Y 640 -Width 200 -Height 40 -FillColor navy |
+    Add-VellumPdfPageImage $pngPath -X 72 -Y 560 -Width 40 -AltText 'A single grey pixel' |
+    Add-VellumPdfPageBarcode QrCode 'https://github.com/Tim81/PSVellumPDF' -X 300 -Y 540 -TargetWidth 80 -AltText 'Project link' |
+    Add-VellumPdfOutlineEntry 'Overview' -TargetPage 1 |
+    Save-VellumPdfDocument -Path (Join-Path $OutputPath 'pdfa2a-pages.pdf') -Validate | Out-Null
 
 # --- pdfua1.pdf: accessible flow document --------------------------------------
 $ua = New-VellumPdfDocument -Conformance PdfUA1 -Language 'en-US'

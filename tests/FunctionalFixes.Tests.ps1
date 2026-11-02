@@ -6,6 +6,10 @@
 
 param()
 
+BeforeDiscovery {
+    $script:render = [bool]((Get-Command pdftoppm -ErrorAction SilentlyContinue) -and (Get-Command convert -ErrorAction SilentlyContinue) -and ((& convert -version 2>&1 | Out-String) -match 'ImageMagick'))   # Windows has its own unrelated convert.exe
+}
+
 BeforeAll {
     $manifest = Join-Path (Split-Path $PSScriptRoot -Parent) 'PSVellumPDF.psd1'
     Import-Module $manifest -Force
@@ -13,9 +17,8 @@ BeforeAll {
     $script:fontPath = Join-Path $PSScriptRoot 'assets' 'DejaVuSans.ttf'
     function script:New-Page([hashtable]$DocParams = @{ Language = 'en' }) { New-VellumPdfPageDocument @DocParams | Add-VellumPdfPage }
     function script:Save-It($Doc, [string]$Name) { $p = Join-Path $TestDrive "$Name.pdf"; $Doc | Save-VellumPdfDocument -Path $p | Out-Null; $p }
-    # Right edge of the dark pixels of page 1 in points, or $null when no renderer is installed.
+    # Right edge of the dark pixels of page 1 in points (needs pdftoppm and ImageMagick).
     function script:Get-InkRight([string]$Pdf) {
-        if (-not (Get-Command pdftoppm -ErrorAction SilentlyContinue) -or -not (Get-Command convert -ErrorAction SilentlyContinue) -or ((& convert -version 2>&1 | Out-String) -notmatch 'ImageMagick')) { return $null }
         $base = Join-Path $TestDrive ([guid]::NewGuid().ToString('N'))
         & pdftoppm -r 72 -png -f 1 -l 1 $Pdf $base
         $png = Get-ChildItem "$base*.png" | Select-Object -First 1
@@ -37,8 +40,16 @@ Describe 'Word spacing with an embedded font' {
         $content = Get-PdfContentText $pdf
         $content | Should -Not -Match '(?m)^[-\d.]+ Tw$'
         ([regex]::Matches($content, '<[0-9A-F]+> Tj')).Count | Should -Be 6
+    }
+
+    # Needs pdftoppm and ImageMagick; reported as skipped (not passed) when they are missing.
+    It 'keeps the right edge of right-aligned word-spaced text in the rendered page' -Skip:(-not $script:render) {
+        $doc = New-VellumPdfPageDocument -Language en | Add-VellumPdfPage -PageWidthMm 211.67 -PageHeightMm 70.6
+        $font = Register-VellumPdfFont -Document $doc -Path $script:fontPath
+        $pdf = Save-It ($doc | Add-VellumPdfText 'A B C D E F' -X 400 -Y 100 -FontSize 20 -WordSpacing 30 -Align Right -FontHandle $font) 'tw-emb-render'
         $right = Get-InkRight $pdf
-        if ($null -ne $right) { $right | Should -BeGreaterThan 395; $right | Should -BeLessThan 405 }
+        $right | Should -BeGreaterThan 395
+        $right | Should -BeLessThan 405
     }
 
     It 'still uses Tw for a base-14 font' {

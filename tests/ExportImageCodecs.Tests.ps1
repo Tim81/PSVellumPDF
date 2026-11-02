@@ -6,11 +6,14 @@
 
 param()
 
+BeforeDiscovery {
+    $script:render = [bool]((Get-Command pdftoppm -ErrorAction SilentlyContinue) -and (Get-Command convert -ErrorAction SilentlyContinue) -and ((& convert -version 2>&1 | Out-String) -match 'ImageMagick'))   # Windows has its own unrelated convert.exe
+}
+
 BeforeAll {
     $manifest = Join-Path (Split-Path $PSScriptRoot -Parent) 'PSVellumPDF.psd1'
     Import-Module $manifest -Force
     $script:assets = Join-Path $PSScriptRoot 'assets'
-    $script:render = [bool]((Get-Command pdftoppm -ErrorAction SilentlyContinue) -and (Get-Command convert -ErrorAction SilentlyContinue) -and ((& convert -version 2>&1 | Out-String) -match 'ImageMagick'))   # Windows has its own unrelated convert.exe
 
     # A PDF whose only content is the image, placed 1 point per pixel so that a 72 dpi render is the image.
     function script:New-ImagePdf([string]$ImagePath, [string]$Name, [int]$Width, [int]$Height) {
@@ -35,7 +38,7 @@ AfterAll {
 }
 
 Describe 'CCITT fax images' {
-    It 'are written as a TIFF that renders pixel for pixel like the PDF (<Sample>)' -ForEach @(
+    It 'are written as a TIFF (<Sample>)' -ForEach @(
         @{ Sample = 'sample-g4.tif'; Compression = 4 }
         @{ Sample = 'sample-g3.tif'; Compression = 3 }
     ) {
@@ -50,15 +53,22 @@ Describe 'CCITT fax images' {
         $bytes = [System.IO.File]::ReadAllBytes($files[0].FullName)
         [System.Text.Encoding]::ASCII.GetString($bytes, 0, 2) | Should -Be 'II'
         [BitConverter]::ToUInt16($bytes, 2) | Should -Be 42
+    }
 
-        if ($script:render) {
-            # Render the PDF at 4x and compare with the TIFF enlarged by pixel replication: identical or the polarity is wrong.
-            $reference = Convert-PdfToPng $source 288
-            $exported = Join-Path $TestDrive "export-$Compression.png"
-            & convert $files[0].FullName -colorspace Gray -filter point -resize 400% $exported
-            # ImageMagick 6 prints '0', ImageMagick 7 prints '0 (0)': compare the differing-pixel count only.
+    # Needs pdftoppm and ImageMagick; reported as skipped (not passed) when they are missing.
+    It 'are written as a TIFF that renders pixel for pixel like the PDF (<Sample>)' -Skip:(-not $script:render) -ForEach @(
+        @{ Sample = 'sample-g4.tif'; Compression = 4 }
+        @{ Sample = 'sample-g3.tif'; Compression = 3 }
+    ) {
+        $source = New-ImagePdf (Join-Path $script:assets $Sample) "ccitt-render-$Compression" 64 48
+        $files = @(Export-VellumPdfImage $source -DestinationPath (Join-Path $TestDrive "out-render-$Compression"))
+        $files.Count | Should -Be 1
+        # Render the PDF at 4x and compare with the TIFF enlarged by pixel replication: identical or the polarity is wrong.
+        $reference = Convert-PdfToPng $source 288
+        $exported = Join-Path $TestDrive "export-$Compression.png"
+        & convert $files[0].FullName -colorspace Gray -filter point -resize 400% $exported
+        # ImageMagick 6 prints '0', ImageMagick 7 prints '0 (0)': compare the differing-pixel count only.
         (((& (Get-Command compare -CommandType Application | Select-Object -First 1) -metric AE -fuzz 20% $reference $exported null: 2>&1) | Out-String).Trim() -split '\s+')[0] | Should -Be '0'
-        }
     }
 
     It 'skips byte-aligned Group 4 data, which a TIFF cannot describe' {

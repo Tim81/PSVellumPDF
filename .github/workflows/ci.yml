@@ -75,6 +75,24 @@ jobs:
         shell: bash
         run: pwsh -NoProfile -File ./build.ps1 Test
 
+      # A German culture writes 0,5 for 0.5: code or tests that format or parse numbers without the
+      # invariant culture only fail here. Same suite, no coverage; any failed test fails the step.
+      - name: Test under de-DE (Pester, no coverage)
+        if: runner.os == 'Linux'
+        shell: pwsh
+        run: |
+          [cultureinfo]::CurrentCulture = 'de-DE'
+          [cultureinfo]::CurrentUICulture = 'de-DE'
+          Import-Module Pester -MinimumVersion 5.7.1
+          $cfg = New-PesterConfiguration
+          $cfg.Run.Path = Join-Path $PWD 'tests'
+          $cfg.Run.PassThru = $true
+          $cfg.Output.Verbosity = 'Normal'
+          $result = Invoke-Pester -Configuration $cfg
+          if ($result.Result -ne 'Passed' -or $result.FailedCount -gt 0) {
+              throw "Pester run under de-DE failed: $($result.FailedCount) test(s) failed."
+          }
+
       - name: Upload test results
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
@@ -84,8 +102,8 @@ jobs:
           if-no-files-found: ignore
 
   # External conformance validation: qpdf checks PDF structure, veraPDF
-  # validates PDF/A-2b compliance (the same validators upstream VellumPdf
-  # gates on). Runs on ubuntu where Docker is available.
+  # validates PDF/A-2b/2u/2a and PDF/UA-1 compliance (the same validators
+  # upstream VellumPdf gates on). Runs on ubuntu where Docker is available.
   validate:
     name: validate (qpdf + veraPDF)
     runs-on: ubuntu-latest
@@ -128,6 +146,8 @@ jobs:
           qpdf --check samples/pdfa2b-jbig2.pdf
           qpdf --check samples/pdfa2b-charts.pdf
           qpdf --check samples/pdfa2b-pages.pdf
+          qpdf --check samples/pdfa2u-text.pdf
+          qpdf --check samples/pdfa2a-pages.pdf
           qpdf --check samples/pdfua1.pdf
           qpdf --check samples/pdfua1-pages.pdf
           qpdf --check samples/pdfua1-structure.pdf
@@ -157,26 +177,42 @@ jobs:
           grep -q '^PASS' verapdf-ua.out || { echo "veraPDF did not report PASS for pdfua1.pdf"; exit 1; }
           echo "veraPDF: pdfua1.pdf is PDF/UA-1 compliant"
 
-      - name: veraPDF PDF/UA-1 on the tagged page documents (informational)
-        # The tagged page-document pipeline (including nested tables and lists) has only been
-        # checked with the in-process preflight; this reports veraPDF's verdict without failing
-        # the build.
-        continue-on-error: true
+      - name: veraPDF PDF/UA-1 on the tagged page documents
         shell: bash
         run: |
+          set -o pipefail
           for sample in pdfua1-pages pdfua1-structure; do
             docker run --rm -v "$PWD/samples:/data" ghcr.io/verapdf/cli \
               --flavour ua1 --format text "/data/$sample.pdf" | tee "verapdf-ua-$sample.out"
-            grep -q '^PASS' "verapdf-ua-$sample.out"
+            grep -q '^PASS' "verapdf-ua-$sample.out" || { echo "veraPDF did not report PASS for $sample.pdf"; exit 1; }
+            echo "veraPDF: $sample.pdf is PDF/UA-1 compliant"
           done
+
+      - name: veraPDF PDF/A-2u validation
+        shell: bash
+        run: |
+          set -o pipefail
+          docker run --rm -v "$PWD/samples:/data" ghcr.io/verapdf/cli \
+            --flavour 2u --format text "/data/pdfa2u-text.pdf" | tee verapdf-2u.out
+          grep -q '^PASS' verapdf-2u.out || { echo "veraPDF did not report PASS for pdfa2u-text.pdf"; exit 1; }
+          echo "veraPDF: pdfa2u-text.pdf is PDF/A-2u compliant"
+
+      - name: veraPDF PDF/A-2a validation
+        shell: bash
+        run: |
+          set -o pipefail
+          docker run --rm -v "$PWD/samples:/data" ghcr.io/verapdf/cli \
+            --flavour 2a --format text "/data/pdfa2a-pages.pdf" | tee verapdf-2a.out
+          grep -q '^PASS' verapdf-2a.out || { echo "veraPDF did not report PASS for pdfa2a-pages.pdf"; exit 1; }
+          echo "veraPDF: pdfa2a-pages.pdf is PDF/A-2a compliant"
 
       - name: In-process preflight (Test-VellumPdfConformance)
         shell: pwsh
         run: |
           Import-Module ./PSVellumPDF.psd1
           $failed = @()
-          foreach ($f in 'pdfa2b', 'pdfa2b-signed', 'pdfa2b-jpx', 'pdfa2b-jbig2', 'pdfa2b-charts', 'pdfa2b-pages', 'pdfua1', 'pdfua1-pages', 'pdfua1-structure') {
-              $r = Test-VellumPdfConformance -Path "samples/$f.pdf"
+          foreach ($f in 'pdfa2b', 'pdfa2b-signed', 'pdfa2b-jpx', 'pdfa2b-jbig2', 'pdfa2b-charts', 'pdfa2b-pages', 'pdfa2u-text', 'pdfa2a-pages', 'pdfua1', 'pdfua1-pages', 'pdfua1-structure') {
+              $r = Test-VellumPdfConformance -Path "samples/$f.pdf" -ErrorAction Stop
               $r | Format-Table Path, Profile, IsCompliant, ErrorCount, WarningCount | Out-String | Write-Host
               if (-not $r.IsCompliant) { $failed += $f }
           }

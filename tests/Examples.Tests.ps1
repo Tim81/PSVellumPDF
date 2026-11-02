@@ -65,5 +65,6 @@ Describe 'examples/10-paths-clipping-and-text-boxes.ps1' {
         Test-Path $written | Should -BeTrue
         Copy-Item $written $out
         if (Get-Command qpdf -ErrorAction SilentlyContinue) { & qpdf --check $out 2>&1 | Out-String | Should -Match 'No syntax or stream encoding errors' }
+        else { Set-ItResult -Skipped -Because 'qpdf is not installed' }   # the qpdf check did not run; do not report it as passed
     }
 }
