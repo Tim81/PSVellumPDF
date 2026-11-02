@@ -58,9 +58,26 @@ function Invoke-Restore {
     if (Test-Path $libDir) { Remove-Item $libDir -Recurse -Force }
     New-Item -ItemType Directory -Path $libDir | Out-Null
 
-    # Copy only the VellumPdf assemblies; framework assemblies ship with PowerShell 7.6.
-    Get-ChildItem $publishDir -Filter 'VellumPdf*.dll' |
-        Copy-Item -Destination $libDir -Force
+    # Copy only the VellumPdf assemblies plus our own interop shim
+    # (PSVellumPDF.Interop.dll, compiled from dependencies/Interop); framework
+    # and PowerShell assemblies ship with PowerShell 7.6.
+    @(
+        Get-ChildItem $publishDir -Filter 'VellumPdf*.dll'
+        Get-ChildItem $publishDir -Filter 'PSVellumPDF.Interop.dll'
+    ) | Copy-Item -Destination $libDir -Force
+    if (-not (Get-ChildItem $publishDir -Filter 'PSVellumPDF.Interop.dll')) {
+        throw 'PSVellumPDF.Interop.dll was not produced by the dependencies project.'
+    }
+
+    # VellumPdf's NOTICE carries third-party acknowledgements (GIF, Adobe Glyph
+    # List) that its licences require alongside redistributed binaries. It is
+    # packed into every VellumPdf package; take it from the restored Kernel one.
+    $nugetRoot = (dotnet nuget locals global-packages --list | Select-Object -First 1) -replace '^global-packages:\s*', ''
+    $lock = Get-Content (Join-Path $root 'dependencies' 'packages.lock.json') -Raw | ConvertFrom-Json
+    $kernelVersion = $lock.dependencies.'net10.0'.'VellumPdf.Kernel'.resolved
+    $notice = Join-Path $nugetRoot 'vellumpdf.kernel' $kernelVersion 'NOTICE'
+    if (-not (Test-Path $notice)) { throw "VellumPdf NOTICE not found at '$notice'." }
+    Copy-Item $notice (Join-Path $libDir 'NOTICE') -Force
 
     $copied = Get-ChildItem $libDir -Filter '*.dll'
     Write-Host "==> lib/ now contains:" -ForegroundColor Green

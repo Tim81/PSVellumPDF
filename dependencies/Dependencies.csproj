@@ -7,6 +7,10 @@
   -->
   <PropertyGroup>
     <TargetFramework>net10.0</TargetFramework>
+    <!-- Besides acquiring VellumPdf, this project compiles the small C# shims in
+         ./Interop into PSVellumPDF.Interop.dll (see Interop/*.cs for why). -->
+    <AssemblyName>PSVellumPDF.Interop</AssemblyName>
+    <RootNamespace>PSVellumPDF.Interop</RootNamespace>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <IsPackable>false</IsPackable>
@@ -21,9 +25,17 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="VellumPdf.Layout" Version="1.5.4" />
+    <PackageReference Include="VellumPdf.Layout" Version="2.3.3" />
     <!-- VellumPdf.Kernel comes in transitively via VellumPdf.Layout. -->
-    <PackageReference Include="VellumPdf.Signing" Version="1.5.4" />
+    <PackageReference Include="VellumPdf.Signing" Version="2.3.3" />
+    <!-- VellumPdf.Reader comes in transitively via VellumPdf.Signing (LTV) and Conformance. -->
+    <PackageReference Include="VellumPdf.Barcodes" Version="2.3.3" />
+    <PackageReference Include="VellumPdf.Conformance" Version="2.3.3" />
+    <PackageReference Include="VellumPdf.Reader" Version="2.3.3" />
+    <PackageReference Include="VellumPdf.Fonts.Standard14" Version="2.3.3" />
+    <!-- Compile-time only: ScriptBlock for ScriptBlockRenderer. The host (pwsh)
+         supplies the real assembly at run time, so never copy it into lib/. -->
+    <PackageReference Include="System.Management.Automation" Version="7.6.2" ExcludeAssets="runtime" />
   </ItemGroup>
 
 </Project>
