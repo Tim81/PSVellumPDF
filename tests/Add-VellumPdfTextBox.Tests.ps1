@@ -15,7 +15,7 @@ BeforeAll {
         foreach ($m in [regex]::Matches($content, '(?s)BT\r?\n(.*?)ET')) {
             $parts = [regex]::Matches($m.Groups[1].Value, '1 0 0 1 ([\d.]+) ([\d.]+) Tm\r?\n\((.*?)\) Tj')
             [pscustomobject]@{
-                Text = ($parts | ForEach-Object { $_.Groups[3].Value }) -join ' '
+                Text = (($parts | ForEach-Object { $_.Groups[3].Value.TrimEnd() }) -join ' ')
                 X    = [double]$parts[0].Groups[1].Value
                 Y    = [double]$parts[0].Groups[2].Value
                 XEnd = [double]$parts[-1].Groups[1].Value
@@ -104,6 +104,26 @@ Describe 'Add-VellumPdfTextBox' {
             ($final.XEnd + $helv.MeasureString(($final.Text -split ' ')[-1], 12)) | Should -BeLessThan (72 + 150 - 1)
         }
         finally { $probe.Dispose() }
+    }
+
+    It 'keeps the spaces between words when text is extracted from justified lines' {
+        $path = Save-Box { param($d) $d | Add-VellumPdfTextBox $script:lorem -X 72 -Y 700 -Width 150 -Align Justify }
+        $extracted = (Get-VellumPdfText -Path $path) -join ' '
+        ($extracted -split '\s+' | Where-Object { $_ }) | Should -Be ($script:lorem -split ' ')
+    }
+
+    It 'ends every justified word but the last of a line with a space glyph in an embedded font' {
+        # Reader's preview extraction skips embedded (CID) fonts, so check the glyph runs themselves.
+        $doc = New-VellumPdfPageDocument -Language en | Add-VellumPdfPage
+        $font = Register-VellumPdfFont -Document $doc -Path $script:fontPath
+        $path = Join-Path $TestDrive 'justify-emb.pdf'
+        $doc | Add-VellumPdfTextBox $script:lorem -X 72 -Y 700 -Width 150 -Align Justify -FontHandle $font |
+            Save-VellumPdfDocument -Path $path | Out-Null
+        $firstLine = [regex]::Match((Get-PdfContentText $path), '(?s)BT\r?\n(.*?)ET').Groups[1].Value
+        $runs = @([regex]::Matches($firstLine, '<([0-9A-F]+)> Tj') | ForEach-Object { $_.Groups[1].Value })
+        $runs.Count | Should -BeGreaterThan 2
+        foreach ($run in $runs[0..($runs.Count - 2)]) { $run | Should -Match '0003$' }
+        $runs[-1] | Should -Not -Match '0003$'
     }
 
     It 'splits a word that is wider than the column' {

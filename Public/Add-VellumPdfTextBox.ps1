@@ -11,9 +11,8 @@ function Add-VellumPdfTextBox {
         at -Leading (default 1.2 times the font size).
 
         -Align Justify stretches every line except the last line of a paragraph to the full
-        width by widening the gaps between words. A justified line is drawn word by word, so
-        text extraction of a justified line returns the words without spaces; use Left when the
-        text must be copy-and-paste friendly.
+        width by widening the gaps between words. A justified line is drawn word by word, each
+        word followed by an invisible space, so extracted text keeps its spaces.
 
         With -MaxHeight the box stops after the lines that fit and warns about the rest. Use
         -PassThru to get the number of lines and the height used (to place the next box); the
@@ -209,8 +208,12 @@ function Add-VellumPdfTextBox {
                         foreach ($w in $line.Words) { $wordsWidth += (& $measure $w) }
                         $gap = ($Width - $wordsWidth) / ($line.Words.Count - 1)
                         $cursor = $X
-                        foreach ($w in $line.Words) {
-                            & $show $w $cursor $baseline ([VellumPdf.Canvas.TextAlignment]::Left)
+                        for ($n = 0; $n -lt $line.Words.Count; $n++) {
+                            $w = $line.Words[$n]
+                            # Every word but the last carries its trailing space in the same run: the space is
+                            # invisible (the next word sits further right), but text extraction then finds it.
+                            $shown = if ($n -lt $line.Words.Count - 1) { $w + ' ' } else { $w }
+                            & $show $shown $cursor $baseline ([VellumPdf.Canvas.TextAlignment]::Left)
                             $cursor += (& $measure $w) + $gap
                         }
                     }

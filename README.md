@@ -164,8 +164,7 @@ signing, a KMS-signed PDF, and paths with clipping, text boxes and page numbers.
   the non-embedded Helvetica font, so PDF/A page documents cannot contain them.
 - An external signer (`Set-VellumPdfSignature -ExternalSigner`) must be a compiled
   `IExternalSigner`, not a script block: the engine calls it on thread-pool threads
-  (see `examples/09-kms-signing.ps1`). Justified text boxes draw word by word, so
-  text extraction returns those lines without spaces.
+  (see `examples/09-kms-signing.ps1`).
 - CMYK and ICC colour are available in page documents and drawings; flow-layout
   elements take RGB. A PDF/A document using CMYK needs
   `Set-VellumPdfOutputIntent -Cmyk`.
