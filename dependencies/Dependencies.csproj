@@ -17,11 +17,10 @@
     <!-- Keep the publish output flat and self-contained so lib/ holds plain DLLs. -->
     <CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies>
     <EnableDynamicLoading>true</EnableDynamicLoading>
-    <!-- Pin the full dependency closure. packages.lock.json is committed; CI
-         restores with RestoreLockedMode so transitive drift fails the build.
-         After bumping a PackageReference, regenerate the lock file with:
-           dotnet restore dependencies/Dependencies.csproj "/p:RestoreLockedMode=false" (add the force-evaluate flag) -->
-    <RestorePackagesWithLockFile>true</RestorePackagesWithLockFile>
+    <!-- No lock file on purpose: System.Security.Cryptography.Pkcs below floats to the
+         newest 10.0.x at every restore, and a floating reference cannot be locked. The
+         VellumPdf references are exact versions, so only Pkcs (and other transitive
+         packages) can move. Restores are therefore not bit-for-bit reproducible. -->
   </PropertyGroup>
 
   <ItemGroup>
@@ -33,6 +32,12 @@
     <PackageReference Include="VellumPdf.Conformance" Version="2.3.3" />
     <PackageReference Include="VellumPdf.Reader" Version="2.3.3" />
     <PackageReference Include="VellumPdf.Fonts.Standard14" Version="2.3.3" />
+    <!-- Always the newest Pkcs 10.0.x. VellumPdf.Signing pulls in an exact (older) version
+         transitively; this direct reference wins, so restore warnings about known
+         advisories in that old version go away as soon as a fixed release exists. It is a
+         build-time package only: build.ps1 never copies it to lib/, and at run time Signing
+         uses the System.Security.Cryptography.Pkcs that ships with PowerShell. -->
+    <PackageReference Include="System.Security.Cryptography.Pkcs" Version="10.0.*" />
     <!-- Compile-time only: ScriptBlock for ScriptBlockRenderer. The host (pwsh)
          supplies the real assembly at run time, so never copy it into lib/. -->
     <PackageReference Include="System.Management.Automation" Version="7.6.2" ExcludeAssets="runtime" />

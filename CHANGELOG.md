@@ -102,11 +102,15 @@ in ways that change output. Upgrade notes are in the README.
 - VellumPdf 2.2 fixed `OwnerPassword = ""` with a user password producing a file that
   opens without any password; the module now refuses the combination up front and
   you should re-encrypt such files made with 1.x.
-- NuGet reports advisories for `System.Security.Cryptography.Pkcs` 10.0.12, which
-  VellumPdf.Signing 2.3.3 requires. The module does not ship that assembly (it uses
-  the one in PowerShell), but be aware when restoring the dependency project.
+- NuGet flagged `System.Security.Cryptography.Pkcs` 10.0.12 (required by VellumPdf.Signing
+  2.3.3) with two advisories. The dependency project now references Pkcs as `10.0.*`, so
+  every restore takes the newest 10.0.x (10.0.14 today), and the warnings are gone. The
+  module never ships that assembly: at run time signing uses the copy bundled with
+  PowerShell, which a module cannot override.
 
 ### Notes
+- `dependencies/packages.lock.json` and locked-mode restore were removed so Pkcs can float;
+  restores are no longer bit-for-bit reproducible (the VellumPdf versions stay exact).
 - VellumPdf.Layout draws no labels on pie charts and does not tag hyperlinks:
   `-Legend` adds a table, and a PDF/UA document containing `-LinkUri` is not fully
   conformant (the module warns once).

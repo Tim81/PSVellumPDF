@@ -27,7 +27,7 @@ jobs:
         shell: pwsh
         run: Add-Content -Path $env:GITHUB_PATH -Value (Join-Path $HOME '.dotnet/tools')
 
-      - name: Restore VellumPdf assemblies (locked mode)
+      - name: Restore VellumPdf assemblies (restores the newest Pkcs; no lock file)
         shell: bash
         run: pwsh -NoProfile -File ./build.ps1 Restore
 

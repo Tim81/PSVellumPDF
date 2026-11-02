@@ -50,9 +50,9 @@ $script:PesterVersion = '5.7.1'
 
 function Invoke-Restore {
     Write-Host '==> Publishing VellumPdf dependencies...' -ForegroundColor Cyan
-    # RestoreLockedMode: fail if the resolved package graph deviates from the
-    # committed dependencies/packages.lock.json (supply-chain drift guard).
-    dotnet publish $depProj -c Release -o $publishDir '/p:RestoreLockedMode=true' | Out-Host
+    # No locked restore: System.Security.Cryptography.Pkcs floats to the newest 10.0.x
+    # (see Dependencies.csproj), so there is no lock file to enforce.
+    dotnet publish $depProj -c Release -o $publishDir | Out-Host
     if ($LASTEXITCODE -ne 0) { throw "dotnet publish failed ($LASTEXITCODE)." }
 
     if (Test-Path $libDir) { Remove-Item $libDir -Recurse -Force }
@@ -73,8 +73,8 @@ function Invoke-Restore {
     # List) that its licences require alongside redistributed binaries. It is
     # packed into every VellumPdf package; take it from the restored Kernel one.
     $nugetRoot = (dotnet nuget locals global-packages --list | Select-Object -First 1) -replace '^global-packages:\s*', ''
-    $lock = Get-Content (Join-Path $root 'dependencies' 'packages.lock.json') -Raw | ConvertFrom-Json
-    $kernelVersion = $lock.dependencies.'net10.0'.'VellumPdf.Kernel'.resolved
+    $kernelDll = Join-Path $publishDir 'VellumPdf.Kernel.dll'
+    $kernelVersion = ([System.Diagnostics.FileVersionInfo]::GetVersionInfo($kernelDll).ProductVersion -split '[+-]')[0]
     $notice = Join-Path $nugetRoot 'vellumpdf.kernel' $kernelVersion 'NOTICE'
     if (-not (Test-Path $notice)) { throw "VellumPdf NOTICE not found at '$notice'." }
     Copy-Item $notice (Join-Path $libDir 'NOTICE') -Force
