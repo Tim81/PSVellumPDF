@@ -10,7 +10,7 @@ function Add-VellumPdfPageTable {
         too tall is an error rather than being split.
 
         Rows are arrays of cells. A row may be empty (@()) when RowSpans from the rows above cover all of
-        its columns; it is drawn as the extension of those cells and gets no TR element. -Row may be an
+        its columns; it is drawn as the extension of those cells and keeps an empty TR element (PDF/UA counts rows by TR). -Row may be an
         empty array when -Header is given (a header-only table); a table with neither is an error.
         A cell is text, or a hashtable with Text and optionally ColSpan,
         RowSpan, Alignment (Left, Center, Right, Justify), Background (colour) and Color (text colour):
