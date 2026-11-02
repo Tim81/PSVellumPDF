@@ -134,7 +134,7 @@ Describe 'Page drawing cmdlets' {
             { $doc | Add-VellumPdfShape Line -X 1 -Y 1 -X2 5 -Y2 5 -FillColor red } | Should -Throw '*no fill*'
             { $doc | Add-VellumPdfShape Rectangle -X 1 -Y 1 } | Should -Throw '*positive -Width and -Height*'
             { $doc | Add-VellumPdfShape Rectangle -X 1 -Y 1 -Width 5 -Height 5 -X2 3 } | Should -Throw '*Line only*'
-            { $doc | Add-VellumPdfShape Rectangle -X 1 -Y 1 -Width 5 -Height 5 -FillColor red -FillCmyk 0, 0, 0, 1 } | Should -Throw '*not both*'
+            { $doc | Add-VellumPdfShape Rectangle -X 1 -Y 1 -Width 5 -Height 5 -FillColor red -FillCmyk 0, 0, 0, 1 } | Should -Throw '*not several*'
             { $doc | Add-VellumPdfShape Rectangle -X ([double]::NaN) -Y 1 -Width 5 -Height 5 } | Should -Throw '*finite*'
             { $doc | Add-VellumPdfShape Rectangle -X 1 -Y 1 -Width 5 -Height 5 -Opacity 2 } | Should -Throw
         }

@@ -34,6 +34,9 @@ function Add-VellumPdfPageImage {
         Alternate text for the image in a tagged document.
     .PARAMETER Decorative
         Mark the image as an artifact (not read by assistive technology) in a tagged document.
+    .PARAMETER Rotation
+        Rotates the image about its centre, in degrees counter-clockwise. -X and -Y, -Width and
+        -Height describe the unrotated image.
     .EXAMPLE
         $doc | Add-VellumPdfPageImage ./logo.png -X 72 -Y 740 -Width 120
     .OUTPUTS
@@ -71,12 +74,17 @@ function Add-VellumPdfPageImage {
         [ValidateScript({ -not [string]::IsNullOrWhiteSpace($_) }, ErrorMessage = '-AltText must not be empty or whitespace.')]
         [string]$AltText,
 
-        [switch]$Decorative
+        [switch]$Decorative,
+
+        # Rotation about the image centre in degrees, counter-clockwise.
+        [double]$Rotation
     )
 
     process {
         try {
             Assert-VellumPdfDocumentOpen -Document $Document -CommandName 'Add-VellumPdfPageImage'
+            $bound = $PSBoundParameters
+            if ($bound.ContainsKey('Rotation') -and -not [double]::IsFinite($Rotation)) { throw 'Add-VellumPdfPageImage: -Rotation must be a finite number of degrees.' }
             $Page = Resolve-VellumPdfPageNumber -Document $Document -Page $Page -Bound $PSBoundParameters.ContainsKey('Page') -CommandName 'Add-VellumPdfPageImage'
             Assert-VellumPdfCoordinate $X 'X' 'Add-VellumPdfPageImage'; Assert-VellumPdfCoordinate $Y 'Y' 'Add-VellumPdfPageImage'
             $pdfPage = Get-VellumPdfPage -Document $Document -Page $Page -CommandName 'Add-VellumPdfPageImage'
@@ -115,7 +123,16 @@ function Add-VellumPdfPageImage {
             try {
                 $kind = if ($Decorative) { 'Artifact' } else { 'Structure' }
                 Invoke-VellumPdfTagged -Document $Document -Canvas $canvas -PdfPage $pdfPage -Kind $kind -StructType Figure -AltText $AltText -Draw {
-                    [void]$canvas.Concat($w, 0, 0, $h, $X, $Y).DoXObject($name)
+                    if ($bound.ContainsKey('Rotation') -and $Rotation -ne 0) {
+                        # Rotate about the image centre: the unit square is scaled to w x h, turned, and put back.
+                        $radians = $Rotation * [math]::PI / 180
+                        $cos = [math]::Cos($radians); $sin = [math]::Sin($radians)
+                        $cx = $X + $w / 2; $cy = $Y + $h / 2
+                        $m = ($w * $cos), ($w * $sin), (0.0 - $h * $sin), ($h * $cos), ($cx - 0.5 * $w * $cos + 0.5 * $h * $sin), ($cy - 0.5 * $w * $sin - 0.5 * $h * $cos) |
+                            ForEach-Object { [math]::Round($_, 8) + 0.0 }
+                        [void]$canvas.Concat($m[0], $m[1], $m[2], $m[3], $m[4], $m[5]).DoXObject($name)
+                    }
+                    else { [void]$canvas.Concat($w, 0, 0, $h, $X, $Y).DoXObject($name) }
                 }
             }
             finally { [void]$canvas.RestoreState() }

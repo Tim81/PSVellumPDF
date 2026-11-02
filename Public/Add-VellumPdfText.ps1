@@ -40,6 +40,9 @@ function Add-VellumPdfText {
         Baseline shift in points: positive for superscript, negative for subscript.
     .PARAMETER HorizontalScale
         Horizontal scaling in percent (100 is normal, 50 half width).
+    .PARAMETER Rotation
+        Rotates the text about its anchor point (-X, -Y), in degrees counter-clockwise. Alignment is
+        applied along the rotated baseline.
     .PARAMETER Role
         In a tagged document (New-VellumPdfPageDocument -Tagged, PdfA2a or PdfUA1): the
         structure role of this text - P (default), H1..H6, Span or Caption.
@@ -96,6 +99,9 @@ function Add-VellumPdfText {
         [ValidateRange(1.0, 1000.0)]
         [double]$HorizontalScale,
 
+        # Rotation about the anchor (X, Y) in degrees, counter-clockwise.
+        [double]$Rotation,
+
         # Structure role in a tagged document: P (default), H1-H6, Span or Caption.
         [ValidateSet('P', 'H1', 'H2', 'H3', 'H4', 'H5', 'H6', 'Span', 'Caption')]
         [string]$Role = 'P',
@@ -128,6 +134,10 @@ function Add-VellumPdfText {
             # Alignment shifts the start by the text's width. The engine measures without
             # character/word spacing and scaling, so when those are set the width is computed
             # here and the text is placed left-aligned at the adjusted x.
+            $rotated = $bound.ContainsKey('Rotation') -and $Rotation -ne 0
+            if ($bound.ContainsKey('Rotation') -and -not [double]::IsFinite($Rotation)) { throw 'Add-VellumPdfText: -Rotation must be a finite number of degrees.' }
+            $anchorX = $X; $anchorY = $Y
+            if ($rotated) { $X = 0.0; $Y = 0.0 }    # drawn at the origin of a rotated, moved coordinate system
             $hasSpacing = $bound.ContainsKey('CharSpacing') -or $bound.ContainsKey('WordSpacing') -or $bound.ContainsKey('HorizontalScale')
             $startX = $X
             $showAlignment = [VellumPdf.Canvas.TextAlignment]::$Align
@@ -145,6 +155,12 @@ function Add-VellumPdfText {
 
             [void]$canvas.SaveState()
             try {
+                if ($rotated) {
+                    $radians = $Rotation * [math]::PI / 180
+                    $cos = [math]::Round([math]::Cos($radians), 8) + 0.0
+                    $sin = [math]::Round([math]::Sin($radians), 8) + 0.0
+                    [void]$canvas.Concat($cos, $sin, (0.0 - $sin), $cos, $anchorX, $anchorY)
+                }
                 if ($bound.ContainsKey('Color')) {
                     $c = ConvertTo-VellumColor $Color
                     [void]$canvas.SetFillColorRgb($c[0], $c[1], $c[2])

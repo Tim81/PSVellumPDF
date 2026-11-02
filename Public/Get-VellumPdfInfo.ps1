@@ -25,6 +25,9 @@ function Get-VellumPdfInfo {
     .PARAMETER Password
         Password for an encrypted PDF (a SecureString). An empty user password is
         tried automatically.
+    .PARAMETER IncludeSignatureContents
+        Add the raw CMS signature bytes (Contents) to every signature object, so that a script can verify
+        it, for example with [System.Security.Cryptography.Pkcs.SignedCms] over the ranges in ByteRange.
     .PARAMETER AllowReconstruction
         Try to recover a damaged file (missing or broken cross-reference table) by
         scanning for objects. The result then has WasReconstructed = $true.
@@ -62,6 +65,8 @@ function Get-VellumPdfInfo {
         [securestring]$Password,
 
         [switch]$AllowReconstruction,
+
+        [switch]$IncludeSignatureContents,
         # Resource limits for hostile or huge files. They can only tighten the reader's
         # built-in ceilings (512 MiB decoded, 1000 diagnostics, 32 form levels, budget 8).
         [ValidateRange(1MB, 512MB)]
@@ -125,13 +130,15 @@ function Get-VellumPdfInfo {
 
                     $signatures = @(foreach ($sig in $reader.Signatures) {
                             $range = $sig.ByteRange.ToArray()
-                            [pscustomobject]@{
+                            $info = [pscustomobject]@{
                                 PSTypeName     = 'PSVellumPDF.PdfSignatureInfo'
                                 SubFilter      = if ($sig.SubFilter) { [string]$sig.SubFilter.Value } else { $null }
                                 SigningTime    = $sig.SigningTime
                                 ByteRange      = $range
                                 ContentsLength = $sig.Contents.Length
                             }
+                            if ($IncludeSignatureContents) { $info | Add-Member -NotePropertyName Contents -NotePropertyValue $sig.Contents.ToArray() }
+                            $info
                         })
 
                     $diagnostics = @(foreach ($d in $reader.Diagnostics) {

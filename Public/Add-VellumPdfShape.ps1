@@ -50,6 +50,10 @@ function Add-VellumPdfShape {
         End y of a Line.
     .PARAMETER FillColor
         Fill colour (RGB triple, hex or name).
+    .PARAMETER FillGray
+        Fill colour as a grey level, 0 (black) to 1 (white), written as DeviceGray.
+    .PARAMETER StrokeGray
+        Outline colour as a grey level, 0 (black) to 1 (white).
     .PARAMETER FillCmyk
         Fill colour as C,M,Y,K in 0..1.
     .PARAMETER StrokeColor
@@ -109,8 +113,10 @@ function Add-VellumPdfShape {
 
         [object]$FillColor,
         [ValidateCount(4, 4)] [ValidateRange(0.0, 1.0)] [double[]]$FillCmyk,
+        [ValidateRange(0.0, 1.0)] [double]$FillGray,
         [object]$StrokeColor,
         [ValidateCount(4, 4)] [ValidateRange(0.0, 1.0)] [double[]]$StrokeCmyk,
+        [ValidateRange(0.0, 1.0)] [double]$StrokeGray,
 
         [ValidateRange(0.0, 10000.0)]
         [double]$StrokeWidth = 1,
@@ -153,8 +159,8 @@ function Add-VellumPdfShape {
                 if (-not $bound.ContainsKey('X2') -or -not $bound.ContainsKey('Y2')) {
                     throw 'Add-VellumPdfShape: a Line needs -X2 and -Y2.'
                 }
-                if ($bound.ContainsKey('FillColor') -or $bound.ContainsKey('FillCmyk') -or $bound.ContainsKey('Opacity')) {
-                    throw 'Add-VellumPdfShape: a Line has no fill; use -StrokeColor/-StrokeCmyk/-StrokeOpacity.'
+                if ($bound.ContainsKey('FillColor') -or $bound.ContainsKey('FillCmyk') -or $bound.ContainsKey('FillGray') -or $bound.ContainsKey('Opacity')) {
+                    throw 'Add-VellumPdfShape: a Line has no fill; use -StrokeColor/-StrokeCmyk/-StrokeGray/-StrokeOpacity.'
                 }
             }
             elseif ($Shape -eq 'Arc') {
@@ -175,6 +181,10 @@ function Add-VellumPdfShape {
                 foreach ($no in 'Radius', 'StartAngle', 'EndAngle') {
                     if ($bound.ContainsKey($no)) { throw "Add-VellumPdfShape: -$no applies to an Arc only." }
                 }
+            }
+            foreach ($side in 'Fill', 'Stroke') {
+                $models = @(@("${side}Color", "${side}Cmyk", "${side}Icc", "${side}Gray") | Where-Object { $bound.ContainsKey($_) })
+                if ($models.Count -gt 1) { throw "Add-VellumPdfShape: give the $($side.ToLower()) colour as RGB/hex/name, CMYK, grey or ICC components, not several." }
             }
             $hasIcc = $bound.ContainsKey('FillIcc') -or $bound.ContainsKey('StrokeIcc')
             if ($hasIcc -ne $bound.ContainsKey('IccProfilePath')) {
@@ -208,9 +218,9 @@ function Add-VellumPdfShape {
                     }
                 }
             }
-            $hasFill = $bound.ContainsKey('FillColor') -or $bound.ContainsKey('FillCmyk') -or $bound.ContainsKey('FillIcc')
+            $hasFill = $bound.ContainsKey('FillColor') -or $bound.ContainsKey('FillCmyk') -or $bound.ContainsKey('FillIcc') -or $bound.ContainsKey('FillGray')
             # Any stroke option asks for an outline (black unless a colour is given), even beside a fill.
-            $strokeRequested = $bound.ContainsKey('LineCap') -or $bound.ContainsKey('LineJoin') -or $bound.ContainsKey('MiterLimit') -or $bound.ContainsKey('StrokeColor') -or $bound.ContainsKey('StrokeCmyk') -or $bound.ContainsKey('StrokeIcc') -or $bound.ContainsKey('StrokeWidth') -or
+            $strokeRequested = $bound.ContainsKey('LineCap') -or $bound.ContainsKey('LineJoin') -or $bound.ContainsKey('MiterLimit') -or $bound.ContainsKey('StrokeColor') -or $bound.ContainsKey('StrokeCmyk') -or $bound.ContainsKey('StrokeIcc') -or $bound.ContainsKey('StrokeGray') -or $bound.ContainsKey('StrokeWidth') -or
                 $bound.ContainsKey('Dash') -or $bound.ContainsKey('StrokeOpacity')
             $hasStroke = $strokeRequested -or $Shape -eq 'Line' -or -not $hasFill
 
@@ -220,8 +230,10 @@ function Add-VellumPdfShape {
                 $tagKind = if ($AltText) { 'Structure' } else { 'Artifact' }
                 Invoke-VellumPdfTagged -Document $Document -Canvas $canvas -PdfPage $Document.Pages[$Page - 1] -Kind $tagKind -StructType Figure -AltText $AltText -Draw {
                 if ($bound.ContainsKey('FillColor')) { $c = ConvertTo-VellumColor $FillColor; [void]$canvas.SetFillColorRgb($c[0], $c[1], $c[2]) }
+                if ($bound.ContainsKey('FillGray')) { [void]$canvas.SetFillColorGray($FillGray) }
                 if ($bound.ContainsKey('FillCmyk')) { [void]$canvas.SetFillColorCmyk($FillCmyk[0], $FillCmyk[1], $FillCmyk[2], $FillCmyk[3]) }
                 if ($bound.ContainsKey('StrokeColor')) { $c = ConvertTo-VellumColor $StrokeColor; [void]$canvas.SetStrokeColorRgb($c[0], $c[1], $c[2]) }
+                if ($bound.ContainsKey('StrokeGray')) { [void]$canvas.SetStrokeColorGray($StrokeGray) }
                 if ($bound.ContainsKey('StrokeCmyk')) { [void]$canvas.SetStrokeColorCmyk($StrokeCmyk[0], $StrokeCmyk[1], $StrokeCmyk[2], $StrokeCmyk[3]) }
                 if ($bound.ContainsKey('FillIcc')) {
                     [void]$canvas.SetFillColorSpace($iccName)
