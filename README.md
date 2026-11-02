@@ -201,7 +201,8 @@ quotes, bullets and dashes): text containing characters beyond it
 cmdlets warn when this is about to happen, and `Save-VellumPdfDocument` lists
 what the engine actually replaced (also on the returned object's
 `TextEncodingWarnings`). The fix, which also satisfies the PDF/A and PDF/UA
-embedding requirement, is a TrueType font:
+embedding requirement, is a TrueType font (conformant documents already embed
+Liberation substitutes for the base-14 names, but those cover Windows-1252 only):
 
 ```powershell
 $doc    = New-VellumPdfDocument -Conformance PdfA2b
@@ -235,6 +236,14 @@ Existing scripts keep working, apart from these changes (details in the
 - **Layout**: text is measured with Windows-1252 widths, tables no longer
   double their margin, and over-long header/footer text is cut at a word
   boundary (reported when saving).
+- **Reader cmdlets**: a bad file among several is reported as a non-terminating
+  error and the others are still processed; add `-ErrorAction Stop` where a
+  script relied on `try`/`catch`.
+- **Tables**: plain `@{}` rows with several keys are refused (their column
+  order is undefined); use `[ordered]@{}` or `[pscustomobject]`.
+- **Conformant flow documents** embed metric-compatible Liberation fonts in
+  place of the base-14 fonts, so PDF/A and PDF/UA-1 files pass without
+  `-FontHandle`. Text in embedded fonts is not extracted by `Get-VellumPdfText`.
 - **Installation**: the module now loads eight assemblies, including
   `VellumPdf.Reader` and a small `PSVellumPDF.Interop`. Run
   `./build.ps1 Restore` after pulling; a stale `lib/` is detected and

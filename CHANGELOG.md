@@ -63,6 +63,22 @@ in ways that change output. Upgrade notes are in the README.
   checks their identity (version 2.0.0.0, strong-name token `b2757187a6d18ae5`),
   so a stale 1.x `lib/` fails at import with the fix instead of a type-load error.
 
+- **Reader cmdlets report a bad file and go on** (`Get-VellumPdfInfo`, `Get-VellumPdfText`,
+  `Test-VellumPdfConformance`, `Export-VellumPdfImage`, `Unprotect-VellumPdfDocument`): a file that is missing,
+  unreadable, malformed or locked is a non-terminating error with the file as `TargetObject`, and the remaining files
+  are still processed. Scripts that relied on `try`/`catch` must add `-ErrorAction Stop`. Files are read one at a
+  time instead of all up front. `Test-VellumPdfConformance -Quiet` returns `$false` for a file it could not check.
+- **Plain hashtable table rows are refused** by `Add-VellumPdfTable` when they have more than one key: a plain
+  `@{}` has no defined key order, so the columns came out shuffled. Use `[ordered]@{...}` or `[pscustomobject]`.
+- **`Add-VellumPdfTextBox` throws** when its text would run below the bottom of the page (it drew off the page
+  silently); `-MaxHeight` still cuts the text off.
+- **Conformant flow documents embed their fonts**: with `-Conformance` PDF/A or PDF/UA-1, base-14 font names are
+  replaced by the embedded, metric-compatible Liberation fonts (as page documents already did), so these files now
+  pass the font-embedding checks without `-FontHandle`. Layout is unchanged. Text in embedded fonts is not
+  extracted by `Get-VellumPdfText`. Symbol and ZapfDingbats have no substitute and need `-FontHandle`.
+- **Right- and centre-aligned text with `-CharSpacing`** aligns on its visible glyphs: the spacing after the last
+  character is no longer counted, so right-aligned text ends exactly at `-X`.
+
 ### Added
 - **New flow-document cmdlets**: `Add-VellumPdfPieChart` (slices or pipeline data,
   colour-blind-safe palette, legend, alternate text), `Add-VellumPdfBarcode`
@@ -191,6 +207,44 @@ in ways that change output. Upgrade notes are in the README.
 - B-LT/B-LTA revocation lookups use a per-signature HTTP client that follows at most
   three redirects, instead of the engine's process-wide shared client.
 - Table without `-Header`: the column-count check no longer counts a phantom header.
+
+### Fixed (second review)
+- `Add-VellumPdfList` with `-FontHandle` and a list item that contains itself crashed the PowerShell process
+  (stack overflow); it now reports the nesting-depth error.
+- `Add-VellumPdfPageList` added an empty sub-item under every hashtable item without `Children`; items may now be
+  objects with `Text`/`Children`, and an item without text is an error. A large `-FontSize` no longer fails on the
+  `-Indent` range.
+- `Add-VellumPdfPageTable` failed on a row fully covered by RowSpans (`@()`) and left half a table behind; such a
+  row is drawn and keeps an empty `TR`. `-Row` may be empty or omitted when `-Header` is given (also for
+  `Add-VellumPdfTable`). A non-numeric `ColSpan`/`RowSpan` gives a clear error.
+- Lower-case `Use-VellumPdfStructure -Type sect` and `-Role h1` passed validation but broke the save; they are
+  written with the standard spelling.
+- `Set-VellumPdfSignature -Level b-t` (lower case) failed with a .NET error.
+- A tab in page text (`Add-VellumPdfText`, `Add-VellumPdfTextBox`, page-band templates, `Measure-VellumPdfText`)
+  drew glyph 0, which PDF/A forbids, or vanished; it is drawn as four spaces.
+- NaN and infinity are refused in colours and in table/list `FontSize`/`Leading` (they wrote `NaN` into the PDF).
+- `Add-VellumPdfDrawing` script blocks use the variable values from when they were added (a loop variable no longer
+  reads its last value; a function's locals are still there at save time), and a block that saves and restores the
+  graphics state unevenly fails the save. `Invoke-VellumPdfCanvas` also detects unbalanced `BT`/`ET` and marked
+  content (`BMC`/`BDC`/`EMC`).
+- `Add-VellumPdfFormField -Selected` matched without regard to case but wrote the caller's spelling, so no option
+  showed as selected; it writes the option's own spelling (case-only duplicates are ambiguous and refused).
+- A text run without font or size wrote an empty link annotation (and failed PDF/UA).
+- Drawing on a page document after `Save-VellumPdfDocument -KeepOpen` is refused (it could never be saved); the
+  messages no longer call a page document a layout document. `Add-VellumPdfPage -Count N -PassThru` returns all
+  new pages.
+- RGB colour or an RGB image in a PDF/A document whose output intent is CMYK warns once (the file fails
+  6.2.4.3); replacing a CMYK intent with an RGB one clears the CMYK state; output-intent profiles with a device
+  class other than printer/monitor/scanner/colour space, or ICC version 5, are refused (PDF/A 6.2.3).
+- `Export-VellumPdfImage` gives unique file names across all inputs of one call (`report-p1-i1-2.png`), so
+  same-named PDFs no longer overwrite each other's images.
+- `Export-VellumPdfImage` and `Unprotect-VellumPdfDocument` have `-AllowReconstruction` (their error message
+  suggested it, and `-ReconstructionBudgetMultiplier` did nothing without it).
+- Reader cmdlets bind piped objects with a `Path` property to `-Path` and objects with `FullName` (for example
+  `Select-Object FullName`) to `-LiteralPath`.
+- Tests and CI: the whole suite runs under de-DE as well (two tests were culture-dependent); checks that need qpdf,
+  pdftoppm or ImageMagick report as skipped instead of passing without checking; the veraPDF PDF/UA-1 run on tagged
+  page documents now fails the build, and new PDF/A-2u and PDF/A-2a samples are validated with veraPDF.
 
 ### Security
 - VellumPdf 2.2 fixed `OwnerPassword = ""` with a user password producing a file that
