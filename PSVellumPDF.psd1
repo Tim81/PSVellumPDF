@@ -38,6 +38,8 @@ Experimental reading (VellumPdf.Reader preview): Get-VellumPdfInfo, Get-VellumPd
         'Add-VellumPdfPage'
         'Add-VellumPdfPageBarcode'
         'Add-VellumPdfPageImage'
+        'Add-VellumPdfPageList'
+        'Add-VellumPdfPageTable'
         'Add-VellumPdfParagraph'
         'Add-VellumPdfPath'
         'Add-VellumPdfPieChart'
@@ -66,6 +68,7 @@ Experimental reading (VellumPdf.Reader preview): Get-VellumPdfInfo, Get-VellumPd
         'Test-VellumPdfConformance'
         'Unprotect-VellumPdfDocument'
         'Use-VellumPdfClip'
+        'Use-VellumPdfStructure'
     )
     FormatsToProcess  = @('PSVellumPDF.Format.ps1xml')
     CmdletsToExport   = @()

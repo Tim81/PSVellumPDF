@@ -10,7 +10,9 @@ function Invoke-VellumPdfTagged {
           Artifact   decorative content: /Artifact BMC ... EMC, no structure element
           Structure  real content: /<StructType> <</MCID n>> BDC ... EMC plus a
                      PdfStructElem(StructType) carrying the MCID, page, language and
-                     (for Figure) the alternate text
+                     (for Figure) the alternate text. The element becomes a child of the
+                     current structure group (Use-VellumPdfStructure, tables, lists) or
+                     is registered at the document root
 
         In an untagged document the code just runs. The drawing code is a script block
         run in the caller's scope.
@@ -24,6 +26,8 @@ function Invoke-VellumPdfTagged {
         [string]$StructType,
         [string]$AltText,
         [string]$Language,
+        # Called with the new structure element before it is added to the tree (table scope, spans, ...).
+        [scriptblock]$Configure,
         [Parameter(Mandatory)] [scriptblock]$Draw
     )
 
@@ -44,5 +48,6 @@ function Invoke-VellumPdfTagged {
     $elem.Page = $PdfPage
     if ($AltText) { $elem.AltText = $AltText }
     if ($Language) { $elem.Language = $Language }
-    $Document.RegisterStructElem($elem)
+    if ($Configure) { & $Configure $elem }
+    Add-VellumPdfStructElement -Document $Document -Element $elem
 }

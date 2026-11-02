@@ -127,43 +127,8 @@ function Add-VellumPdfTextBox {
             if (-not $resolved.Handle -and $Document.Conformance -eq [VellumPdf.Document.PdfConformance]::None) {
                 Write-VellumPdfEncodingWarning -Text $Text -CommandName 'Add-VellumPdfTextBox'
             }
-            $measure = if ($resolved.Handle) {
-                { param($s) $resolved.Handle.MeasureString($s, $FontSize) }
-            }
-            else {
-                { param($s) $resolved.Resource.MeasureString($s, $FontSize) }
-            }
-
-            # Greedy line breaking. Each line remembers whether it ends its paragraph (not justified then).
             $lines = [System.Collections.Generic.List[object]]::new()
-            foreach ($paragraph in ($Text -split '\r?\n')) {
-                $words = @($paragraph -split '[ \t]+' | Where-Object { $_ -ne '' })
-                if ($words.Count -eq 0) { $lines.Add([pscustomobject]@{ Words = @(); Last = $true }); continue }
-                $current = [System.Collections.Generic.List[string]]::new()
-                foreach ($word in $words) {
-                    $pieces = @($word)
-                    if ((& $measure $word) -gt $Width) {
-                        # Wider than the column: split at character boundaries.
-                        $pieces = [System.Collections.Generic.List[string]]::new()
-                        $chunk = ''
-                        foreach ($ch in [System.Text.Rune[]]($word.EnumerateRunes() | ForEach-Object { $_ })) {
-                            $next = $chunk + $ch.ToString()
-                            if ($chunk -ne '' -and (& $measure $next) -gt $Width) { $pieces.Add($chunk); $chunk = $ch.ToString() }
-                            else { $chunk = $next }
-                        }
-                        if ($chunk -ne '') { $pieces.Add($chunk) }
-                    }
-                    foreach ($piece in $pieces) {
-                        $candidate = if ($current.Count) { ($current -join ' ') + ' ' + $piece } else { $piece }
-                        if ($current.Count -and (& $measure $candidate) -gt $Width) {
-                            $lines.Add([pscustomobject]@{ Words = $current.ToArray(); Last = $false })
-                            $current = [System.Collections.Generic.List[string]]::new()
-                        }
-                        $current.Add($piece)
-                    }
-                }
-                $lines.Add([pscustomobject]@{ Words = $current.ToArray(); Last = $true })
-            }
+            $lines.AddRange([object[]](Split-VellumPdfTextLine -Text $Text -Width $Width -Resolved $resolved -FontSize $FontSize))
 
             $allowed = $lines.Count
             $hadWords = [bool]($lines | Where-Object { $_.Words.Count -gt 0 })
@@ -204,42 +169,8 @@ function Add-VellumPdfTextBox {
                     [void]$canvas.SetFillColorRgb($c[0], $c[1], $c[2])
                 }
                 if ($resolved.Handle) { $Document.RegisterEmbeddedFontUsage($pdfPage, $resolved.Handle) }
-                $show = {
-                    param([string]$s, [double]$x, [double]$y, $alignment)
-                    if ($resolved.Handle) {
-                        [void][PSVellumPDF.Interop.CanvasHelpers]::ShowEmbeddedText($canvas, $resolved.Handle, $s, $FontSize, $x, $y, $alignment)
-                    }
-                    else { [void]$canvas.ShowTextAligned($s, $x, $y, $alignment) }
-                }
                 Invoke-VellumPdfTagged -Document $Document -Canvas $canvas -PdfPage $pdfPage -Kind Structure -StructType $Role -Language $Language -Draw {
-                    $row = 0
-                    foreach ($line in $lines) {
-                        $baseline = $Y - $FontSize - $row * $Leading
-                        $row++
-                        if ($line.Words.Count -eq 0) { continue }
-                        [void]$canvas.BeginText()
-                        if ($resolved.Handle) { [void]$canvas.SetFontByName($resolved.Handle.ResourceName, $FontSize) }
-                        else { [void]$canvas.SetFont($resolved.Resource, $FontSize) }
-                        $textLine = $line.Words -join ' '
-                        if ($Align -eq 'Justify' -and -not $line.Last -and $line.Words.Count -gt 1) {
-                            $wordsWidth = 0.0
-                            foreach ($w in $line.Words) { $wordsWidth += (& $measure $w) }
-                            $gap = ($Width - $wordsWidth) / ($line.Words.Count - 1)
-                            $cursor = $X
-                            for ($n = 0; $n -lt $line.Words.Count; $n++) {
-                                $w = $line.Words[$n]
-                                # Every word but the last carries its trailing space in the same run: the space is
-                                # invisible (the next word sits further right), but text extraction then finds it.
-                                $shown = if ($n -lt $line.Words.Count - 1) { $w + ' ' } else { $w }
-                                & $show $shown $cursor $baseline ([VellumPdf.Canvas.TextAlignment]::Left)
-                                $cursor += (& $measure $w) + $gap
-                            }
-                        }
-                        elseif ($Align -eq 'Center') { & $show $textLine ($X + $Width / 2) $baseline ([VellumPdf.Canvas.TextAlignment]::Center) }
-                        elseif ($Align -eq 'Right') { & $show $textLine ($X + $Width) $baseline ([VellumPdf.Canvas.TextAlignment]::Right) }
-                        else { & $show $textLine $X $baseline ([VellumPdf.Canvas.TextAlignment]::Left) }
-                        [void]$canvas.EndText()
-                    }
+                    Write-VellumPdfTextLines -Canvas $canvas -Resolved $resolved -FontSize $FontSize -Lines $lines.ToArray() -X $X -Top $Y -Width $Width -Leading $Leading -Align $Align
                 }
             }
             finally { [void]$canvas.RestoreState() }

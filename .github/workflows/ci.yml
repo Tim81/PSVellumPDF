@@ -120,6 +120,7 @@ jobs:
           qpdf --check samples/pdfa2b-pages.pdf
           qpdf --check samples/pdfua1.pdf
           qpdf --check samples/pdfua1-pages.pdf
+          qpdf --check samples/pdfua1-structure.pdf
           qpdf --check samples/forms.pdf
           qpdf --check samples/linearized.pdf
           qpdf --check-linearization samples/linearized.pdf
@@ -146,22 +147,25 @@ jobs:
           grep -q '^PASS' verapdf-ua.out || { echo "veraPDF did not report PASS for pdfua1.pdf"; exit 1; }
           echo "veraPDF: pdfua1.pdf is PDF/UA-1 compliant"
 
-      - name: veraPDF PDF/UA-1 on the tagged page document (informational)
-        # The tagged page-document pipeline has only been checked with the in-process
-        # preflight; this reports veraPDF's verdict without failing the build.
+      - name: veraPDF PDF/UA-1 on the tagged page documents (informational)
+        # The tagged page-document pipeline (including nested tables and lists) has only been
+        # checked with the in-process preflight; this reports veraPDF's verdict without failing
+        # the build.
         continue-on-error: true
         shell: bash
         run: |
-          docker run --rm -v "$PWD/samples:/data" ghcr.io/verapdf/cli \
-            --flavour ua1 --format text "/data/pdfua1-pages.pdf" | tee verapdf-ua-pages.out
-          grep -q '^PASS' verapdf-ua-pages.out
+          for sample in pdfua1-pages pdfua1-structure; do
+            docker run --rm -v "$PWD/samples:/data" ghcr.io/verapdf/cli \
+              --flavour ua1 --format text "/data/$sample.pdf" | tee "verapdf-ua-$sample.out"
+            grep -q '^PASS' "verapdf-ua-$sample.out"
+          done
 
       - name: In-process preflight (Test-VellumPdfConformance)
         shell: pwsh
         run: |
           Import-Module ./PSVellumPDF.psd1
           $failed = @()
-          foreach ($f in 'pdfa2b', 'pdfa2b-signed', 'pdfa2b-jpx', 'pdfa2b-jbig2', 'pdfa2b-charts', 'pdfa2b-pages', 'pdfua1', 'pdfua1-pages') {
+          foreach ($f in 'pdfa2b', 'pdfa2b-signed', 'pdfa2b-jpx', 'pdfa2b-jbig2', 'pdfa2b-charts', 'pdfa2b-pages', 'pdfua1', 'pdfua1-pages', 'pdfua1-structure') {
               $r = Test-VellumPdfConformance -Path "samples/$f.pdf"
               $r | Format-Table Path, Profile, IsCompliant, ErrorCount, WarningCount | Out-String | Write-Host
               if (-not $r.IsCompliant) { $failed += $f }

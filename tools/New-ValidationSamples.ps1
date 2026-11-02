@@ -17,6 +17,8 @@
       pdfua1.pdf        - PDF/UA-1 flow document (title, embedded font, alt text)
       pdfua1-pages.pdf  - tagged PDF/UA-1 page-based document (headings, text, figure,
                           barcode, artifacts)
+      pdfua1-structure.pdf - PDF/UA-1 page-based document with a section, a table (header,
+                          spans) and nested lists
       linearized.pdf    - page-based document written as "fast web view"
       forms.pdf         - page-based document with AcroForm fields
       encrypted.pdf     - password-protected (user password: validate)
@@ -178,6 +180,20 @@ $uaPages |
     Add-VellumPdfPageImage $pngPath -X 72 -Y 560 -Width 40 -AltText 'A single grey pixel' |
     Add-VellumPdfPageBarcode QrCode 'https://github.com/Tim81/PSVellumPDF' -X 300 -Y 540 -TargetWidth 80 -AltText 'Project link' |
     Save-VellumPdfDocument -Path (Join-Path $OutputPath 'pdfua1-pages.pdf') -Validate | Out-Null
+
+# --- pdfua1-structure.pdf: nested structure (section, table, list) --------------
+New-VellumPdfPageDocument -Conformance PdfUA1 -Language 'en-US' | Add-VellumPdfPage |
+    Set-VellumPdfDocumentInfo -Title 'Structure Sample' -Author 'PSVellumPDF CI' |
+    Use-VellumPdfStructure Sect -ScriptBlock {
+        $_ | Add-VellumPdfText 'Quarterly summary' -X 72 -Y 760 -FontSize 20 -Font HelveticaBold -Role H1 |
+            Add-VellumPdfPageTable -X 72 -Y 730 -Width 450 -Header 'Item', 'Qty', 'Price' -ColumnAlignment Left, Right, Right `
+                -HeaderBackground '#e8f0fe' -AlternateRowBackground '#f4f4f4' -Row @(
+                @('Widget with a long description that wraps onto a second line', '2', '10.00'),
+                @('Gadget', '1', '24.50'),
+                @(@{ Text = 'Total'; ColSpan = 2 }, '44.50')) |
+            Add-VellumPdfPageList -X 72 -Y 560 -Width 300 -Item 'Review the figures', @{ Text = 'Plan the next quarter'; Children = 'Budget', 'Hiring' }, 'Share the summary'
+    } |
+    Save-VellumPdfDocument -Path (Join-Path $OutputPath 'pdfua1-structure.pdf') -Validate | Out-Null
 
 # --- linearized.pdf / forms.pdf: page documents ---------------------------------
 New-VellumPdfPageDocument -Linearize -Language 'en-US' | Add-VellumPdfPage -Count 3 |
