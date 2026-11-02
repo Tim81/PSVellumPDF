@@ -85,6 +85,7 @@ function Add-VellumPdfLink {
         else {
             $target = Get-VellumPdfPage -Document $Document -Page $TargetPage -CommandName 'Add-VellumPdfLink'
             if (-not [double]::IsFinite($DestLeft)) { throw 'Add-VellumPdfLink: -DestLeft must be finite.' }
+            if ($PSBoundParameters.ContainsKey('DestTop') -and -not [double]::IsFinite($DestTop)) { throw 'Add-VellumPdfLink: -DestTop must be finite.' }
             $link.DestPage = $target
             $link.DestLeft = $DestLeft
             $link.DestTop = if ($PSBoundParameters.ContainsKey('DestTop')) { $DestTop } else { $target.MediaBox.UrY }

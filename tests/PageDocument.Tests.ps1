@@ -445,3 +445,83 @@ Describe 'Why form fields are refused in PDF/A' {
         ([regex]::Matches($t, '/BaseFont\s*/')).Count | Should -BeGreaterThan 1
     }
 }
+
+Describe 'Arc shapes and ICC colour' {
+    BeforeAll {
+        $script:srgb = Join-Path $TestDrive 'srgb.icc'
+        [System.IO.File]::WriteAllBytes($script:srgb, [VellumPdf.Document.IccProfiles]::Srgb)
+        $script:cmykIcc = Join-Path $TestDrive 'cmyk.icc'
+        [System.IO.File]::WriteAllBytes($script:cmykIcc, [VellumPdf.Document.IccProfiles]::GenericCmyk)
+    }
+
+    It 'draws an arc that starts with a move to its first point and then Bezier curves' {
+        $path = Save-Page { param($d) $d | Add-VellumPdfShape Arc -X 100 -Y 100 -Radius 50 -StartAngle 0 -EndAngle 180 -StrokeWidth 2 } 'arc'
+        $c = Get-PdfContentText $path
+        $c | Should -Match '(?m)^150 100 m\r?\n[\d. ]+ c\r?\n[\d. ]+ c\r?\nS'
+    }
+
+    It 'validates arc parameters' {
+        $doc = New-VellumPdfPageDocument | Add-VellumPdfPage
+        try {
+            { $doc | Add-VellumPdfShape Arc -X 1 -Y 1 -Radius 5 -StartAngle 0 } | Should -Throw '*needs -EndAngle*'
+            { $doc | Add-VellumPdfShape Arc -X 1 -Y 1 -Radius 5 -StartAngle 0 -EndAngle 90 -Width 3 } | Should -Throw '*does not apply to an Arc*'
+            { $doc | Add-VellumPdfShape Rectangle -X 1 -Y 1 -Width 5 -Height 5 -Radius 3 } | Should -Throw '*applies to an Arc only*'
+        }
+        finally { $doc.Dispose() }
+    }
+
+    It 'fills and strokes in ICC-based colour, embedding the profile once per page' {
+        $path = Save-Page {
+            param($d)
+            $d | Add-VellumPdfShape Rectangle -X 10 -Y 10 -Width 30 -Height 30 -IccProfilePath $script:srgb -FillIcc 0.2, 0.4, 0.6 |
+                Add-VellumPdfShape Rectangle -X 50 -Y 10 -Width 30 -Height 30 -IccProfilePath $script:srgb -FillIcc 1, 0, 0 -StrokeIcc 0, 0, 1 |
+                Add-VellumPdfShape Rectangle -X 90 -Y 10 -Width 30 -Height 30 -IccProfilePath $script:cmykIcc -FillIcc 0, 1, 1, 0
+        } 'icc'
+        $c = Get-PdfContentText $path
+        $c | Should -Match '/VICC1 cs\r?\n0\.2 0\.4 0\.6 scn'
+        $c | Should -Match '/VICC1 CS\r?\n0 0 1 SCN'
+        $c | Should -Match '/VICC2 cs\r?\n0 1 1 0 scn'
+        ([regex]::Matches((Get-PdfText $path), '/ICCBased')).Count | Should -Be 2   # sRGB once + CMYK once
+    }
+
+    It 'validates ICC parameters' {
+        $doc = New-VellumPdfPageDocument | Add-VellumPdfPage
+        try {
+            $r = @{ X = 1; Y = 1; Width = 5; Height = 5 }
+            { $doc | Add-VellumPdfShape Rectangle @r -FillIcc 0, 0, 0 } | Should -Throw '*go together*'
+            { $doc | Add-VellumPdfShape Rectangle @r -IccProfilePath $script:srgb -FillIcc 0, 0 } | Should -Throw '*needs 3 value(s)*'
+            { $doc | Add-VellumPdfShape Rectangle @r -IccProfilePath $script:srgb -FillIcc 0, 0, 0 -FillColor red } | Should -Throw '*not several*'
+            { $doc | Add-VellumPdfShape Rectangle @r -IccProfilePath (Join-Path $TestDrive 'nope.icc') -FillIcc 0, 0, 0 } | Should -Throw '*ICC profile not found*'
+            $junk = Join-Path $TestDrive 'junk.icc'
+            [System.IO.File]::WriteAllBytes($junk, [byte[]](1..200))
+            { $doc | Add-VellumPdfShape Rectangle @r -IccProfilePath $junk -FillIcc 0, 0, 0 } | Should -Throw '*not an ICC profile*'
+        }
+        finally { $doc.Dispose() }
+    }
+
+    It 'keeps a PDF/A-2b page document with ICC colour compliant' {
+        $path = Save-Page { param($d) $d | Add-VellumPdfShape Rectangle -X 10 -Y 10 -Width 30 -Height 30 -IccProfilePath $script:srgb -FillIcc 0.2, 0.4, 0.6 | Add-VellumPdfText 'x' -X 72 -Y 700 } 'icc-pdfa' @{ Conformance = 'PdfA2b'; Language = 'en' }
+        (Test-VellumPdfConformance -Path $path -Profile PdfA2b).IsCompliant | Should -BeTrue
+    }
+}
+
+Describe 'Options that must not be silently ignored' {
+    It 'a fill-only shape still gets the outline its stroke options ask for' {
+        $path = Save-Page { param($d) $d | Add-VellumPdfShape Rectangle -X 10 -Y 10 -Width 50 -Height 50 -FillColor yellow -StrokeWidth 3 -Dash 4, 2 } 'fillstroke'
+        $c = Get-PdfContentText $path
+        $c | Should -Match '3 w'
+        $c | Should -Match '\[4 2\] 0 d'
+        $c | Should -Match '\nB\n'
+    }
+
+    It 'rejects a position on a radio group and a non-finite -DestTop' {
+        $doc = New-VellumPdfPageDocument | Add-VellumPdfPage -Count 2
+        try {
+            $ro = @(@{ X = 1; Y = 1; Width = 5; Height = 5; ExportValue = 'a' })
+            { $doc | Add-VellumPdfFormField Radio -Name g -X 5 -RadioOption $ro } | Should -Throw '*does not apply to -Type Radio*'
+            { $doc | Add-VellumPdfLink -X 1 -Y 1 -Width 5 -Height 5 -TargetPage 2 -DestTop ([double]::NaN) } | Should -Throw '*-DestTop must be finite*'
+            { $doc | Add-VellumPdfOutlineEntry 'x' -TargetPage 2 -DestTop ([double]::PositiveInfinity) } | Should -Throw '*-DestTop must be finite*'
+        }
+        finally { $doc.Dispose() }
+    }
+}

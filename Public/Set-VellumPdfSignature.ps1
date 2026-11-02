@@ -88,7 +88,7 @@ function Set-VellumPdfSignature {
         -TimestampUrl, for example one that talks to an internal TSA or a test double.
     .PARAMETER RevocationClient
         A custom OCSP/CRL source (VellumPdf.Signing.IRevocationClient) for B-LT/B-LTA.
-        Default: the built-in HttpRevocationClient.
+        Default: the built-in HttpRevocationClient, which follows at most three redirects.
     .PARAMETER RevocationTimeout
         Timeout of the built-in revocation client. B-LT/B-LTA only.
     .PARAMETER SignaturePage
@@ -270,13 +270,7 @@ function Set-VellumPdfSignature {
             # Long-term levels embed the chain and revocation evidence in the signature.
             $settings.EstimatedSignatureSizeBytes = 32768
         }
-        if ($levelName -in 'B-LT', 'B-LTA') {
-            $settings.RevocationClient = if ($RevocationClient) { $RevocationClient }
-                elseif ($PSBoundParameters.ContainsKey('RevocationTimeout')) {
-                    [VellumPdf.Signing.HttpRevocationClient]::new($null, $RevocationTimeout)
-                }
-                else { [VellumPdf.Signing.HttpRevocationClient]::new() }
-        }
+        if ($levelName -in 'B-LT', 'B-LTA' -and $RevocationClient) { $settings.RevocationClient = $RevocationClient }
         if ($TimestampClient) { $settings.TimestampClient = $TimestampClient }
 
         if ($PSBoundParameters.ContainsKey('TimestampUrl')) {
@@ -298,6 +292,28 @@ function Set-VellumPdfSignature {
         if ($clientProp -and $clientProp.Value) {
             $clientProp.Value.Dispose()
             $clientProp.Value = $null
+        }
+
+        # Same for the revocation client's HttpClient from a previous staging.
+        $revProp = $Document.PSObject.Properties['PSVellumRevocationHttpClient']
+        if ($revProp -and $revProp.Value) {
+            $revProp.Value.Dispose()
+            $revProp.Value = $null
+        }
+        if ($levelName -in 'B-LT', 'B-LTA' -and -not $RevocationClient) {
+            # The OCSP/CRL addresses come from the signing certificate chain. CRL hosts do
+            # legitimately redirect (unlike a timestamp authority), so redirects stay on but
+            # are capped, and the client is per signature rather than the engine's process-wide
+            # shared one; Save-VellumPdfDocument disposes it with the document. Built here, after
+            # all parameter validation, so a rejected call cannot leak it.
+            $handler = [System.Net.Http.SocketsHttpHandler]::new()
+            $handler.AllowAutoRedirect = $true
+            $handler.MaxAutomaticRedirections = 3
+            $revocationHttpClient = [System.Net.Http.HttpClient]::new($handler, $true)
+            $timeoutArg = if ($PSBoundParameters.ContainsKey('RevocationTimeout')) { $RevocationTimeout } else { $null }
+            $settings.RevocationClient = [VellumPdf.Signing.HttpRevocationClient]::new($revocationHttpClient, $timeoutArg)
+            if ($revProp) { $revProp.Value = $revocationHttpClient }
+            else { $Document.PSObject.Properties.Add([psnoteproperty]::new('PSVellumRevocationHttpClient', $revocationHttpClient)) }
         }
 
         if ($PSBoundParameters.ContainsKey('TimestampUrl')) {

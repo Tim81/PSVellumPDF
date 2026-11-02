@@ -327,10 +327,12 @@ function Save-VellumPdfDocument {
                 }
                 # An HttpClient stashed by Set-VellumPdfSignature -TimestampUrl was
                 # only needed for this signing write; dispose it with the document.
-                $clientProp = $Document.PSObject.Properties['PSVellumTimestampHttpClient']
-                if ($clientProp -and $clientProp.Value) {
-                    $clientProp.Value.Dispose()
-                    $clientProp.Value = $null
+                foreach ($clientName in 'PSVellumTimestampHttpClient', 'PSVellumRevocationHttpClient') {
+                    $clientProp = $Document.PSObject.Properties[$clientName]
+                    if ($clientProp -and $clientProp.Value) {
+                        $clientProp.Value.Dispose()
+                        $clientProp.Value = $null
+                    }
                 }
             }
         }

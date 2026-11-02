@@ -358,6 +358,16 @@ Describe 'Add-VellumPdfImage load options, CCITT and margins' {
         finally { $doc.Dispose() }
     }
 
+    It 'refuses CCITT-only switches for other formats instead of ignoring them' {
+        $doc = New-VellumPdfDocument
+        try {
+            $png = [System.IO.File]::ReadAllBytes($script:gray16)
+            { $doc | Add-VellumPdfImage -ImageBytes $png -Format Png -BlackIs1 } | Should -Throw '*Ccitt only*'
+            { $doc | Add-VellumPdfImage -ImageBytes $png -Format Png -CcittK 0 } | Should -Throw '*Ccitt only*'
+        }
+        finally { $doc.Dispose() }
+    }
+
     It 'refuses load options for formats that have none' {
         $doc = New-VellumPdfDocument
         try {

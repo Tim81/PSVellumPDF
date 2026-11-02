@@ -134,14 +134,11 @@ function Add-VellumPdfFormField {
 
         # The appearance stream can draw Latin-1 and the Windows-1252 punctuation; anything else makes Save fail
         # (after the document is spent), so check here.
-        $cp1252 = [System.Collections.Generic.HashSet[int]]::new([int[]](0x20AC, 0x201A, 0x0192, 0x201E, 0x2026, 0x2020, 0x2021,
-                0x02C6, 0x2030, 0x0160, 0x2039, 0x0152, 0x017D, 0x2018, 0x2019, 0x201C, 0x201D, 0x2022, 0x2013, 0x2014, 0x02DC,
-                0x2122, 0x0161, 0x203A, 0x0153, 0x017E, 0x0178))
         $assertDrawable = {
             param([string]$What, [string]$Text)
             foreach ($ch in $Text.ToCharArray()) {
                 $code = [int]$ch
-                if (($code -gt 0xFF -or ($code -ge 0x80 -and $code -le 0x9F)) -and -not $cp1252.Contains($code)) {
+                if (-not (Test-VellumPdfWinAnsiChar -CodeUnit $code)) {
                     throw ("Add-VellumPdfFormField: $What contains U+$($code.ToString('X4')), which the field appearance cannot draw " +
                         '(Latin-1 and Windows-1252 punctuation only).')
                 }
@@ -163,7 +160,14 @@ function Add-VellumPdfFormField {
             [VellumPdf.Document.PdfRectangle]::new([double]$x, [double]$y, [double]$x + [double]$w, [double]$y + [double]$h)
         }
 
-        if ($Type -ne 'Radio') {
+        if ($Type -eq 'Radio') {
+            foreach ($n in 'Page', 'X', 'Y', 'Width', 'Height') {
+                if ($bound.ContainsKey($n)) {
+                    throw "Add-VellumPdfFormField: -$n does not apply to -Type Radio; give each button's own Page/X/Y/Width/Height in -RadioOption."
+                }
+            }
+        }
+        else {
             foreach ($req in 'X', 'Y', 'Width', 'Height') {
                 if (-not $bound.ContainsKey($req)) { throw "Add-VellumPdfFormField: -Type $Type needs -$req." }
             }

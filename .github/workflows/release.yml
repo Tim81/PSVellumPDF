@@ -21,7 +21,7 @@ jobs:
 
       - name: Install PowerShell 7.6
         shell: bash
-        run: dotnet tool install --global PowerShell --version 7.6.2
+        run: dotnet tool install --global PowerShell --version 7.6.9
 
       - name: Put the .NET tools PowerShell first on PATH
         shell: pwsh

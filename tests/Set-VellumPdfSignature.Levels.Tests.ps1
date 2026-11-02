@@ -177,6 +177,11 @@ Describe 'Set-VellumPdfSignature PAdES levels' {
             $doc | Set-VellumPdfSignature -Certificate $script:cert -TimestampClient $tsa -Level B-LT -EstimatedSignatureSize 50000 | Out-Null
             $doc.PSVellumSignature.EstimatedSignatureSizeBytes | Should -Be 50000
             $doc.PSVellumSignature.RevocationClient | Should -BeOfType ([VellumPdf.Signing.HttpRevocationClient])
+            # Per-signature client with a capped redirect budget, disposed with the document.
+            $doc.PSVellumRevocationHttpClient | Should -BeOfType ([System.Net.Http.HttpClient])
+            $client = $doc.PSVellumRevocationHttpClient
+            $doc | Set-VellumPdfSignature -Certificate $script:cert -TimestampClient $tsa -Level B-LT | Out-Null
+            [object]::ReferenceEquals($doc.PSVellumRevocationHttpClient, $client) | Should -BeFalse   # re-staging replaced (and disposed) it
         }
         finally { $doc.Dispose() }
     }

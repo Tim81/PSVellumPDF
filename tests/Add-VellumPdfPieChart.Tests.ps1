@@ -4,6 +4,7 @@
 BeforeAll {
     $manifest = Join-Path (Split-Path $PSScriptRoot -Parent) 'PSVellumPDF.psd1'
     Import-Module $manifest -Force
+    . (Join-Path $PSScriptRoot 'TestHelpers.ps1')
     function script:Get-PdfText([string]$Path) { [System.IO.File]::ReadAllText($Path, [System.Text.Encoding]::Latin1) }
     # PDF text strings that are not pure ASCII are stored as UTF-16BE with a BOM.
     function script:Get-Utf16Pattern([string]$Text) {
@@ -13,6 +14,32 @@ BeforeAll {
 
 AfterAll {
     Remove-Module PSVellumPDF -Force -ErrorAction SilentlyContinue
+}
+
+Describe 'Add-VellumPdfPieChart appearance options reach the file' {
+    BeforeAll {
+        function script:Save-Pie([hashtable]$Extra, [string]$Name) {
+            $path = Join-Path $TestDrive "$Name.pdf"
+            New-VellumPdfDocument | Add-VellumPdfPieChart -Slice @(@{ Value = 1 }, @{ Value = 1 }) @Extra |
+                Save-VellumPdfDocument -Path $path | Out-Null
+            Get-PdfContentText $path
+        }
+    }
+
+    It 'draws the separator stroke in the requested colour and width' {
+        $plain = Save-Pie @{} 'nostroke'
+        $plain | Should -Not -Match '1 0 0 RG'
+        $c = Save-Pie @{ StrokeColor = 'red'; StrokeWidth = 2 } 'stroke'
+        $c | Should -Match '1 0 0 RG'
+        $c | Should -Match '(?m)^2 w$'
+    }
+
+    It 'moves the chart down: -MarginTop replaces the chart default of 6pt' {
+        $y = { param($c) [double][regex]::Match($c, '[\d.]+ ([\d.]+) m').Groups[1].Value }
+        $base = & $y (Save-Pie @{} 'm0')
+        $moved = & $y (Save-Pie @{ MarginTop = 100 } 'm100')
+        $base - $moved | Should -Be 94   # 100 - the built-in 6pt
+    }
 }
 
 Describe 'Add-VellumPdfPieChart' {

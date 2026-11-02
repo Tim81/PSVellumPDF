@@ -52,7 +52,11 @@ function Unprotect-VellumPdfDocument {
     )
 
     process {
-        $source = Get-VellumPdfInput -Path $Path -LiteralPath $LiteralPath -CommandName 'Unprotect-VellumPdfDocument' | Select-Object -First 1
+        $sources = @(Get-VellumPdfInput -Path $Path -LiteralPath $LiteralPath -CommandName 'Unprotect-VellumPdfDocument')
+        if ($sources.Count -ne 1) {
+            throw "Unprotect-VellumPdfDocument: the path matches $($sources.Count) files; decrypt one file at a time (each needs its own -DestinationPath)."
+        }
+        $source = $sources[0]
         $target = $ExecutionContext.SessionState.Path.GetUnresolvedProviderPathFromPSPath($DestinationPath)
         if ([string]::Equals($target, $source.Name, [System.StringComparison]::OrdinalIgnoreCase)) {
             throw 'Unprotect-VellumPdfDocument: -DestinationPath must be a different file than the source.'

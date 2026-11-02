@@ -86,16 +86,32 @@ in ways that change output. Upgrade notes are in the README.
   as `TextEncodingWarnings` and `BandTruncations`.
 - **Images**: `Add-VellumPdfImage -Format Ccitt` (raw fax data with `-Columns`/`-Rows`
   and options), `-ReduceToEightBit`, `-DecodeToRaster`, `-MarginLeft`/`-MarginRight`.
+- `Add-VellumPdfShape`: an `Arc` shape and ICC-based colour (`-IccProfilePath` with
+  `-FillIcc`/`-StrokeIcc`; the profile is embedded once per page and its component
+  count is read from the file).
 - About 35 more CSS colour names; `-ColumnWidth 0` means auto.
 - `PSVellumPDF.Interop`: a small C# shim for what PowerShell cannot call directly
   (span-taking canvas operators) and the renderer behind `Add-VellumPdfDrawing`.
   Display formats for preflight results and PDF info.
-- Examples 05-08, new validation samples (charts, page documents, PDF/UA,
+- Image loading and the Windows-1252 table now live in one private helper each. CI uses
+  PowerShell 7.6.9. Examples 05-08, new validation samples (charts, page documents, PDF/UA,
   linearized, forms), veraPDF PDF/UA-1 and qpdf linearization checks in CI, and an
   engine-surface test that fails by name when a VellumPdf upgrade removes anything
   the module uses. `tools/Get-VellumPdfApiSurface.py` diffs two engine releases.
 
 ### Fixed
+- Pie chart `-StrokeColor` and `-MarginTop`/`-MarginBottom` had no effect (the cmdlet's
+  bound parameters were read from inside a script block, where they are empty).
+- `Add-VellumPdfElement` now honours the space a previous `-MarginBottom` left (an
+  invisible spacer is inserted before the element).
+- `Get-VellumPdfText` on a PDF with no pages returned an error instead of nothing;
+  `-DestTop` of `Add-VellumPdfLink`/`Add-VellumPdfOutlineEntry` must be finite.
+- Options that were silently ignored are now applied or refused: stroke options beside
+  a fill in `Add-VellumPdfShape`, `-X/-Y/-Width/-Height/-Page` with a Radio field, the
+  CCITT-only image switches on other formats, and a wildcard `-Path` that matches
+  several files in `Unprotect-VellumPdfDocument`.
+- B-LT/B-LTA revocation lookups use a per-signature HTTP client that follows at most
+  three redirects, instead of the engine's process-wide shared client.
 - Table without `-Header`: the column-count check no longer counts a phantom header.
 
 ### Security

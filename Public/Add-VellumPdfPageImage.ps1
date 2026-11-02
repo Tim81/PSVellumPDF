@@ -76,30 +76,9 @@ function Add-VellumPdfPageImage {
             if (-not [System.IO.File]::Exists($resolved)) { throw "Add-VellumPdfPageImage: file not found: '$resolved'." }
             $bytes = [System.IO.File]::ReadAllBytes($resolved)
             $source = "'$resolved'"
-            $key = switch ([System.IO.Path]::GetExtension($resolved).ToLowerInvariant()) {
-                { $_ -in '.jpg', '.jpeg' } { 'jpeg' }
-                '.png' { 'png' } '.bmp' { 'bmp' } '.gif' { 'gif' }
-                { $_ -in '.tif', '.tiff' } { 'tiff' }
-                { $_ -in '.jbig2', '.jb2' } { 'jbig2' }
-                { $_ -in '.jp2', '.jpx', '.j2k', '.jpf' } { 'jpeg2000' }
-                default { throw "Add-VellumPdfPageImage: unsupported image extension '$_'." }
-            }
+            $key = Get-VellumPdfImageFormat -Extension ([System.IO.Path]::GetExtension($resolved)) -CommandName 'Add-VellumPdfPageImage'
         }
-        try {
-            $image = switch ($key) {
-                'jpeg' { [VellumPdf.Images.JpegImageLoader]::Load($bytes) }
-                'png' { [VellumPdf.Images.PngImageLoader]::Load($bytes) }
-                'bmp' { [VellumPdf.Images.BmpImageLoader]::Load($bytes) }
-                'gif' { [VellumPdf.Images.GifImageLoader]::Load($bytes) }
-                'tiff' { [VellumPdf.Images.TiffImageLoader]::Load($bytes) }
-                'jbig2' { [VellumPdf.Images.Jbig2ImageLoader]::Load($bytes) }
-                'jpeg2000' { [VellumPdf.Images.JpxImageLoader]::Load($bytes) }
-            }
-        }
-        catch {
-            $inner = if ($_.Exception.InnerException) { $_.Exception.InnerException.Message } else { $_.Exception.Message }
-            throw "Add-VellumPdfPageImage: failed to load ${source}: $inner"
-        }
+        $image = Import-VellumPdfImage -Bytes $bytes -Format $key -CommandName 'Add-VellumPdfPageImage' -Source $source
 
         $w = if ($PSBoundParameters.ContainsKey('Width')) { $Width } elseif ($PSBoundParameters.ContainsKey('Height')) { $Height * $image.Width / $image.Height } else { [double]$image.Width }
         $h = if ($PSBoundParameters.ContainsKey('Height')) { $Height } elseif ($PSBoundParameters.ContainsKey('Width')) { $Width * $image.Height / $image.Width } else { [double]$image.Height }

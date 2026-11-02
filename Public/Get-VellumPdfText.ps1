@@ -66,7 +66,7 @@ function Get-VellumPdfText {
             $reader = Open-VellumPdfReader -Bytes $source.Data -Password $plain -AllowReconstruction:$AllowReconstruction `
                 -CommandName 'Get-VellumPdfText' -Source $source.Name
             try {
-                $numbers = if ($Page) { $Page } else { 1..$reader.PageCount }
+                $numbers = if ($Page) { $Page } elseif ($reader.PageCount -gt 0) { 1..$reader.PageCount } else { @() }   # 1..0 would count down to page 0
                 foreach ($n in $numbers) {
                     if ($n -gt $reader.PageCount) {
                         throw "Get-VellumPdfText: '$($source.Name)' has $($reader.PageCount) page(s); page $n does not exist."

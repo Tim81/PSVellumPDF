@@ -190,19 +190,7 @@ function Add-VellumPdfImage {
             }
             $bytes = [System.IO.File]::ReadAllBytes($resolved)
             $source = "'$resolved'"
-            $ext = [System.IO.Path]::GetExtension($resolved).ToLowerInvariant()
-            $formatKey = switch ($ext) {
-                '.jpg' { 'jpeg' }   '.jpeg' { 'jpeg' }   '.png' { 'png' }
-                '.bmp' { 'bmp' }    '.gif' { 'gif' }
-                '.tif' { 'tiff' }   '.tiff' { 'tiff' }
-                '.jbig2' { 'jbig2' } '.jb2' { 'jbig2' }
-                '.jp2' { 'jpeg2000' } '.jpx' { 'jpeg2000' } '.j2k' { 'jpeg2000' } '.jpf' { 'jpeg2000' }
-                default {
-                    throw ("Add-VellumPdfImage: unsupported image extension '$ext'. " +
-                        "Supported extensions are: .jpg, .jpeg, .png, .bmp, .gif, .tif, " +
-                        ".tiff, .jbig2, .jb2, .jp2, .jpx, .j2k, .jpf.")
-                }
-            }
+            $formatKey = Get-VellumPdfImageFormat -Extension ([System.IO.Path]::GetExtension($resolved)) -CommandName 'Add-VellumPdfImage'
         }
 
         # Load options (bit depth / decode mode) exist only on some loaders.
@@ -217,6 +205,7 @@ function Add-VellumPdfImage {
             if ($ReduceToEightBit) { $loadOptions.BitDepth = [VellumPdf.Images.ImageBitDepth]::ReduceToEight }
             if ($DecodeToRaster)   { $loadOptions.DecodeMode = [VellumPdf.Images.ImageDecodeMode]::DecodeToRaster }
         }
+        $ccitt = $null
         if ($formatKey -eq 'ccitt') {
             if (-not $PSBoundParameters.ContainsKey('Columns') -or -not $PSBoundParameters.ContainsKey('Rows')) {
                 throw 'Add-VellumPdfImage: -Format Ccitt needs -Columns and -Rows (raw fax data has no header).'
@@ -227,29 +216,15 @@ function Add-VellumPdfImage {
             $ccitt.EncodedByteAlign = $EncodedByteAlign.IsPresent
             $ccitt.EndOfLine = $EndOfLine.IsPresent
         }
-        elseif ($PSBoundParameters.ContainsKey('Columns') -or $PSBoundParameters.ContainsKey('Rows')) {
+        elseif ($PSBoundParameters.ContainsKey('Columns') -or $PSBoundParameters.ContainsKey('Rows') -or $PSBoundParameters.ContainsKey('CcittK') -or
+                $BlackIs1 -or $EncodedByteAlign -or $EndOfLine) {
             throw 'Add-VellumPdfImage: -Columns/-Rows/-CcittK/-BlackIs1/-EncodedByteAlign/-EndOfLine apply to -Format Ccitt only.'
         }
 
-        # Loader errors ("Not a PNG file.") do not mention the source; rethrow
-        # with it so batch scripts can identify the culprit.
-        try {
-            $xObject = switch ($formatKey) {
-                'jpeg'     { [VellumPdf.Images.JpegImageLoader]::Load($bytes) }
-                'png'      { if ($loadOptions) { [VellumPdf.Images.PngImageLoader]::Load($bytes, $loadOptions) } else { [VellumPdf.Images.PngImageLoader]::Load($bytes) } }
-                'bmp'      { [VellumPdf.Images.BmpImageLoader]::Load($bytes) }
-                'gif'      { [VellumPdf.Images.GifImageLoader]::Load($bytes) }
-                'tiff'     { if ($loadOptions) { [VellumPdf.Images.TiffImageLoader]::Load($bytes, $loadOptions) } else { [VellumPdf.Images.TiffImageLoader]::Load($bytes) } }
-                'jbig2'    { if ($loadOptions) { [VellumPdf.Images.Jbig2ImageLoader]::Load($bytes, $loadOptions) } else { [VellumPdf.Images.Jbig2ImageLoader]::Load($bytes) } }
-                'jpeg2000' { if ($loadOptions) { [VellumPdf.Images.JpxImageLoader]::Load($bytes, $loadOptions) } else { [VellumPdf.Images.JpxImageLoader]::Load($bytes) } }
-                'ccitt'    { [VellumPdf.Images.CcittImageLoader]::Load($bytes, $Columns, $Rows, $ccitt, $loadOptions) }
-            }
-        }
-        catch {
-            if ($_.Exception.Message -like 'Add-VellumPdfImage:*') { throw }
-            $inner = if ($_.Exception.InnerException) { $_.Exception.InnerException.Message } else { $_.Exception.Message }
-            throw "Add-VellumPdfImage: failed to load $($source): $inner"
-        }
+        # Loader errors ("Not a PNG file.") do not mention the source; Import-VellumPdfImage
+        # rethrows them with it so batch scripts can identify the culprit.
+        $xObject = Import-VellumPdfImage -Bytes $bytes -Format $formatKey -LoadOptions $loadOptions -Columns $Columns -Rows $Rows `
+            -CcittOptions $ccitt -CommandName 'Add-VellumPdfImage' -Source $source
 
         $layoutImage = [VellumPdf.Layout.Elements.LayoutImage]::new($xObject)
 

@@ -116,6 +116,16 @@ Describe 'Get-VellumPdfText' {
         $pages[-1].Text | Should -Match 'Last words'
     }
 
+    It 'returns nothing for a document without pages instead of asking for page 0' {
+        # A reconstructed file whose page tree is empty: drop the single page from a valid file.
+        $bytes = [System.IO.File]::ReadAllBytes($script:sample)
+        $text = [System.Text.Encoding]::Latin1.GetString($bytes) -replace '/Count \d+', '/Count 0' -replace '/Kids \[[^\]]*\]', '/Kids []'
+        $none = [System.Text.Encoding]::Latin1.GetBytes($text)
+        $info = Get-VellumPdfInfo -Bytes $none -AllowReconstruction
+        $info.PageCount | Should -Be 0
+        Get-VellumPdfText -Bytes $none -AllowReconstruction | Should -BeNullOrEmpty
+    }
+
     It 'reads an encrypted file with its password and rejects a page that does not exist' {
         Get-VellumPdfText -Path $script:locked -Password $script:pw | Should -Match 'Secret text'
         { Get-VellumPdfText -Path $script:sample -Page 99 } | Should -Throw '*page 99 does not exist*'
@@ -161,6 +171,13 @@ Describe 'Unprotect-VellumPdfDocument' {
         { Unprotect-VellumPdfDocument -Path $script:sample -DestinationPath (Join-Path $TestDrive 'x.pdf') } | Should -Throw '*is not encrypted*'
         { Unprotect-VellumPdfDocument -Path $script:locked -DestinationPath (Join-Path $TestDrive 'y.pdf') } | Should -Throw '*needs a password*'
         Test-Path (Join-Path $TestDrive 'y.pdf') | Should -BeFalse
+    }
+
+    It 'refuses a wildcard that matches several files' {
+        Copy-Item $script:locked (Join-Path $TestDrive 'multi-a.pdf')
+        Copy-Item $script:locked (Join-Path $TestDrive 'multi-b.pdf')
+        { Unprotect-VellumPdfDocument -Path (Join-Path $TestDrive 'multi-*.pdf') -DestinationPath (Join-Path $TestDrive 'm.pdf') -Password $script:pw } |
+            Should -Throw '*matches 2 files*'
     }
 
     It 'does nothing under -WhatIf' {

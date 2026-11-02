@@ -26,20 +26,11 @@ function Write-VellumPdfEncodingWarning {
         [string]$CommandName
     )
 
-    # The 27 code points Windows-1252 maps into 0x80..0x9F (all others in
-    # U+0080..U+009F are C1 controls the engine cannot encode).
-    if (-not (Test-Path variable:script:WinAnsiExtras)) {
-        $script:WinAnsiExtras = [System.Collections.Generic.HashSet[int]]::new(
-            [int[]](0x20AC, 0x201A, 0x0192, 0x201E, 0x2026, 0x2020, 0x2021, 0x02C6, 0x2030, 0x0160,
-                0x2039, 0x0152, 0x017D, 0x2018, 0x2019, 0x201C, 0x201D, 0x2022, 0x2013, 0x2014,
-                0x02DC, 0x2122, 0x0161, 0x203A, 0x0153, 0x017E, 0x0178))
-    }
     foreach ($t in $Text) {
         if (-not $t) { continue }
         for ($i = 0; $i -lt $t.Length; $i++) {
             $c = $t[$i]
-            if ([int]$c -le 255 -and ([int]$c -lt 0x80 -or [int]$c -gt 0x9F)) { continue }
-            if ($script:WinAnsiExtras.Contains([int]$c)) { continue }
+            if ([int]$c -lt 0x80 -or (Test-VellumPdfWinAnsiChar -CodeUnit ([int]$c))) { continue }   # ASCII fast path, no call
 
             # Report the real codepoint for supplementary-plane characters
             # (emoji etc.) instead of a bare UTF-16 surrogate half.

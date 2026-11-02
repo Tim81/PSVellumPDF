@@ -107,7 +107,7 @@ Test-VellumPdfConformance ./report.pdf            # in-process PDF/A / PDF/UA pr
 |---|---|
 | `New-VellumPdfPageDocument` | Create one: `-Conformance` (None, PdfA2b/2u), page size, `-Linearize`, `-DocumentId`/`-Timestamp` for reproducible output |
 | `Add-VellumPdfPage` | Add pages: size, `-Rotate`, `-Count` |
-| `Add-VellumPdfShape` / `-Text` / `-Gradient` / `-PageImage` / `-PageBarcode` | Draw at x/y (RGB or CMYK colour, dashes, opacity, alignment) |
+| `Add-VellumPdfShape` / `-Text` / `-Gradient` / `-PageImage` / `-PageBarcode` | Draw at x/y (rectangle, ellipse, arc, line; RGB, CMYK or ICC colour, dashes, opacity, alignment) |
 | `Invoke-VellumPdfCanvas` | Full canvas access from a script block |
 | `Add-VellumPdfFormField` | Text, check box, choice, radio group and push button fields |
 | `Add-VellumPdfLink` | Link a rectangle to a URL or another page |

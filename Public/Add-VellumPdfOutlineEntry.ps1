@@ -53,6 +53,7 @@ function Add-VellumPdfOutlineEntry {
         Assert-VellumPdfDocumentOpen -Document $Document -CommandName 'Add-VellumPdfOutlineEntry'
         $target = Get-VellumPdfPage -Document $Document -Page $TargetPage -CommandName 'Add-VellumPdfOutlineEntry'
         if (-not [double]::IsFinite($DestLeft)) { throw 'Add-VellumPdfOutlineEntry: -DestLeft must be finite.' }
+        if ($PSBoundParameters.ContainsKey('DestTop') -and -not [double]::IsFinite($DestTop)) { throw 'Add-VellumPdfOutlineEntry: -DestTop must be finite.' }
 
         # Track the deepest level so far: a level may be at most one deeper than the previous entry.
         $prop = $Document.PSObject.Properties['PSVellumOutlineLevel']

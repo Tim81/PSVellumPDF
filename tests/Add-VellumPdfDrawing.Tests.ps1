@@ -123,6 +123,21 @@ Describe 'Add-VellumPdfElement' {
         (Get-Item $out).Length | Should -BeGreaterThan 400
     }
 
+    It 'places the space a previous -MarginBottom deferred in front of the element' {
+        $y = {
+            param($mb, $name)
+            $qr = [VellumPdf.Barcodes.QrCode]::new('hello'); $qr.ModuleSize = 2
+            $out = Join-Path $TestDrive "$name.pdf"
+            New-VellumPdfDocument | Add-VellumPdfParagraph -Text 'First' -MarginBottom $mb |
+                Add-VellumPdfElement -Renderer ([VellumPdf.Barcodes.BarcodeRenderer]::new($qr)) |
+                Save-VellumPdfDocument -Path $out | Out-Null
+            [double][regex]::Match((Get-PdfContentText $out), '[\d.]+ ([\d.]+) [\d.]+ [\d.]+ re').Groups[1].Value
+        }
+        $base = & $y 0 'sp0'
+        $spaced = & $y 40 'sp40'
+        $base - $spaced | Should -Be 40
+    }
+
     It 'requires an IRenderer' {
         $doc = New-VellumPdfDocument
         try { { $doc | Add-VellumPdfElement -Renderer 'nope' } | Should -Throw }

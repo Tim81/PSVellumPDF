@@ -123,6 +123,8 @@ function Add-VellumPdfPieChart {
     begin {
         $collected = [System.Collections.Generic.List[object]]::new()
         $palette = Get-VellumPdfPalette
+        # Inside the script block below $PSBoundParameters would be the block's own (empty) dictionary.
+        $boundParameters = $PSBoundParameters
 
         # Builds and adds the chart (and legend) for a list of raw slice specs.
         $buildChart = {
@@ -187,7 +189,7 @@ function Add-VellumPdfPieChart {
             $chart.Slices = $slices
             $chart.Diameter = $Diameter
             $chart.StrokeWidth = $StrokeWidth
-            if ($PSBoundParameters.ContainsKey('StrokeColor')) {
+            if ($boundParameters.ContainsKey('StrokeColor')) {
                 $sc = ConvertTo-VellumColor $StrokeColor
                 $chart.StrokeColor = [VellumPdf.Layout.Core.ColorRgb]::new($sc[0], $sc[1], $sc[2])
             }
@@ -199,7 +201,7 @@ function Add-VellumPdfPieChart {
             if ($Decorative) { $chart.Decorative = $true }
 
             Set-VellumPdfElementMargin -Element $chart -Top $MarginTop -Bottom $MarginBottom `
-                -BoundParameters $PSBoundParameters -Document $Document
+                -BoundParameters $boundParameters -Document $Document
             [void]$Document.Add($chart)
 
             if ($Legend) {
