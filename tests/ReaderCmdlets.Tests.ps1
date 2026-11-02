@@ -52,7 +52,7 @@ Describe 'Get-VellumPdfInfo' {
     }
 
     It 'describes encryption and needs the password' {
-        { Get-VellumPdfInfo -Path $script:locked } | Should -Throw '*needs a password*'
+        { Get-VellumPdfInfo -Path $script:locked -ErrorAction Stop } | Should -Throw '*needs a password*'
         $i = Get-VellumPdfInfo -Path $script:locked -Password $script:pw
         $i.IsEncrypted | Should -BeTrue
         $i.Encryption.KeyLengthBits | Should -Be 256
@@ -86,16 +86,16 @@ Describe 'Get-VellumPdfInfo' {
 
         $bytes = [System.IO.File]::ReadAllBytes($path)
         $broken = $bytes[0..($bytes.Length - 120)]   # cut off the xref table and trailer
-        { Get-VellumPdfInfo -Bytes $broken } | Should -Throw '*Try -AllowReconstruction*'
+        { Get-VellumPdfInfo -Bytes $broken -ErrorAction Stop } | Should -Throw '*Try -AllowReconstruction*'
         $recovered = Get-VellumPdfInfo -Bytes $broken -AllowReconstruction
         $recovered.WasReconstructed | Should -BeTrue
         $recovered.PageCount | Should -Be 1
     }
 
     It 'gives clear errors for missing, malformed and unmatched input' {
-        { Get-VellumPdfInfo -LiteralPath (Join-Path $TestDrive 'nope.pdf') } | Should -Throw '*file not found*'
-        { Get-VellumPdfInfo -Path (Join-Path $TestDrive 'nomatch*.pdf') } | Should -Throw '*no file matches*'
-        { Get-VellumPdfInfo -Bytes ([byte[]](1, 2, 3)) } | Should -Throw '*not a well-formed PDF*'
+        { Get-VellumPdfInfo -LiteralPath (Join-Path $TestDrive 'nope.pdf') -ErrorAction Stop } | Should -Throw '*file not found*'
+        { Get-VellumPdfInfo -Path (Join-Path $TestDrive 'nomatch*.pdf') -ErrorAction Stop } | Should -Throw '*no file matches*'
+        { Get-VellumPdfInfo -Bytes ([byte[]](1, 2, 3)) -ErrorAction Stop } | Should -Throw '*not a well-formed PDF*'
     }
 }
 
@@ -177,7 +177,7 @@ Describe 'Get-VellumPdfText' {
 
     It 'reads an encrypted file with its password and rejects a page that does not exist' {
         Get-VellumPdfText -Path $script:locked -Password $script:pw | Should -Match 'Secret text'
-        { Get-VellumPdfText -Path $script:sample -Page 99 } | Should -Throw '*page 99 does not exist*'
+        { Get-VellumPdfText -Path $script:sample -Page 99 -ErrorAction Stop } | Should -Throw '*page 99 does not exist*'
     }
 }
 
@@ -217,8 +217,8 @@ Describe 'Unprotect-VellumPdfDocument' {
         $existing = Join-Path $TestDrive 'exists.pdf'
         Set-Content -LiteralPath $existing -Value 'x'
         { Unprotect-VellumPdfDocument -Path $script:locked -DestinationPath $existing -Password $script:pw } | Should -Throw '*use -Force*'
-        { Unprotect-VellumPdfDocument -Path $script:sample -DestinationPath (Join-Path $TestDrive 'x.pdf') } | Should -Throw '*is not encrypted*'
-        { Unprotect-VellumPdfDocument -Path $script:locked -DestinationPath (Join-Path $TestDrive 'y.pdf') } | Should -Throw '*needs a password*'
+        { Unprotect-VellumPdfDocument -Path $script:sample -DestinationPath (Join-Path $TestDrive 'x.pdf') -ErrorAction Stop } | Should -Throw '*is not encrypted*'
+        { Unprotect-VellumPdfDocument -Path $script:locked -DestinationPath (Join-Path $TestDrive 'y.pdf') -ErrorAction Stop } | Should -Throw '*needs a password*'
         Test-Path (Join-Path $TestDrive 'y.pdf') | Should -BeFalse
     }
 

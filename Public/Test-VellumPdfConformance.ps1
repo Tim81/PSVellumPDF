@@ -17,12 +17,19 @@ function Test-VellumPdfConformance {
         fast regression gate, not a replacement for a certified validator when a
         formal compliance statement is required. Known gap: it does not examine
         fonts that are used only by form fields or other annotation appearances.
+
+        Several files can be given (or piped); they are opened one at a time. A failure for
+        one file (not found, unreadable, malformed, wrong password, ...) is a non-terminating
+        error with that file as TargetObject and the next file is still processed; use
+        -ErrorAction Stop to stop at the first one. Invalid parameters terminate. With -Quiet a file that could
+        not be checked makes the result $false.
     .PARAMETER Path
-        The PDF file(s). Accepts wildcards. Piped strings bind here; the file returned
-        by Save-VellumPdfDocument (a FileInfo) binds to -LiteralPath, so it can be piped
+        The PDF file(s). Accepts wildcards. Piped strings bind here, and so do piped objects with a Path property;
+        the file returned by Save-VellumPdfDocument (a FileInfo) binds to -LiteralPath, so it can be piped
         straight in and names containing [ ] work.
     .PARAMETER LiteralPath
-        The PDF file(s), taken literally (no wildcards).
+        The PDF file(s), taken literally (no wildcards). Aliases PSPath and FullName, so objects with either
+        property (FileInfo, Select-Object FullName) bind by name.
     .PARAMETER Bytes
         The PDF as a byte array.
     .PARAMETER Profile
@@ -48,11 +55,11 @@ function Test-VellumPdfConformance {
     [System.Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSAvoidAssignmentToAutomaticVariable', '',
         Justification = '-Profile names the PDF conformance profile (documented API); inside this function it only shadows the host-profile variable.')]
     param(
-        [Parameter(Mandatory, Position = 0, ValueFromPipeline, ParameterSetName = 'Path')]
+        [Parameter(Mandatory, Position = 0, ValueFromPipeline, ValueFromPipelineByPropertyName, ParameterSetName = 'Path')]
         [string[]]$Path,
 
         [Parameter(Mandatory, ValueFromPipelineByPropertyName, ParameterSetName = 'LiteralPath')]
-        [Alias('PSPath')]
+        [Alias('PSPath', 'FullName')]
         [string[]]$LiteralPath,
 
         [Parameter(Mandatory, ParameterSetName = 'Bytes')]
@@ -79,42 +86,48 @@ function Test-VellumPdfConformance {
 
     process {
         try {
-            $sources = @(Get-VellumPdfInput -Path $Path -LiteralPath $LiteralPath -Bytes $Bytes -CommandName 'Test-VellumPdfConformance')
+            foreach ($source in Get-VellumPdfInput -Path $Path -LiteralPath $LiteralPath -Bytes $Bytes -CommandName 'Test-VellumPdfConformance') {
+                try {
+                    Read-VellumPdfInput -Source $source
+                    $name = $source.Name
+                    $data = [byte[]]$source.Data
 
-            foreach ($source in $sources) {
-                $name = $source.Name
-                $data = [byte[]]$source.Data
-
-                $profiles = $Profile
-                if (-not $profiles) {
-                    try {
-                        $claimed = [VellumPdf.Conformance.PdfPreflight]::DetectClaimedProfiles($data, $plain)
-                    }
-                    catch [VellumPdf.Reader.PdfPasswordException] {
-                        throw "Test-VellumPdfConformance: '$name' is encrypted and needs a password. Pass -Password."
-                    }
-                    catch [System.IO.InvalidDataException] {
-                        throw "Test-VellumPdfConformance: '$name' is not a well-formed PDF: $($_.Exception.Message)"
-                    }
-                    $profiles = @(foreach ($c in $claimed) {
-                            switch ($c) {
-                                ([VellumPdf.Conformance.PdfConformance]::PdfA2B) { 'PdfA2b' }
-                                ([VellumPdf.Conformance.PdfConformance]::PdfA2U) { 'PdfA2u' }
-                                ([VellumPdf.Conformance.PdfConformance]::PdfA2A) { 'PdfA2a' }
-                                ([VellumPdf.Conformance.PdfConformance]::PdfUA1) { 'PdfUA1' }
-                            }
-                        })
+                    $profiles = $Profile
                     if (-not $profiles) {
-                        throw ("Test-VellumPdfConformance: '$name' does not claim PDF/A-2 or PDF/UA-1 conformance. " +
-                            'Pass -Profile to validate it against a profile anyway.')
+                        try {
+                            $claimed = [VellumPdf.Conformance.PdfPreflight]::DetectClaimedProfiles($data, $plain)
+                        }
+                        catch [VellumPdf.Reader.PdfPasswordException] {
+                            throw "Test-VellumPdfConformance: '$name' is encrypted and needs a password. Pass -Password."
+                        }
+                        catch [System.IO.InvalidDataException] {
+                            throw "Test-VellumPdfConformance: '$name' is not a well-formed PDF: $($_.Exception.Message)"
+                        }
+                        $profiles = @(foreach ($c in $claimed) {
+                                switch ($c) {
+                                    ([VellumPdf.Conformance.PdfConformance]::PdfA2B) { 'PdfA2b' }
+                                    ([VellumPdf.Conformance.PdfConformance]::PdfA2U) { 'PdfA2u' }
+                                    ([VellumPdf.Conformance.PdfConformance]::PdfA2A) { 'PdfA2a' }
+                                    ([VellumPdf.Conformance.PdfConformance]::PdfUA1) { 'PdfUA1' }
+                                }
+                            })
+                        if (-not $profiles) {
+                            throw ("Test-VellumPdfConformance: '$name' does not claim PDF/A-2 or PDF/UA-1 conformance. " +
+                                'Pass -Profile to validate it against a profile anyway.')
+                        }
+                    }
+
+                    foreach ($p in $profiles) {
+                        $result = Invoke-VellumPdfPreflight -Bytes $data -Level $p -Password $plain -Source $name
+                        if (-not $result.IsCompliant) { $allOk = $false }
+                        if (-not $Quiet) { $result }
                     }
                 }
-
-                foreach ($p in $profiles) {
-                    $result = Invoke-VellumPdfPreflight -Bytes $data -Level $p -Password $plain -Source $name
-                    if (-not $result.IsCompliant) { $allOk = $false }
-                    if (-not $Quiet) { $result }
+                catch {
+                    $allOk = $false   # a file that could not be checked is not known to conform
+                    $PSCmdlet.WriteError((ConvertTo-VellumPdfFileError -ErrorRecord $_ -Target $source.Name -CommandName 'Test-VellumPdfConformance'))
                 }
+                finally { $source.Data = $null; $data = $null }   # one file in memory at a time
             }
         }
         catch {

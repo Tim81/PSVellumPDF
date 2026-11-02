@@ -11,10 +11,17 @@ function Get-VellumPdfText {
         TrueType subsets is not extracted; no spaces are inserted between text
         runs that the PDF positions apart; there is no OCR for scanned pages.
         Diagnostics about text it could not decode are written as warnings.
+
+        Several files can be given (or piped); they are opened one at a time. A failure for
+        one file (not found, unreadable, malformed, wrong password, ...) is a non-terminating
+        error with that file as TargetObject and the next file is still processed; use
+        -ErrorAction Stop to stop at the first one. A -Page beyond the end of a file counts as a failure for that file. Invalid parameters terminate.
     .PARAMETER Path
-        The PDF file(s). Accepts wildcards. Piped strings bind here; piped FileInfo objects (Get-ChildItem) bind to -LiteralPath through their PSPath, so names containing [ ] work.
+        The PDF file(s). Accepts wildcards. Piped strings bind here, and so do piped objects with a Path property;
+        piped FileInfo objects (Get-ChildItem) bind to -LiteralPath through their PSPath, so names containing [ ] work.
     .PARAMETER LiteralPath
-        The PDF file(s), taken literally.
+        The PDF file(s), taken literally. Aliases PSPath and FullName, so objects with either property
+        (FileInfo, Select-Object FullName) bind by name.
     .PARAMETER Bytes
         The PDF as a byte array.
     .PARAMETER Page
@@ -46,11 +53,11 @@ function Get-VellumPdfText {
     [OutputType([string])]
     [OutputType('PSVellumPDF.PdfPageText')]
     param(
-        [Parameter(Mandatory, Position = 0, ValueFromPipeline, ParameterSetName = 'Path')]
+        [Parameter(Mandatory, Position = 0, ValueFromPipeline, ValueFromPipelineByPropertyName, ParameterSetName = 'Path')]
         [string[]]$Path,
 
         [Parameter(Mandatory, ValueFromPipelineByPropertyName, ParameterSetName = 'LiteralPath')]
-        [Alias('PSPath')]
+        [Alias('PSPath', 'FullName')]
         [string[]]$LiteralPath,
 
         [Parameter(Mandatory, ParameterSetName = 'Bytes')]
@@ -96,29 +103,36 @@ function Get-VellumPdfText {
     process {
         try {
             foreach ($source in Get-VellumPdfInput -Path $Path -LiteralPath $LiteralPath -Bytes $Bytes -CommandName 'Get-VellumPdfText') {
-                $reader = Open-VellumPdfReader -Limit $limits -Bytes $source.Data -Password $plain -AllowReconstruction:$AllowReconstruction `
-                    -CommandName 'Get-VellumPdfText' -Source $source.Name
                 try {
-                    $numbers = if ($Page) { $Page } elseif ($reader.PageCount -gt 0) { 1..$reader.PageCount } else { @() }   # 1..0 would count down to page 0
-                    foreach ($n in $numbers) {
-                        if ($n -gt $reader.PageCount) {
-                            throw "Get-VellumPdfText: '$($source.Name)' has $($reader.PageCount) page(s); page $n does not exist."
+                    Read-VellumPdfInput -Source $source
+                    $reader = Open-VellumPdfReader -Limit $limits -Bytes $source.Data -Password $plain -AllowReconstruction:$AllowReconstruction `
+                        -CommandName 'Get-VellumPdfText' -Source $source.Name
+                    try {
+                        $numbers = if ($Page) { $Page } elseif ($reader.PageCount -gt 0) { 1..$reader.PageCount } else { @() }   # 1..0 would count down to page 0
+                        foreach ($n in $numbers) {
+                            if ($n -gt $reader.PageCount) {
+                                throw "Get-VellumPdfText: '$($source.Name)' has $($reader.PageCount) page(s); page $n does not exist."
+                            }
+                        }
+                        $texts = foreach ($n in $numbers) {
+                            $result = $reader.GetPage($n - 1).ExtractText()
+                            foreach ($d in $result.Diagnostics) {
+                                Write-Warning "Get-VellumPdfText: page ${n}: $($d.Message)"
+                            }
+                            [pscustomobject]@{ PSTypeName = 'PSVellumPDF.PdfPageText'; Page = $n; Text = $result.Text }
+                        }
+                        if ($PerPage) { $texts }
+                        else {
+                            $separator = [VellumPdf.Reader.PdfTextExtractionOptions]::new().PageSeparator
+                            ($texts | ForEach-Object Text) -join $separator
                         }
                     }
-                    $texts = foreach ($n in $numbers) {
-                        $result = $reader.GetPage($n - 1).ExtractText()
-                        foreach ($d in $result.Diagnostics) {
-                            Write-Warning "Get-VellumPdfText: page ${n}: $($d.Message)"
-                        }
-                        [pscustomobject]@{ PSTypeName = 'PSVellumPDF.PdfPageText'; Page = $n; Text = $result.Text }
-                    }
-                    if ($PerPage) { $texts }
-                    else {
-                        $separator = [VellumPdf.Reader.PdfTextExtractionOptions]::new().PageSeparator
-                        ($texts | ForEach-Object Text) -join $separator
-                    }
+                    finally { $reader.Dispose() }
                 }
-                finally { $reader.Dispose() }
+                catch {
+                    $PSCmdlet.WriteError((ConvertTo-VellumPdfFileError -ErrorRecord $_ -Target $source.Name -CommandName 'Get-VellumPdfText'))
+                }
+                finally { $source.Data = $null }   # one file in memory at a time
             }
         }
         catch {

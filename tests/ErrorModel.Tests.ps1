@@ -6,6 +6,10 @@
 
 param()
 
+BeforeDiscovery {
+    $script:haveQpdf = [bool](Get-Command qpdf -ErrorAction SilentlyContinue)
+}
+
 BeforeAll {
     $manifest = Join-Path (Split-Path $PSScriptRoot -Parent) 'PSVellumPDF.psd1'
     Import-Module $manifest -Force
@@ -24,7 +28,6 @@ Describe 'Errors terminate whatever -ErrorAction says' {
             @{ Pref = $pref; Name = 'Add-VellumPdfPath conflicting colours'; Run = { param($ea) New-Page | Add-VellumPdfPath 'M 0 0 L 1 1' -FillColor red -FillCmyk 0, 0, 0, 1 -ErrorAction $ea } }
             @{ Pref = $pref; Name = 'Add-VellumPdfShape without size'; Run = { param($ea) New-Page | Add-VellumPdfShape Rectangle -X 1 -Y 1 -ErrorAction $ea } }
             @{ Pref = $pref; Name = 'Save -Validate on an unconformant document'; Run = { param($ea) New-VellumPdfDocument | Add-VellumPdfParagraph -Text x | Save-VellumPdfDocument -Path (Join-Path $TestDrive 'nv.pdf') -Validate -ErrorAction $ea } }
-            @{ Pref = $pref; Name = 'Get-VellumPdfText missing file'; Run = { param($ea) Get-VellumPdfText -Path (Join-Path $TestDrive 'missing.pdf') -ErrorAction $ea } }
         }
     ) {
         { & $Run $Pref } | Should -Throw
@@ -62,13 +65,18 @@ Describe 'Coordinates are bounded to the page limit' {
         { & $Run } | Should -Throw '*between -14400 and 14400*'
     }
 
-    It 'accepts values at the limit and writes a file qpdf accepts' {
+    It 'accepts values at the limit and writes a file' {
         $path = Join-Path $TestDrive 'limit.pdf'
         New-Page @{ Conformance = 'PdfA2b'; Language = 'en' } | Add-VellumPdfPath 'M -14400 14400 L 14400 -14400' -StrokeColor black |
             Save-VellumPdfDocument -Path $path -Validate | Out-Null
-        if (Get-Command qpdf -ErrorAction SilentlyContinue) {
-            & qpdf --check $path 2>&1 | Out-String | Should -Match 'No syntax or stream encoding errors'
-        }
+        Test-Path $path | Should -BeTrue
+    }
+
+    It 'writes a file qpdf accepts for values at the limit' -Skip:(-not $script:haveQpdf) {
+        $path = Join-Path $TestDrive 'limit-qpdf.pdf'
+        New-Page @{ Conformance = 'PdfA2b'; Language = 'en' } | Add-VellumPdfPath 'M -14400 14400 L 14400 -14400' -StrokeColor black |
+            Save-VellumPdfDocument -Path $path -Validate | Out-Null
+        & qpdf --check $path 2>&1 | Out-String | Should -Match 'No syntax or stream encoding errors'
     }
 }
 
@@ -118,11 +126,11 @@ Describe 'Reader input handling' {
     }
 
     It 'names the cmdlet for a missing file, an empty file and an empty byte array' {
-        { Get-VellumPdfInfo -Path (Join-Path $TestDrive 'nope.pdf') } | Should -Throw 'Get-VellumPdfInfo: file not found*'
+        { Get-VellumPdfInfo -Path (Join-Path $TestDrive 'nope.pdf') -ErrorAction Stop } | Should -Throw 'Get-VellumPdfInfo: file not found*'
         $empty = Join-Path $TestDrive 'empty.pdf'
         [System.IO.File]::WriteAllBytes($empty, [byte[]]@())
-        { Get-VellumPdfInfo -LiteralPath $empty } | Should -Throw '*is empty, so it is not a PDF*'
-        { Get-VellumPdfText -Bytes ([byte[]]@()) } | Should -Throw '*empty*not a PDF*'
-        { Get-VellumPdfText -Bytes ([byte[]]@(0)) } | Should -Throw '*not a well-formed PDF*'
+        { Get-VellumPdfInfo -LiteralPath $empty -ErrorAction Stop } | Should -Throw '*is empty, so it is not a PDF*'
+        { Get-VellumPdfText -Bytes ([byte[]]@()) -ErrorAction Stop } | Should -Throw '*empty*not a PDF*'
+        { Get-VellumPdfText -Bytes ([byte[]]@(0)) -ErrorAction Stop } | Should -Throw '*not a well-formed PDF*'
     }
 }

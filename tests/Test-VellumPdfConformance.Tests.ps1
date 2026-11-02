@@ -49,7 +49,7 @@ Describe 'Test-VellumPdfConformance' {
     It 'validates against an explicit profile, a byte array, and -LiteralPath' {
         $path = Join-Path $TestDrive 'plain.pdf'
         New-VellumPdfDocument -Tagged -Language en | Add-VellumPdfParagraph -Text 'x' | Save-VellumPdfDocument -Path $path | Out-Null
-        { Test-VellumPdfConformance -Path $path } | Should -Throw '*does not claim*'
+        { Test-VellumPdfConformance -Path $path -ErrorAction Stop } | Should -Throw '*does not claim*'
         (Test-VellumPdfConformance -Path $path -Profile PdfUA1).Profile | Should -Be 'PdfUA1'
         (Test-VellumPdfConformance -LiteralPath $path -Profile PdfA2b).Path | Should -Be $path
         $bytes = [System.IO.File]::ReadAllBytes($path)
@@ -65,9 +65,9 @@ Describe 'Test-VellumPdfConformance' {
     }
 
     It 'throws clear errors for a missing file, junk bytes and wildcard misses' {
-        { Test-VellumPdfConformance -LiteralPath (Join-Path $TestDrive 'nope.pdf') -Profile PdfA2b } | Should -Throw '*file not found*'
-        { Test-VellumPdfConformance -Path (Join-Path $TestDrive 'nomatch*.pdf') -Profile PdfA2b } | Should -Throw
-        { Test-VellumPdfConformance -Bytes ([byte[]](1, 2, 3)) -Profile PdfA2b } | Should -Throw '*not a well-formed PDF*'
+        { Test-VellumPdfConformance -LiteralPath (Join-Path $TestDrive 'nope.pdf') -Profile PdfA2b -ErrorAction Stop } | Should -Throw '*file not found*'
+        { Test-VellumPdfConformance -Path (Join-Path $TestDrive 'nomatch*.pdf') -Profile PdfA2b -ErrorAction Stop } | Should -Throw
+        { Test-VellumPdfConformance -Bytes ([byte[]](1, 2, 3)) -Profile PdfA2b -ErrorAction Stop } | Should -Throw '*not a well-formed PDF*'
     }
 
     It 'asks for a password for an encrypted PDF and opens it with one' {
@@ -76,7 +76,7 @@ Describe 'Test-VellumPdfConformance' {
         New-VellumPdfDocument -Tagged -Language en | Add-VellumPdfParagraph -Text 'x' |
             Protect-VellumPdfDocument -UserPassword $pw -OwnerPassword (ConvertTo-SecureString 'owner' -AsPlainText -Force) |
             Save-VellumPdfDocument -Path $path | Out-Null
-        { Test-VellumPdfConformance -Path $path -Profile PdfUA1 } | Should -Throw '*needs a password*'
+        { Test-VellumPdfConformance -Path $path -Profile PdfUA1 -ErrorAction Stop } | Should -Throw '*needs a password*'
         { Test-VellumPdfConformance -Path $path -Profile PdfUA1 -Password $pw } | Should -Not -Throw
     }
 }
