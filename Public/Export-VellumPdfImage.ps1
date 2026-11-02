@@ -12,8 +12,8 @@ function Export-VellumPdfImage {
         lossless: JPEG (.jpg) and JPEG 2000 (.jp2, .j2k) are written as they are;
         CCITT fax images are wrapped in a single-strip TIFF (.tif); JBIG2 images are
         joined with their shared "global" segments into a standalone sequential JBIG2
-        file (.jb2). A CCITT image with byte-aligned Group 4 rows (which TIFF cannot
-        describe) and any other image that cannot be written as a PNG (for example CMYK
+        file (.jb2). A CCITT image TIFF cannot describe (Group 4 with byte-aligned rows,
+        Group 3 without end-of-line codes unless it is one-dimensional and byte-aligned) and any other image that cannot be written as a PNG (for example CMYK
         or indexed samples) are skipped with a warning.
         Each file object carries Page, Encoding, Width, Height, BitsPerComponent,
         ColorSpace, ComponentCount, IsInline, IsStencilMask and HasSoftMask.
@@ -150,11 +150,12 @@ function Export-VellumPdfImage {
                                     $inverted = $decode.Count -ge 2 -and $decode[0] -gt $decode[1]
                                     $columns = if ($fax.Columns -gt 0) { $fax.Columns } else { $image.Width }
                                     $data = [PSVellumPDF.Interop.ImageContainers]::BuildCcittTiff(
-                                        $columns, $image.Height, $fax.K, ($fax.BlackIs1 -xor $inverted), $fax.EncodedByteAlign, $image.Data.ToArray())
+                                        $columns, $image.Height, $fax.K, ($fax.BlackIs1 -xor $inverted), $fax.EncodedByteAlign, $fax.EndOfLine, $image.Data.ToArray())
                                     $ext = 'tif'
                                     if ($null -eq $data) {
-                                        Write-Warning ("Export-VellumPdfImage: the CCITT image on page $pageNumber uses Group 4 coding with byte-aligned rows, " +
-                                            'which a TIFF cannot describe; it was skipped.')
+                                        Write-Warning ("Export-VellumPdfImage: the CCITT image on page $pageNumber ($columns x $($image.Height), K=$($fax.K), " +
+                                            "EndOfLine=$($fax.EndOfLine), EncodedByteAlign=$($fax.EncodedByteAlign)) has no TIFF equivalent " +
+                                            '(Group 3 needs end-of-line codes, Group 4 cannot be byte-aligned, and the size must stay within 100,000 pixels); it was skipped.')
                                     }
                                 }
                                 'Jbig2' {

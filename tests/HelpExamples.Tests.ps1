@@ -99,9 +99,9 @@ Describe 'Help examples parse and match the command metadata' {
             for ($i = 1; $i -lt $elements.Count; $i++) {
                 if ($elements[$i] -isnot [System.Management.Automation.Language.CommandParameterAst]) { continue }
                 $parameterName = $elements[$i].ParameterName
-                $match = $meta.Parameters.Values | Where-Object { $_.Name -like "$parameterName*" -or $_.Aliases -contains $parameterName } | Select-Object -First 1
-                if (-not $match -and $meta.Parameters.Keys -notcontains $parameterName) { "${commandName}: no parameter -$parameterName"; continue }
-                $parameter = $meta.Parameters[$parameterName] ?? $match
+                                # Exact names (or aliases) only: an abbreviation would pass here but be ambiguous when run.
+                $parameter = $meta.Parameters.Values | Where-Object { $_.Name -eq $parameterName -or $_.Aliases -contains $parameterName } | Select-Object -First 1
+                if (-not $parameter) { "${commandName}: no parameter -$parameterName"; continue }
                 $validateSet = $parameter.Attributes | Where-Object { $_ -is [System.Management.Automation.ValidateSetAttribute] }
                 $valueAst = if ($elements[$i].Argument) { $elements[$i].Argument } elseif ($i + 1 -lt $elements.Count) { $elements[$i + 1] }
                 if ($validateSet -and $valueAst -is [System.Management.Automation.Language.StringConstantExpressionAst] -and $valueAst.Value -notin $validateSet.ValidValues) {

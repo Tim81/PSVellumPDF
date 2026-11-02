@@ -1,4 +1,4 @@
-#requires -Version 7.6
+﻿#requires -Version 7.6
 #requires -Modules @{ ModuleName = 'Pester'; ModuleVersion = '5.0' }
 
 # Behaviour the first review found untested: pages other than 1, roles and languages in the structure tree,

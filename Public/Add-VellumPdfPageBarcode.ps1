@@ -156,7 +156,7 @@ function Add-VellumPdfPageBarcode {
     process {
         try {
             Assert-VellumPdfDocumentOpen -Document $Document -CommandName 'Add-VellumPdfPageBarcode'
-            $Page = Resolve-VellumPdfPageNumber -Document $Document -Page $Page -Bound $PSBoundParameters.ContainsKey('Page') -CommandName 'Add-VellumPdfPageBarcode'
+            $Page = Resolve-VellumPdfPageNumber -Document $Document -Page $(if ($PSBoundParameters.ContainsKey('Page')) { $PSBoundParameters['Page'] } else { 1 }) -Bound $PSBoundParameters.ContainsKey('Page') -CommandName 'Add-VellumPdfPageBarcode'
             Assert-VellumPdfCoordinate $X 'X' 'Add-VellumPdfPageBarcode'; Assert-VellumPdfCoordinate $Y 'Y' 'Add-VellumPdfPageBarcode'
             # Validates -Page up front (the canvas lookup below would do so too, but after building the symbol).
             [void](Get-VellumPdfPage -Document $Document -Page $Page -CommandName 'Add-VellumPdfPageBarcode')

@@ -61,12 +61,12 @@ Describe 'CCITT fax images' {
     }
 
     It 'skips byte-aligned Group 4 data, which a TIFF cannot describe' {
-        [PSVellumPDF.Interop.ImageContainers]::BuildCcittTiff(64, 48, -1, $true, $true, [byte[]]@(1, 2, 3)) | Should -BeNullOrEmpty
-        [PSVellumPDF.Interop.ImageContainers]::BuildCcittTiff(0, 48, -1, $true, $false, [byte[]]@(1)) | Should -BeNullOrEmpty
+        [PSVellumPDF.Interop.ImageContainers]::BuildCcittTiff(64, 48, -1, $true, $true, $true, [byte[]]@(1, 2, 3)) | Should -BeNullOrEmpty
+        [PSVellumPDF.Interop.ImageContainers]::BuildCcittTiff(0, 48, -1, $true, $false, $true, [byte[]]@(1)) | Should -BeNullOrEmpty
     }
 
     It 'writes the Group 3 options into the TIFF tags' {
-        $tiff = [PSVellumPDF.Interop.ImageContainers]::BuildCcittTiff(64, 48, 4, $false, $true, [byte[]]@(1, 2, 3))
+        $tiff = [PSVellumPDF.Interop.ImageContainers]::BuildCcittTiff(64, 48, 4, $false, $true, $true, [byte[]]@(1, 2, 3))
         $count = [BitConverter]::ToUInt16($tiff, 8)
         $tags = @{}
         for ($i = 0; $i -lt $count; $i++) { $o = 10 + 12 * $i; $tags[[int][BitConverter]::ToUInt16($tiff, $o)] = [BitConverter]::ToUInt16($tiff, $o + 8) }

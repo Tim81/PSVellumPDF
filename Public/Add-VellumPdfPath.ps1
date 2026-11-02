@@ -152,7 +152,7 @@ function Add-VellumPdfPath {
     process {
         try {
             Assert-VellumPdfDocumentOpen -Document $Document -CommandName 'Add-VellumPdfPath'
-            $Page = Resolve-VellumPdfPageNumber -Document $Document -Page $Page -Bound $PSBoundParameters.ContainsKey('Page') -CommandName 'Add-VellumPdfPath'
+            $Page = Resolve-VellumPdfPageNumber -Document $Document -Page $(if ($PSBoundParameters.ContainsKey('Page')) { $PSBoundParameters['Page'] } else { 1 }) -Bound $PSBoundParameters.ContainsKey('Page') -CommandName 'Add-VellumPdfPath'
             $bound = $PSBoundParameters
             foreach ($side in 'Fill', 'Stroke') {
                 $models = @(@("${side}Color", "${side}Cmyk", "${side}Icc", "${side}Gray") | Where-Object { $bound.ContainsKey($_) })

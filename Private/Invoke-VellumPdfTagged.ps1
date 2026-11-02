@@ -41,13 +41,17 @@ function Invoke-VellumPdfTagged {
     }
 
     $mcid = $Canvas.BeginMarkedContent($StructType)
+    # The element is registered even when Draw throws: the marked content is already in the page, and an
+    # MCID that no structure element owns would corrupt the ParentTree of an otherwise valid file.
     try { & $Draw }
-    finally { [void]$Canvas.EndMarkedContent() }
-    $elem = [VellumPdf.Document.PdfStructElem]::new($StructType)
-    $elem.Mcid = $mcid
-    $elem.Page = $PdfPage
-    if ($AltText) { $elem.AltText = $AltText }
-    if ($Language) { $elem.Language = $Language }
-    if ($Configure) { & $Configure $elem }
-    Add-VellumPdfStructElement -Document $Document -Element $elem
+    finally {
+        [void]$Canvas.EndMarkedContent()
+        $elem = [VellumPdf.Document.PdfStructElem]::new($StructType)
+        $elem.Mcid = $mcid
+        $elem.Page = $PdfPage
+        if ($AltText) { $elem.AltText = $AltText }
+        if ($Language) { $elem.Language = $Language }
+        if ($Configure) { & $Configure $elem }
+        Add-VellumPdfStructElement -Document $Document -Element $elem
+    }
 }

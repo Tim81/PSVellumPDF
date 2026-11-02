@@ -111,7 +111,7 @@ function Add-VellumPdfFormField {
     process {
         try {
             Assert-VellumPdfDocumentOpen -Document $Document -CommandName 'Add-VellumPdfFormField'
-            $Page = Resolve-VellumPdfPageNumber -Document $Document -Page $Page -Bound $PSBoundParameters.ContainsKey('Page') -CommandName 'Add-VellumPdfFormField'
+            $Page = Resolve-VellumPdfPageNumber -Document $Document -Page $(if ($PSBoundParameters.ContainsKey('Page')) { $PSBoundParameters['Page'] } else { 1 }) -Bound $PSBoundParameters.ContainsKey('Page') -CommandName 'Add-VellumPdfFormField'
             $bound = $PSBoundParameters
 
             if ($Document.Conformance -ne [VellumPdf.Document.PdfConformance]::None) {

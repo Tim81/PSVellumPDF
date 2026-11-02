@@ -147,7 +147,7 @@ function Add-VellumPdfShape {
     process {
         try {
             Assert-VellumPdfDocumentOpen -Document $Document -CommandName 'Add-VellumPdfShape'
-            $Page = Resolve-VellumPdfPageNumber -Document $Document -Page $Page -Bound $PSBoundParameters.ContainsKey('Page') -CommandName 'Add-VellumPdfShape'
+            $Page = Resolve-VellumPdfPageNumber -Document $Document -Page $(if ($PSBoundParameters.ContainsKey('Page')) { $PSBoundParameters['Page'] } else { 1 }) -Bound $PSBoundParameters.ContainsKey('Page') -CommandName 'Add-VellumPdfShape'
             $bound = $PSBoundParameters
             foreach ($pair in @('X', $X), @('Y', $Y), @('Width', $Width), @('Height', $Height), @('X2', $X2), @('Y2', $Y2), @('Radius', $Radius)) {
                 Assert-VellumPdfCoordinate $pair[1] $pair[0] 'Add-VellumPdfShape'

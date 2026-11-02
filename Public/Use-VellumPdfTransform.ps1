@@ -16,6 +16,9 @@ function Use-VellumPdfTransform {
         the result moves. A block that draws on another page than -Page is not transformed there
         (a warning says so).
 
+        Links and form fields (Add-VellumPdfLink, Add-VellumPdfFormField) are annotations placed in page
+        coordinates and are not transformed, nor clipped by Use-VellumPdfClip.
+
         The block runs in the caller's scope with the document as $_. Its own output is discarded;
         the cmdlet writes the document to the pipeline, so the call chains.
     .PARAMETER Document
@@ -27,7 +30,8 @@ function Use-VellumPdfTransform {
     .PARAMETER Rotate
         Rotation in degrees, counter-clockwise (negative is clockwise).
     .PARAMETER Scale
-        One factor for both directions, or two (horizontal, vertical). Negative values mirror.
+        One factor for both directions, or two (horizontal, vertical). Negative values mirror. The size of
+        a factor is limited to 0.000001 ... 1,000,000.
     .PARAMETER OriginX
         x of the point the scale and rotation are about, in points (default 0).
     .PARAMETER OriginY
@@ -70,10 +74,12 @@ function Use-VellumPdfTransform {
     process {
         try {
             Assert-VellumPdfDocumentOpen -Document $Document -CommandName 'Use-VellumPdfTransform'
-            $Page = Resolve-VellumPdfPageNumber -Document $Document -Page $Page -Bound $PSBoundParameters.ContainsKey('Page') -CommandName 'Use-VellumPdfTransform'
+            $Page = Resolve-VellumPdfPageNumber -Document $Document -Page $(if ($PSBoundParameters.ContainsKey('Page')) { $PSBoundParameters['Page'] } else { 1 }) -Bound $PSBoundParameters.ContainsKey('Page') -CommandName 'Use-VellumPdfTransform'
             if (-not [double]::IsFinite($Rotate)) { throw 'Use-VellumPdfTransform: -Rotate must be a finite number of degrees.' }
             foreach ($factor in $Scale) {
-                if (-not [double]::IsFinite($factor) -or $factor -eq 0) { throw 'Use-VellumPdfTransform: -Scale must be finite and not zero.' }
+                if (-not [double]::IsFinite($factor) -or $factor -eq 0 -or [Math]::Abs($factor) -lt 1e-6 -or [Math]::Abs($factor) -gt 1e6) {
+                    throw 'Use-VellumPdfTransform: -Scale must be finite, not zero, and between 0.000001 and 1,000,000 in size (a smaller factor collapses the drawing; a larger one overflows the numbers PDF allows).'
+                }
             }
             foreach ($pair in @('OriginX', $OriginX), @('OriginY', $OriginY), @('TranslateX', $TranslateX), @('TranslateY', $TranslateY)) {
                 Assert-VellumPdfCoordinate $pair[1] $pair[0] 'Use-VellumPdfTransform'
@@ -89,6 +95,7 @@ function Use-VellumPdfTransform {
             $f = $OriginY - ($b * $OriginX + $d * $OriginY) + $TranslateY
             # Rounding (and + 0.0) keeps floating-point dust and "-0" out of the content stream.
             $a, $b, $c, $d, $e, $f = $a, $b, $c, $d, $e, $f | ForEach-Object { [math]::Round($_, 8) + 0.0 }
+            if (($a, $b, $c, $d | Where-Object { $_ -ne 0 }).Count -eq 0) { throw 'Use-VellumPdfTransform: the transformation collapses everything to a point.' }
             $canvas = Get-VellumPdfPageCanvas -Document $Document -Page $Page -CommandName 'Use-VellumPdfTransform'
             [void]$canvas.SaveState()
             Push-VellumPdfScopePage -Document $Document -Page $Page

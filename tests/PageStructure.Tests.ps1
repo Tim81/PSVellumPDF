@@ -1,4 +1,4 @@
-#requires -Version 7.6
+﻿#requires -Version 7.6
 #requires -Modules @{ ModuleName = 'Pester'; ModuleVersion = '5.0' }
 
 # Nested structure in tagged page documents: Use-VellumPdfStructure, Add-VellumPdfPageTable, Add-VellumPdfPageList.
@@ -33,9 +33,9 @@ AfterAll {
 
 Describe 'Use-VellumPdfStructure' -Skip:(-not $script:haveQpdf) {
     It 'nests what is tagged inside a block under one group, and scopes nest' {
-        $path = Save-Valid (New-Tagged | Use-VellumPdfStructure Sect -ScriptBlock {
+        $path = Save-Valid (New-Tagged | Use-VellumPdfStructure -Type Sect -ScriptBlock {
                 $_ | Add-VellumPdfText 'Heading' -X 72 -Y 760 -FontSize 18 -Role H1 |
-                    Use-VellumPdfStructure Div -ScriptBlock { $_ | Add-VellumPdfText 'Inner paragraph' -X 72 -Y 730 } |
+                    Use-VellumPdfStructure -Type Div -ScriptBlock { $_ | Add-VellumPdfText 'Inner paragraph' -X 72 -Y 730 } |
                     Add-VellumPdfTextBox 'Second paragraph in the section.' -X 72 -Y 700 -Width 300
             } | Add-VellumPdfText 'Outside' -X 72 -Y 600) 'sect'
         $tree = Get-PdfStructureTree $path
@@ -48,17 +48,17 @@ Describe 'Use-VellumPdfStructure' -Skip:(-not $script:haveQpdf) {
 
     It 'warns when nothing was tagged, runs the block untagged, and rejects a bad language' {
         $w = $null
-        $null = New-Tagged | Use-VellumPdfStructure Sect -ScriptBlock { } -WarningVariable w -WarningAction SilentlyContinue
+        $null = New-Tagged | Use-VellumPdfStructure -Type Sect -ScriptBlock { } -WarningVariable w -WarningAction SilentlyContinue
         "$w" | Should -Match 'nothing was tagged'
         $plain = New-VellumPdfPageDocument | Add-VellumPdfPage
-        $out = $plain | Use-VellumPdfStructure Div -ScriptBlock { $_ | Add-VellumPdfText 'x' -X 1 -Y 1 }
+        $out = $plain | Use-VellumPdfStructure -Type Div -ScriptBlock { $_ | Add-VellumPdfText 'x' -X 1 -Y 1 }
         $out | Should -BeOfType ([VellumPdf.Document.PdfDocument])
-        { New-Tagged | Use-VellumPdfStructure Sect -Language 'bad tag' -ScriptBlock { } } | Should -Throw '*BCP 47*'
+        { New-Tagged | Use-VellumPdfStructure -Type Sect -Language 'bad tag' -ScriptBlock { } } | Should -Throw '*BCP 47*'
         $plain.Dispose()
     }
 
     It 'writes the group language' {
-        $path = Save-Valid (New-Tagged | Use-VellumPdfStructure Sect -Language fr-FR -ScriptBlock { $_ | Add-VellumPdfText 'Bonjour' -X 72 -Y 700 -Language fr-FR }) 'sect-lang'
+        $path = Save-Valid (New-Tagged | Use-VellumPdfStructure -Type Sect -Language fr-FR -ScriptBlock { $_ | Add-VellumPdfText 'Bonjour' -X 72 -Y 700 -Language fr-FR }) 'sect-lang'
         (Get-PdfStructureTree $path)[0].Lang | Should -Be 'fr-FR'
     }
 }
@@ -205,7 +205,7 @@ Describe 'Add-VellumPdfPageList' {
 
 Describe 'Table and list inside a structure group' -Skip:(-not $script:haveQpdf) {
     It 'nests under Sect and keeps reading order' {
-        $path = Save-Valid (New-Tagged | Use-VellumPdfStructure Sect -ScriptBlock {
+        $path = Save-Valid (New-Tagged | Use-VellumPdfStructure -Type Sect -ScriptBlock {
                 $_ | Add-VellumPdfText 'Report' -X 72 -Y 760 -FontSize 18 -Role H1 |
                     Add-VellumPdfPageTable -X 72 -Y 740 -Width 300 -Header 'A', 'B' -Row @(, @('1', '2')) |
                     Add-VellumPdfPageList -X 72 -Y 600 -Width 300 -Item 'one', 'two'

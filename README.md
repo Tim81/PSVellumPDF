@@ -181,6 +181,11 @@ Several cmdlets take their input as arrays of arrays; a single table row is writ
 - CMYK and ICC colour are available in page documents and drawings; flow-layout
   elements take RGB. A PDF/A document using CMYK needs
   `Set-VellumPdfOutputIntent -Cmyk`.
+- Page-text cmdlets that measure text (text boxes, tables, lists, `Measure-VellumPdfText`, aligned text) refuse the
+  Symbol and ZapfDingbats fonts, which have no width table in VellumPdf. Annotations (links, form fields) are not
+  moved by `Use-VellumPdfTransform` or clipped by `Use-VellumPdfClip`.
+- The in-process preflight does not flag a DeviceRGB gradient in a PDF/A document with a CMYK output intent
+  (ISO 19005-2, 6.2.4.3); give gradients in such documents colours that suit the intent, or check with veraPDF.
 - `Test-VellumPdfConformance` covers the checks decidable in-process; it does
   not examine fonts used only by form fields. Use veraPDF for a formal
   compliance statement.

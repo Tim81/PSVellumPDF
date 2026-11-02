@@ -24,7 +24,7 @@ function Use-VellumPdfStructure {
     .PARAMETER Language
         BCP 47 language tag for the whole group.
     .EXAMPLE
-        $doc | Use-VellumPdfStructure Sect -ScriptBlock {
+        $doc | Use-VellumPdfStructure -Type Sect -ScriptBlock {
             $_ | Add-VellumPdfText 'Results' -X 72 -Y 760 -Role H1 |
                 Add-VellumPdfTextBox 'The results are shown below.' -X 72 -Y 740 -Width 400
         }
@@ -39,11 +39,10 @@ function Use-VellumPdfStructure {
         [Parameter(Mandatory, ValueFromPipeline)]
         [VellumPdf.Document.PdfDocument]$Document,
 
-        [Parameter(Position = 0)]
         [ValidateSet('Sect', 'Div', 'Art', 'Part', 'BlockQuote', 'Index', 'TOC')]
         [string]$Type = 'Sect',
 
-        [Parameter(Mandatory, Position = 1)]
+        [Parameter(Mandatory, Position = 0)]
         [scriptblock]$ScriptBlock,
 
         [ValidateNotNullOrEmpty()]
@@ -61,10 +60,17 @@ function Use-VellumPdfStructure {
             $group = [VellumPdf.Document.PdfStructElem]::new($Type)
             if ($Language) { $group.Language = $Language }
             Push-VellumPdfStructParent -Document $Document -Element $group
-            try { $null = $Document | ForEach-Object -Process $ScriptBlock }
-            finally { Pop-VellumPdfStructParent -Document $Document }
-            if ($group.Children.Count -gt 0) { Add-VellumPdfStructElement -Document $Document -Element $group }
-            else { Write-Warning "Use-VellumPdfStructure: nothing was tagged inside the $Type block, so no structure element was written." }
+            $completed = $false
+            try {
+                $null = $Document | ForEach-Object -Process $ScriptBlock
+                $completed = $true
+            }
+            finally {
+                Pop-VellumPdfStructParent -Document $Document
+                # Whatever was tagged before a failure stays in the tree: its marked content is already in the page.
+                if ($group.Children.Count -gt 0) { Add-VellumPdfStructElement -Document $Document -Element $group }
+                elseif ($completed) { Write-Warning "Use-VellumPdfStructure: nothing was tagged inside the $Type block, so no structure element was written." }
+            }
             $Document
         }
         catch {

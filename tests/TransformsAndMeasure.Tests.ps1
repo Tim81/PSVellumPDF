@@ -1,4 +1,4 @@
-#requires -Version 7.6
+﻿#requires -Version 7.6
 #requires -Modules @{ ModuleName = 'Pester'; ModuleVersion = '5.0' }
 
 # Use-VellumPdfTransform, -Rotation on text and images, Measure-VellumPdfText, grey colours and

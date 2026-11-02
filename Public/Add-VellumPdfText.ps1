@@ -114,13 +114,17 @@ function Add-VellumPdfText {
     process {
         try {
             Assert-VellumPdfDocumentOpen -Document $Document -CommandName 'Add-VellumPdfText'
-            $Page = Resolve-VellumPdfPageNumber -Document $Document -Page $Page -Bound $PSBoundParameters.ContainsKey('Page') -CommandName 'Add-VellumPdfText'
+            $Page = Resolve-VellumPdfPageNumber -Document $Document -Page $(if ($PSBoundParameters.ContainsKey('Page')) { $PSBoundParameters['Page'] } else { 1 }) -Bound $PSBoundParameters.ContainsKey('Page') -CommandName 'Add-VellumPdfText'
             Assert-VellumPdfLanguageTag -Value $Language -CommandName 'Add-VellumPdfText'
+            Assert-VellumPdfValidText -Text $Text -CommandName 'Add-VellumPdfText'
             Assert-VellumPdfCoordinate $X 'X' 'Add-VellumPdfText'; Assert-VellumPdfCoordinate $Y 'Y' 'Add-VellumPdfText'
             if ($Text -match '[\r\n]') { throw 'Add-VellumPdfText: -Text must be a single line; use New-VellumPdfDocument for wrapped text.' }
 
             $resolved = Get-VellumPdfPageFont -Document $Document -FontHandle $FontHandle -Font $Font -CommandName 'Add-VellumPdfText'
             Write-VellumPdfMissingGlyphWarning -Handle $resolved.Handle -Text $Text -CommandName 'Add-VellumPdfText'
+            if (-not $FontHandle -and ($Align -ne 'Left' -or $PSBoundParameters.ContainsKey('CharSpacing') -or $PSBoundParameters.ContainsKey('WordSpacing') -or $PSBoundParameters.ContainsKey('HorizontalScale'))) {
+                Assert-VellumPdfMeasurableFont -Font $Font -CommandName 'Add-VellumPdfText' -Reason 'it aligns or spaces the text'
+            }
             if (-not $resolved.Handle -and $Document.Conformance -eq [VellumPdf.Document.PdfConformance]::None) {
                 Write-VellumPdfEncodingWarning -Text $Text -CommandName 'Add-VellumPdfText'
             }
@@ -137,16 +141,18 @@ function Add-VellumPdfText {
             $rotated = $bound.ContainsKey('Rotation') -and $Rotation -ne 0
             if ($bound.ContainsKey('Rotation') -and -not [double]::IsFinite($Rotation)) { throw 'Add-VellumPdfText: -Rotation must be a finite number of degrees.' }
             $anchorX = $X; $anchorY = $Y
-            if ($rotated) { $X = 0.0; $Y = 0.0 }    # drawn at the origin of a rotated, moved coordinate system
+            # Rotated text is drawn at the origin of a rotated, moved coordinate system.
+            $drawX = if ($rotated) { 0.0 } else { $X }
+            $drawY = if ($rotated) { 0.0 } else { $Y }
             $hasSpacing = $bound.ContainsKey('CharSpacing') -or $bound.ContainsKey('WordSpacing') -or $bound.ContainsKey('HorizontalScale')
-            $startX = $X
+            $startX = $drawX
             $showAlignment = [VellumPdf.Canvas.TextAlignment]::$Align
             $tc = if ($bound.ContainsKey('CharSpacing')) { $CharSpacing } else { 0.0 }
             $tw = if ($bound.ContainsKey('WordSpacing')) { $WordSpacing } else { 0.0 }
             $th = if ($bound.ContainsKey('HorizontalScale')) { $HorizontalScale } else { 100.0 }
             if ($hasSpacing -and $Align -ne 'Left') {
                 $width = Measure-VellumPdfTextWidth -Resolved $resolved -Text $Text -FontSize $FontSize -CharSpacing $tc -WordSpacing $tw -HorizontalScale $th
-                $startX = if ($Align -eq 'Center') { $X - $width / 2 } else { $X - $width }
+                $startX = if ($Align -eq 'Center') { $drawX - $width / 2 } else { $drawX - $width }
                 $showAlignment = [VellumPdf.Canvas.TextAlignment]::Left
             }
             # Word spacing (Tw) only applies to the single-byte space code. An embedded font is drawn with
@@ -167,6 +173,7 @@ function Add-VellumPdfText {
                 }
                 Invoke-VellumPdfTagged -Document $Document -Canvas $canvas -PdfPage $pdfPage -Kind Structure -StructType $Role -Language $Language -Draw {
                     [void]$canvas.BeginText()
+                    try {
                     if ($bound.ContainsKey('CharSpacing')) { [void]$canvas.SetCharSpacing($CharSpacing) }
                     if ($bound.ContainsKey('WordSpacing') -and -not $placeWords) { [void]$canvas.SetWordSpacing($WordSpacing) }
                     if ($bound.ContainsKey('Rise')) { [void]$canvas.SetTextRise($Rise) }
@@ -180,20 +187,21 @@ function Add-VellumPdfText {
                             foreach ($m in [regex]::Matches($Text, '[^ ]*(?: |$)')) {
                                 $piece = $m.Value
                                 if ($piece.Length -eq 0) { continue }
-                                [void][PSVellumPDF.Interop.CanvasHelpers]::ShowEmbeddedText($canvas, $resolved.Handle, $piece, $FontSize, $cursor, $Y, [VellumPdf.Canvas.TextAlignment]::Left)
+                                [void][PSVellumPDF.Interop.CanvasHelpers]::ShowEmbeddedText($canvas, $resolved.Handle, $piece, $FontSize, $cursor, $drawY, [VellumPdf.Canvas.TextAlignment]::Left)
                                 $trailing = if ($piece.EndsWith(' ')) { $tw } else { 0.0 }
                                 $cursor += Measure-VellumPdfTextWidth -Resolved $resolved -Text $piece -FontSize $FontSize -CharSpacing $tc -WordSpacing $trailing -HorizontalScale $th
                             }
                         }
                         else {
-                            [void][PSVellumPDF.Interop.CanvasHelpers]::ShowEmbeddedText($canvas, $resolved.Handle, $Text, $FontSize, $startX, $Y, $showAlignment)
+                            [void][PSVellumPDF.Interop.CanvasHelpers]::ShowEmbeddedText($canvas, $resolved.Handle, $Text, $FontSize, $startX, $drawY, $showAlignment)
                         }
                     }
                     else {
                         [void]$canvas.SetFont($resolved.Resource, $FontSize)
-                        [void]$canvas.ShowTextAligned($Text, $startX, $Y, $showAlignment)
+                        [void]$canvas.ShowTextAligned($Text, $startX, $drawY, $showAlignment)
                     }
-                    [void]$canvas.EndText()
+                    }
+                    finally { [void]$canvas.EndText() }
                 }
             }
             finally { [void]$canvas.RestoreState() }

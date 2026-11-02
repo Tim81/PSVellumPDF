@@ -35,6 +35,7 @@ function Write-VellumPdfTextLine {
         $row++
         if ($line.Words.Count -eq 0) { continue }
         [void]$Canvas.BeginText()
+        try {
         if ($Resolved.Handle) { [void]$Canvas.SetFontByName($Resolved.Handle.ResourceName, $FontSize) }
         else { [void]$Canvas.SetFont($Resolved.Resource, $FontSize) }
         $textLine = $line.Words -join ' '
@@ -53,6 +54,7 @@ function Write-VellumPdfTextLine {
         elseif ($Align -eq 'Center') { & $show $textLine ($X + $Width / 2) $baseline ([VellumPdf.Canvas.TextAlignment]::Center) }
         elseif ($Align -eq 'Right') { & $show $textLine ($X + $Width) $baseline ([VellumPdf.Canvas.TextAlignment]::Right) }
         else { & $show $textLine $X $baseline $left }
-        [void]$Canvas.EndText()
+        }
+        finally { [void]$Canvas.EndText() }
     }
 }

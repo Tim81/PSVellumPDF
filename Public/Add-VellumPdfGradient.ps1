@@ -65,7 +65,7 @@ function Add-VellumPdfGradient {
     process {
         try {
             Assert-VellumPdfDocumentOpen -Document $Document -CommandName 'Add-VellumPdfGradient'
-            $Page = Resolve-VellumPdfPageNumber -Document $Document -Page $Page -Bound $PSBoundParameters.ContainsKey('Page') -CommandName 'Add-VellumPdfGradient'
+            $Page = Resolve-VellumPdfPageNumber -Document $Document -Page $(if ($PSBoundParameters.ContainsKey('Page')) { $PSBoundParameters['Page'] } else { 1 }) -Bound $PSBoundParameters.ContainsKey('Page') -CommandName 'Add-VellumPdfGradient'
             Assert-VellumPdfCoordinate $X 'X' 'Add-VellumPdfGradient'; Assert-VellumPdfCoordinate $Y 'Y' 'Add-VellumPdfGradient'; Assert-VellumPdfCoordinate $Width 'Width' 'Add-VellumPdfGradient'; Assert-VellumPdfCoordinate $Height 'Height' 'Add-VellumPdfGradient'
             if ($Type -eq 'Radial' -and $PSBoundParameters.ContainsKey('Direction')) {
                 throw 'Add-VellumPdfGradient: -Direction applies to an Axial gradient only.'

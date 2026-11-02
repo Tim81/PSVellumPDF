@@ -154,8 +154,13 @@ function Add-VellumPdfPageTable {
     process {
         try {
             Assert-VellumPdfDocumentOpen -Document $Document -CommandName 'Add-VellumPdfPageTable'
-            $Page = Resolve-VellumPdfPageNumber -Document $Document -Page $Page -Bound $PSBoundParameters.ContainsKey('Page') -CommandName 'Add-VellumPdfPageTable'
+            $Page = Resolve-VellumPdfPageNumber -Document $Document -Page $(if ($PSBoundParameters.ContainsKey('Page')) { $PSBoundParameters['Page'] } else { 1 }) -Bound $PSBoundParameters.ContainsKey('Page') -CommandName 'Add-VellumPdfPageTable'
+            [void](Get-VellumPdfPage -Document $Document -Page $Page -CommandName 'Add-VellumPdfPageTable')
             Assert-VellumPdfLanguageTag -Value $Language -CommandName 'Add-VellumPdfPageTable'
+            if (-not $FontHandle) {
+                Assert-VellumPdfMeasurableFont -Font $Font -CommandName 'Add-VellumPdfPageTable' -Reason 'it wraps cell text'
+                if ($HeaderFont) { Assert-VellumPdfMeasurableFont -Font $HeaderFont -CommandName 'Add-VellumPdfPageTable' -Reason 'it wraps cell text' }
+            }
             Assert-VellumPdfCoordinate $X 'X' 'Add-VellumPdfPageTable'
             Assert-VellumPdfCoordinate $Y 'Y' 'Add-VellumPdfPageTable'
             $bound = $PSBoundParameters
@@ -173,23 +178,30 @@ function Add-VellumPdfPageTable {
             $cellOf = {
                 param($spec)
                 $isMap = $spec -is [System.Collections.IDictionary]
+                if (-not $isMap -and $spec -isnot [string] -and $spec -isnot [ValueType] -and $null -ne $spec) {
+                    throw ("Add-VellumPdfPageTable: a cell must be text or a hashtable with a Text key, not $($spec.GetType().Name). " +
+                        'Rows are arrays of cells; a single row is written -Row @(,@(''a'', ''b'')) and records are not supported (use Add-VellumPdfTable for objects).')
+                }
+                if ($isMap -and -not $spec.Contains('Text')) { throw 'Add-VellumPdfPageTable: a cell hashtable needs a Text key (rows are arrays of cells, not records).' }
                 $text = if ($isMap) { [string](Get-VellumPdfPropertyValue -InputObject $spec -Name 'Text') } else { [string]$spec }
+                Assert-VellumPdfValidText -Text $text -CommandName 'Add-VellumPdfPageTable'
                 $span = {
                     param($key)
                     $v = if ($isMap) { Get-VellumPdfPropertyValue -InputObject $spec -Name $key }
                     if ($null -eq $v) { 1 }
                     else {
-                        $n = $v -as [int]
-                        if ($null -eq $n -or $n -lt 1 -or $n -gt 1000) { throw "Add-VellumPdfPageTable: cell $key must be a whole number from 1 to 1000; got '$v'." }
-                        $n
+                        $d = $v -as [double]
+                        if ($null -eq $d -or $d -ne [Math]::Floor($d) -or $d -lt 1 -or $d -gt 1000) { throw "Add-VellumPdfPageTable: cell $key must be a whole number from 1 to 1000; got '$v'." }
+                        [int]$d
                     }
                 }
                 $align = if ($isMap) { Get-VellumPdfPropertyValue -InputObject $spec -Name 'Alignment' }
                 if ($align -and [string]$align -notin 'Left', 'Center', 'Right', 'Justify') { throw "Add-VellumPdfPageTable: cell Alignment '$align' is invalid; use Left, Center, Right or Justify." }
                 [pscustomobject]@{
                     Text = $text; ColSpan = (& $span 'ColSpan'); RowSpan = (& $span 'RowSpan'); Align = [string]$align
-                    Background = $(if ($isMap) { Get-VellumPdfPropertyValue -InputObject $spec -Name 'Background' })
-                    Color = $(if ($isMap) { Get-VellumPdfPropertyValue -InputObject $spec -Name 'Color' })
+                    # Colours are resolved here, before anything is drawn, so a bad value cannot leave half a table behind.
+                    Background = $(if ($isMap -and $null -ne (Get-VellumPdfPropertyValue -InputObject $spec -Name 'Background')) { ConvertTo-VellumColor (Get-VellumPdfPropertyValue -InputObject $spec -Name 'Background') })
+                    Color = $(if ($isMap -and $null -ne (Get-VellumPdfPropertyValue -InputObject $spec -Name 'Color')) { ConvertTo-VellumColor (Get-VellumPdfPropertyValue -InputObject $spec -Name 'Color') })
                     Row = 0; Col = 0; IsHeader = $false; Scope = $null; Lines = $null; Height = 0.0
                 }
             }
@@ -203,16 +215,15 @@ function Add-VellumPdfPageTable {
                 $bodyIndex = 0
                 foreach ($specRow in $source) {
                     $column = 0
-                    $first = $true
                     foreach ($spec in @($specRow)) {
                         while ($taken.ContainsKey("$rowIndex,$column")) { $column++ }
                         $cell = & $cellOf $spec
                         $cell.Row = $rowIndex; $cell.Col = $column
-                        $cell.IsHeader = ($kind -eq 'Header') -or ($RowHeader -and $first)
-                        $cell.Scope = if ($kind -eq 'Header') { 'Column' } elseif ($RowHeader -and $first) { 'Row' }
+                        $isRowHeader = $RowHeader -and $column -eq 0 -and $kind -eq 'Body'
+                        $cell.IsHeader = ($kind -eq 'Header') -or $isRowHeader
+                        $cell.Scope = if ($kind -eq 'Header') { 'Column' } elseif ($isRowHeader) { 'Row' }
                         for ($dr = 0; $dr -lt $cell.RowSpan; $dr++) { for ($dc = 0; $dc -lt $cell.ColSpan; $dc++) { $taken["$($rowIndex + $dr),$($column + $dc)"] = $true } }
                         $column += $cell.ColSpan
-                        $first = $false
                         $cells.Add($cell)
                     }
                     $rowKinds.Add($(if ($kind -eq 'Header') { 'Header' } elseif ($bodyIndex % 2 -eq 1) { 'Alternate' } else { 'Body' }))
@@ -225,6 +236,21 @@ function Add-VellumPdfPageTable {
             $columnCount = ($cells | ForEach-Object { $_.Col + $_.ColSpan } | Measure-Object -Maximum).Maximum
             $lastRowUsed = ($cells | ForEach-Object { $_.Row + $_.RowSpan } | Measure-Object -Maximum).Maximum
             if ($lastRowUsed -gt $rowCount) { throw "Add-VellumPdfPageTable: a RowSpan runs past the last row (the table has $rowCount row(s))." }
+
+            # A row that does not fill every grid column makes a table PDF/UA validators reject (7.2-41/42/43).
+            $irregular = @(0..($rowCount - 1) | Where-Object {
+                    $r = $_
+                    @(0..($columnCount - 1) | Where-Object { $taken.ContainsKey("$r,$_") }).Count -ne $columnCount
+                })
+            if ($irregular.Count -gt 0) {
+                Write-Warning ("Add-VellumPdfPageTable: row(s) $((@($irregular | ForEach-Object { $_ + 1 })) -join ', ') do not fill all $columnCount grid columns " +
+                    '(cells, ColSpan and RowSpan do not add up); a tagged table like this fails PDF/UA validation.')
+            }
+            $cellsByRow = @{}
+            foreach ($cell in $cells) {
+                if (-not $cellsByRow.ContainsKey($cell.Row)) { $cellsByRow[$cell.Row] = [System.Collections.Generic.List[object]]::new() }
+                $cellsByRow[$cell.Row].Add($cell)
+            }
 
             if ($PSCmdlet.ParameterSetName -eq 'ColumnWidth') {
                 if ($ColumnWidth.Count -ne $columnCount) { throw "Add-VellumPdfPageTable: -ColumnWidth has $($ColumnWidth.Count) value(s) but the table has $columnCount column(s)." }
@@ -277,8 +303,10 @@ function Add-VellumPdfPageTable {
             $canvas = Get-VellumPdfPageCanvas -Document $Document -Page $Page -CommandName 'Add-VellumPdfPageTable'
             if ($body.Handle) { $Document.RegisterEmbeddedFontUsage($pdfPage, $body.Handle) }
             if ($head.Handle -and $head.Handle -ne $body.Handle) { $Document.RegisterEmbeddedFontUsage($pdfPage, $head.Handle) }
-            $textRgb = if ($bound.ContainsKey('Color')) { ConvertTo-VellumColor $Color } else { 0, 0, 0 }
-            $borderRgb = if ($bound.ContainsKey('BorderColor')) { ConvertTo-VellumColor $BorderColor } else { 0, 0, 0 }
+            # Colour operators are written only for colours that were asked for: a default RGB operator would
+            # fail PDF/A with a CMYK output intent.
+            $textRgb = if ($bound.ContainsKey('Color')) { ConvertTo-VellumColor $Color }
+            $borderRgb = if ($bound.ContainsKey('BorderColor')) { ConvertTo-VellumColor $BorderColor }
             $headerBg = if ($bound.ContainsKey('HeaderBackground')) { ConvertTo-VellumColor $HeaderBackground }
             $altBg = if ($bound.ContainsKey('AlternateRowBackground')) { ConvertTo-VellumColor $AlternateRowBackground }
 
@@ -294,12 +322,13 @@ function Add-VellumPdfPageTable {
                     }
                     foreach ($cell in $cells) {
                         if ($null -eq $cell.Background) { continue }
-                        $bg = ConvertTo-VellumColor $cell.Background
+                        $bg = $cell.Background
                         $bottom = $rowTop[$cell.Row + $cell.RowSpan]
                         [void]$canvas.SaveState().SetFillColorRgb($bg[0], $bg[1], $bg[2]).Rectangle($colLeft[$cell.Col], $bottom, $colLeft[$cell.Col + $cell.ColSpan] - $colLeft[$cell.Col], $rowTop[$cell.Row] - $bottom).Fill().RestoreState()
                     }
                     if ($BorderWidth -gt 0) {
-                        [void]$canvas.SaveState().SetStrokeColorRgb($borderRgb[0], $borderRgb[1], $borderRgb[2]).SetLineWidth($BorderWidth)
+                        [void]$canvas.SaveState().SetLineWidth($BorderWidth)
+                        if ($borderRgb) { [void]$canvas.SetStrokeColorRgb($borderRgb[0], $borderRgb[1], $borderRgb[2]) }
                         foreach ($cell in $cells) {
                             $bottom = $rowTop[$cell.Row + $cell.RowSpan]
                             [void]$canvas.Rectangle($colLeft[$cell.Col], $bottom, $colLeft[$cell.Col + $cell.ColSpan] - $colLeft[$cell.Col], $rowTop[$cell.Row] - $bottom).Stroke()
@@ -324,7 +353,7 @@ function Add-VellumPdfPageTable {
                             Push-VellumPdfStructParent -Document $Document -Element $tableRow
                         }
                         try {
-                            foreach ($cell in ($cells | Where-Object { $_.Row -eq $r })) {
+                            foreach ($cell in @($cellsByRow[$r])) {
                                 $structType = if ($cell.IsHeader) { 'TH' } else { 'TD' }
                                 $configure = {
                                     param($element)
@@ -334,27 +363,32 @@ function Add-VellumPdfPageTable {
                                 }.GetNewClosure()
                                 $cellResolved = if ($cell.IsHeader -and $cell.Scope -eq 'Column') { $head } else { $body }
                                 $alignment = if ($cell.Align) { $cell.Align } elseif ($ColumnAlignment -and $cell.Col -lt $ColumnAlignment.Count) { $ColumnAlignment[$cell.Col] } else { 'Left' }
-                                $rgb = if ($null -ne $cell.Color) { ConvertTo-VellumColor $cell.Color } else { $textRgb }
+                                $rgb = if ($null -ne $cell.Color) { $cell.Color } else { $textRgb }
                                 $cellLeft = $colLeft[$cell.Col] + $Padding
                                 $cellWidth = $colLeft[$cell.Col + $cell.ColSpan] - $colLeft[$cell.Col] - 2 * $Padding
                                 $cellTop = $rowTop[$cell.Row] - $Padding
                                 $cellLines = $cell.Lines
                                 $cellFont = $cellResolved
                                 Invoke-VellumPdfTagged -Document $Document -Canvas $canvas -PdfPage $pdfPage -Kind Structure -StructType $structType -Configure $configure -Draw {
-                                    [void]$canvas.SaveState().SetFillColorRgb($rgb[0], $rgb[1], $rgb[2])
-                                    $hasText = [bool]($cellLines | Where-Object { $_.Words.Count -gt 0 })
-                                    if ($hasText) {
-                                        Write-VellumPdfTextLine -Canvas $canvas -Resolved $cellFont -FontSize $FontSize -Lines $cellLines -X $cellLeft -Top $cellTop -Width $cellWidth -Leading $Leading -Align $alignment
+                                    [void]$canvas.SaveState()
+                                    try {
+                                        if ($rgb) { [void]$canvas.SetFillColorRgb($rgb[0], $rgb[1], $rgb[2]) }
+                                        $hasText = [bool]($cellLines | Where-Object { $_.Words.Count -gt 0 })
+                                        if ($hasText) {
+                                            Write-VellumPdfTextLine -Canvas $canvas -Resolved $cellFont -FontSize $FontSize -Lines $cellLines -X $cellLeft -Top $cellTop -Width $cellWidth -Leading $Leading -Align $alignment
+                                        }
                                     }
-                                    [void]$canvas.RestoreState()
+                                    finally { [void]$canvas.RestoreState() }
                                 }
                             }
                         }
                         finally { if ($Document.Tagged) { Pop-VellumPdfStructParent -Document $Document } }
                     }
                 }
-                finally { if ($Document.Tagged) { Pop-VellumPdfStructParent -Document $Document } }
-                if ($Document.Tagged) { Add-VellumPdfStructElement -Document $Document -Element $table }
+                finally {
+                    # Even a table that failed half way is registered: the cells already drawn own MCIDs.
+                    if ($Document.Tagged) { Pop-VellumPdfStructParent -Document $Document; Add-VellumPdfStructElement -Document $Document -Element $table }
+                }
             }
             finally { [void]$canvas.RestoreState() }
 

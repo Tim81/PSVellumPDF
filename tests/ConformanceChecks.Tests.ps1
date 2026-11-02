@@ -1,4 +1,4 @@
-#requires -Version 7.6
+﻿#requires -Version 7.6
 #requires -Modules @{ ModuleName = 'Pester'; ModuleVersion = '5.0' }
 
 # Conformance-related input checks: what PDF/UA and PDF/A need from the content the module draws.

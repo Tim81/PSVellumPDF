@@ -44,7 +44,7 @@ function Test-VellumPdfConformance {
     #>
     [CmdletBinding(DefaultParameterSetName = 'Path')]
     [OutputType('PSVellumPDF.PreflightResult')]
-    [OutputType([bool], ParameterSetName = 'Quiet')]
+    [OutputType([bool])]
     param(
         [Parameter(Mandatory, Position = 0, ValueFromPipeline, ParameterSetName = 'Path')]
         [string[]]$Path,

@@ -116,8 +116,10 @@ function Add-VellumPdfTextBox {
     process {
         try {
             Assert-VellumPdfDocumentOpen -Document $Document -CommandName 'Add-VellumPdfTextBox'
-            $Page = Resolve-VellumPdfPageNumber -Document $Document -Page $Page -Bound $PSBoundParameters.ContainsKey('Page') -CommandName 'Add-VellumPdfTextBox'
+            $Page = Resolve-VellumPdfPageNumber -Document $Document -Page $(if ($PSBoundParameters.ContainsKey('Page')) { $PSBoundParameters['Page'] } else { 1 }) -Bound $PSBoundParameters.ContainsKey('Page') -CommandName 'Add-VellumPdfTextBox'
             Assert-VellumPdfLanguageTag -Value $Language -CommandName 'Add-VellumPdfTextBox'
+            Assert-VellumPdfValidText -Text $Text -CommandName 'Add-VellumPdfTextBox'
+            if (-not $FontHandle) { Assert-VellumPdfMeasurableFont -Font $Font -CommandName 'Add-VellumPdfTextBox' -Reason 'it wraps text' }
             Assert-VellumPdfCoordinate $X 'X' 'Add-VellumPdfTextBox'; Assert-VellumPdfCoordinate $Y 'Y' 'Add-VellumPdfTextBox'; Assert-VellumPdfCoordinate $Width 'Width' 'Add-VellumPdfTextBox'
             $bound = $PSBoundParameters
             if (-not $bound.ContainsKey('Leading')) { $Leading = 1.2 * $FontSize }

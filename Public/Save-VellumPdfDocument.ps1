@@ -153,6 +153,9 @@ function Save-VellumPdfDocument {
                 else { '<bytes>' }
             }
             else {
+                if ($Path.IndexOfAny([System.IO.Path]::GetInvalidPathChars()) -ge 0) {
+                    throw "Save-VellumPdfDocument: -Path contains a character that is not allowed in a file name (such as a NUL or control character)."
+                }
                 $ExecutionContext.SessionState.Path.GetUnresolvedProviderPathFromPSPath($Path)
             }
 
@@ -221,6 +224,8 @@ function Save-VellumPdfDocument {
                                 }
                                 throw "Save-VellumPdfDocument: failed to sign '$resolved': $reason $hint"
                             }
+                            # Messages the module raised itself (balance check) already say what is wrong.
+                            if ($reason -like 'Invoke-VellumPdfCanvas:*') { throw "Save-VellumPdfDocument: failed to render '$resolved': $reason" }
                             throw ("Save-VellumPdfDocument: failed to render '$resolved': $reason " +
                                 'Check for extreme margin values or elements taller than the page.')
                         }

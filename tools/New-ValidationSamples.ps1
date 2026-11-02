@@ -184,7 +184,7 @@ $uaPages |
 # --- pdfua1-structure.pdf: nested structure (section, table, list) --------------
 New-VellumPdfPageDocument -Conformance PdfUA1 -Language 'en-US' | Add-VellumPdfPage |
     Set-VellumPdfDocumentInfo -Title 'Structure Sample' -Author 'PSVellumPDF CI' |
-    Use-VellumPdfStructure Sect -ScriptBlock {
+    Use-VellumPdfStructure -Type Sect -ScriptBlock {
         $_ | Add-VellumPdfText 'Quarterly summary' -X 72 -Y 760 -FontSize 20 -Font HelveticaBold -Role H1 |
             Add-VellumPdfPageTable -X 72 -Y 730 -Width 450 -Header 'Item', 'Qty', 'Price' -ColumnAlignment Left, Right, Right `
                 -HeaderBackground '#e8f0fe' -AlternateRowBackground '#f4f4f4' -Row @(

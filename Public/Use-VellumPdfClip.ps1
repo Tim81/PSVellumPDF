@@ -12,6 +12,9 @@ function Use-VellumPdfClip {
         -X/-Y/-Width/-Height, or as an ellipse with -Ellipse. The default -FillRule NonZero
         or EvenOdd decides what is inside when sub-paths overlap.
 
+        Links and form fields (Add-VellumPdfLink, Add-VellumPdfFormField) are annotations in page coordinates
+        and are not affected by the clip.
+
         The block runs in the caller's scope with the document as $_. Its own output is
         discarded; the cmdlet writes the document to the pipeline, so the call chains.
     .PARAMETER Document
@@ -76,7 +79,7 @@ function Use-VellumPdfClip {
     process {
         try {
             Assert-VellumPdfDocumentOpen -Document $Document -CommandName 'Use-VellumPdfClip'
-            $Page = Resolve-VellumPdfPageNumber -Document $Document -Page $Page -Bound $PSBoundParameters.ContainsKey('Page') -CommandName 'Use-VellumPdfClip'
+            $Page = Resolve-VellumPdfPageNumber -Document $Document -Page $(if ($PSBoundParameters.ContainsKey('Page')) { $PSBoundParameters['Page'] } else { 1 }) -Bound $PSBoundParameters.ContainsKey('Page') -CommandName 'Use-VellumPdfClip'
             switch ($PSCmdlet.ParameterSetName) {
                 'Data' { $ops = ConvertTo-VellumPdfPathOp -Data $Data -CommandName 'Use-VellumPdfClip' }
                 'Point' { $ops = ConvertTo-VellumPdfPathOp -Point $Point -Close -CommandName 'Use-VellumPdfClip' }

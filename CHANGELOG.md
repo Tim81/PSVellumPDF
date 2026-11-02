@@ -166,6 +166,18 @@ in ways that change output. Upgrade notes are in the README.
 - A clip scope's `-Page` is the page its drawing goes to; a text box no longer splits on no-break spaces and honours
   `-MaxHeight` exactly; page bands warn when they run off the page; `-LineCap`/`-LineJoin` accept any letter case;
   table and pie data tolerate missing properties; `Save-VellumPdfDocument` leaked a task object with `-ExternalSigner`.
+- **Failures keep the structure tree consistent**: content tagged before a `Use-VellumPdfStructure` block, a table or
+  a list failed no longer ends up with MCIDs that no structure element owns (a corrupt ParentTree that
+  `-Validate` did not notice); table cell colours are checked before anything is drawn.
+- **`Add-VellumPdfParagraph -Run`** no longer swaps an embedded font for Helvetica when the run sets `-FontHandle`
+  but no `-FontSize`; unpaired UTF-16 surrogates and the Symbol/ZapfDingbats fonts (no width table in VellumPdf) are
+  refused with a cmdlet-named error where text is measured; `-Page` beyond the page count is named for tables and
+  lists; `Use-VellumPdfTransform -Scale` is limited to 0.000001 ... 1,000,000; Group 3 CCITT without end-of-line
+  codes is exported as TIFF compression 2 (one-dimensional byte-aligned data) or skipped, never as an undecodable
+  file; a hostile JBIG2 header can no longer abort the export; `-RowHeader` marks only grid column 0;
+  page tables and lists write no colour operator unless a colour was given (DeviceRGB fails PDF/A with a CMYK
+  intent) and the table is no longer quadratic in rows; numbered lists widen the marker column and label more
+  than 26 children aa, ab ...; values no longer leak between documents piped to one call.
 - Pie chart `-StrokeColor` and `-MarginTop`/`-MarginBottom` had no effect (the cmdlet's
   bound parameters were read from inside a script block, where they are empty).
 - `Add-VellumPdfElement` now honours the space a previous `-MarginBottom` left (an

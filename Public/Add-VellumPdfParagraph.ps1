@@ -148,8 +148,9 @@ function Add-VellumPdfParagraph {
                     $stamp = $r.PSObject.Properties['PSVellumRunBound']
                     if ($stamp -and ((-not ($stamp.Value -contains 'Font' -or $stamp.Value -contains 'FontHandle')) -or $stamp.Value -notcontains 'FontSize')) {
                         $merged = [VellumPdf.Layout.Core.TextStyle]::new()
-                        $merged.FontRef = $r.Style.FontRef
-                        $merged.Font = $r.Style.Font
+                        # TextStyle.Font and FontRef replace each other: set exactly one of them.
+                        if ($stamp.Value -contains 'FontHandle') { $merged.FontRef = $r.Style.FontRef }
+                        elseif ($stamp.Value -contains 'Font') { $merged.Font = $r.Style.Font }
                         $merged.FontSize = $r.Style.FontSize
                         $merged.Leading = $r.Style.Leading
                         $merged.Color = $r.Style.Color

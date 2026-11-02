@@ -58,8 +58,10 @@ Describe 'examples/10-paths-clipping-and-text-boxes.ps1' {
         $out = Join-Path $TestDrive "paths-$_.pdf"
         # A child process, so that the culture change cannot leak into this session.
         $script = "[cultureinfo]::CurrentCulture = '$_'; & '$(Join-Path $script:examples '10-paths-clipping-and-text-boxes.ps1')'"
-        $null = & (Get-Command pwsh).Source -NoProfile -Command $script 2>&1
         $written = Join-Path $script:examples 'paths-and-text-boxes.pdf'
+        Remove-Item $written -ErrorAction SilentlyContinue   # a leftover file from an earlier run must not pass for this one
+        $output = & (Get-Command pwsh).Source -NoProfile -Command $script 2>&1
+        $LASTEXITCODE | Should -Be 0 -Because (($output | Out-String))
         Test-Path $written | Should -BeTrue
         Copy-Item $written $out
         if (Get-Command qpdf -ErrorAction SilentlyContinue) { & qpdf --check $out 2>&1 | Out-String | Should -Match 'No syntax or stream encoding errors' }

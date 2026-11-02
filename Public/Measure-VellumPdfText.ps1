@@ -64,6 +64,8 @@ function Measure-VellumPdfText {
     process {
         try {
             if ($Text -match '[\r\n]') { throw 'Measure-VellumPdfText: -Text must be a single line.' }
+            Assert-VellumPdfValidText -Text $Text -CommandName 'Measure-VellumPdfText'
+            if (-not $FontHandle) { Assert-VellumPdfMeasurableFont -Font $Font -CommandName 'Measure-VellumPdfText' -Reason 'it measures text' }
             $resolved = $null
             $unencodable = [System.Collections.Generic.List[string]]::new()
             $missing = [System.Collections.Generic.List[string]]::new()

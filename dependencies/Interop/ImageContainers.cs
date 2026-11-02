@@ -19,12 +19,21 @@ public static class ImageContainers
     /// <param name="k">PDF /K: negative for Group 4, 0 for 1-D Group 3, positive for mixed 2-D Group 3.</param>
     /// <param name="blackIs1">PDF /BlackIs1, already combined with an inverting /Decode array.</param>
     /// <param name="byteAlign">PDF /EncodedByteAlign.</param>
+    /// <param name="endOfLine">PDF /EndOfLine: whether the rows are separated by EOL codes.</param>
     /// <param name="data">The CCITT-encoded bytes.</param>
-    public static byte[]? BuildCcittTiff(int width, int height, int k, bool blackIs1, bool byteAlign, byte[] data)
+    /// <remarks>
+    /// TIFF Compression 3 (Group 3 fax) requires an EOL code before every row, so Group 3 data without them
+    /// cannot be written as such. The one exception is one-dimensional data with byte-aligned rows and no EOLs,
+    /// which is TIFF Compression 2 (CCITT modified Huffman RLE). Other combinations return null.
+    /// Dimensions above 100,000 pixels return null (no reader opens such a file).
+    /// </remarks>
+    public static byte[]? BuildCcittTiff(int width, int height, int k, bool blackIs1, bool byteAlign, bool endOfLine, byte[] data)
     {
         ArgumentNullException.ThrowIfNull(data);
-        if (width <= 0 || height <= 0) return null;
+        if (width <= 0 || height <= 0 || width > 100_000 || height > 100_000) return null;
         if (k < 0 && byteAlign) return null;
+        var modifiedHuffman = k == 0 && byteAlign && !endOfLine;
+        if (k >= 0 && !endOfLine && !modifiedHuffman) return null;
 
         var group4 = k < 0;
         // Photometric 1 (BlackIsZero) for BlackIs1 = true and 0 (WhiteIsZero) otherwise. Checked against
@@ -36,14 +45,15 @@ public static class ImageContainers
             (256, 4, (uint)width),
             (257, 4, (uint)height),
             (258, 3, 1),
-            (259, 3, group4 ? 4u : 3u),
+            (259, 3, group4 ? 4u : modifiedHuffman ? 2u : 3u),
             (262, 3, photometric),
             (273, 4, 0),          // StripOffsets, patched below
             (277, 3, 1),
             (278, 4, (uint)height),
             (279, 4, (uint)data.Length),
-            ((ushort)(292 + (group4 ? 1 : 0)), 4, group4 ? 0u : (uint)((k > 0 ? 1 : 0) | (byteAlign ? 4 : 0))),
         };
+        if (!modifiedHuffman)
+            entries.Add(((ushort)(292 + (group4 ? 1 : 0)), 4, group4 ? 0u : (uint)((k > 0 ? 1 : 0) | (byteAlign ? 4 : 0))));
 
         // Header (8) + IFD (2 + 12 * n + 4) + data.
         var ifdSize = 2 + 12 * entries.Count + 4;
@@ -122,22 +132,22 @@ public static class ImageContainers
     private static List<Segment>? ParseSegments(byte[] data)
     {
         var list = new List<Segment>();
-        var i = 0;
+        long i = 0;
         while (i < data.Length)
         {
-            var start = i;
+            var start = (int)i;
             if (i + 6 > data.Length) return null;
-            var number = BinaryPrimitives.ReadUInt32BigEndian(data.AsSpan(i));
+            var number = BinaryPrimitives.ReadUInt32BigEndian(data.AsSpan((int)i));
             var flags = data[i + 4];
             var type = flags & 0x3F;
             var largePage = (flags & 0x40) != 0;
             i += 5;
             var countByte = data[i];
-            var count = countByte >> 5;
+            long count = countByte >> 5;
             if (count == 7)
             {
                 if (i + 4 > data.Length) return null;
-                count = (int)(BinaryPrimitives.ReadUInt32BigEndian(data.AsSpan(i)) & 0x1FFFFFFF);
+                count = BinaryPrimitives.ReadUInt32BigEndian(data.AsSpan((int)i)) & 0x1FFFFFFF;
                 i += 4 + (count + 8) / 8;
             }
             else
@@ -149,12 +159,12 @@ public static class ImageContainers
             i += count * referenceSize;
             i += largePage ? 4 : 1;
             if (i + 4 > data.Length) return null;
-            var length = BinaryPrimitives.ReadUInt32BigEndian(data.AsSpan(i));
+            var length = BinaryPrimitives.ReadUInt32BigEndian(data.AsSpan((int)i));
             i += 4;
             if (length == 0xFFFFFFFF) return null; // unknown length (immediate generic regions in streams) is not handled
             if (i + (long)length > data.Length) return null;
-            i += (int)length;
-            list.Add(new Segment(number, type, data.AsSpan(start, i - start).ToArray()));
+            i += length;
+            list.Add(new Segment(number, type, data.AsSpan(start, (int)i - start).ToArray()));
         }
 
         return list;
