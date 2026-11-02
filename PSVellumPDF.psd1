@@ -44,6 +44,7 @@ Experimental reading (VellumPdf.Reader preview): Get-VellumPdfInfo, Get-VellumPd
         'Add-VellumPdfShape'
         'Add-VellumPdfTable'
         'Add-VellumPdfText'
+        'Add-VellumPdfTextBox'
         'Export-VellumPdfImage'
         'Get-VellumPdfBarcodeMatrix'
         'Get-VellumPdfConformanceCoverage'
