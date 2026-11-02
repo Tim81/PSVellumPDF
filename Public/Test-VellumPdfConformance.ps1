@@ -69,28 +69,7 @@ function Test-VellumPdfConformance {
     }
 
     process {
-        $sources = [System.Collections.Generic.List[object]]::new()
-        if ($PSCmdlet.ParameterSetName -eq 'Bytes') {
-            $sources.Add([pscustomobject]@{ Name = '<bytes>'; Data = $Bytes })
-        }
-        else {
-            $paths = if ($PSCmdlet.ParameterSetName -eq 'LiteralPath') {
-                foreach ($lp in $LiteralPath) { $ExecutionContext.SessionState.Path.GetUnresolvedProviderPathFromPSPath($lp) }
-            }
-            else {
-                foreach ($p in $Path) {
-                    $found = @($ExecutionContext.SessionState.Path.GetResolvedProviderPathFromPSPath($p, [ref]$null))
-                    if (-not $found) { throw "Test-VellumPdfConformance: no file matches '$p'." }
-                    $found
-                }
-            }
-            foreach ($file in $paths) {
-                if (-not [System.IO.File]::Exists($file)) {
-                    throw "Test-VellumPdfConformance: file not found: '$file'."
-                }
-                $sources.Add([pscustomobject]@{ Name = $file; Data = [System.IO.File]::ReadAllBytes($file) })
-            }
-        }
+        $sources = @(Get-VellumPdfInput -Path $Path -LiteralPath $LiteralPath -Bytes $Bytes -CommandName 'Test-VellumPdfConformance')
 
         foreach ($source in $sources) {
             $name = $source.Name
