@@ -38,7 +38,7 @@ function Register-VellumPdfFont {
                Add-VellumPdfParagraph -Text 'Body with embedded font.' -FontHandle $handle |
                Save-VellumPdfDocument -Path ./output.pdf
     .EXAMPLE
-        $bytes = [System.IO.File]::ReadAllBytes('./DejaVuSans.ttf')
+        $bytes = [System.IO.File]::ReadAllBytes((Resolve-Path ./DejaVuSans.ttf).ProviderPath)
         $handle = Register-VellumPdfFont -Document $doc -FontBytes $bytes
     .OUTPUTS
         VellumPdf.Fonts.EmbeddedFontHandle
@@ -47,7 +47,7 @@ function Register-VellumPdfFont {
     [OutputType([VellumPdf.Fonts.EmbeddedFontHandle])]
     param(
         [Parameter(Mandatory, ValueFromPipeline)]
-        [VellumPdf.Layout.Document]$Document,
+        [object]$Document,
 
         [Parameter(Mandatory, Position = 0, ParameterSetName = 'Path')]
         [string]$Path,
@@ -57,22 +57,28 @@ function Register-VellumPdfFont {
     )
 
     process {
-        Assert-VellumPdfDocumentOpen -Document $Document -CommandName 'Register-VellumPdfFont'
+        try {
+            Assert-VellumPdfDocumentOpen -Document $Document -CommandName 'Register-VellumPdfFont'
 
-        $handle = if ($PSCmdlet.ParameterSetName -eq 'Bytes') {
-            $Document.UseTrueTypeFont($FontBytes)
-        }
-        else {
-            $resolved = $ExecutionContext.SessionState.Path.GetUnresolvedProviderPathFromPSPath($Path)
-            if (-not [System.IO.File]::Exists($resolved)) {
-                throw "Register-VellumPdfFont: font file not found: '$resolved'. Verify the path and try again."
+            $handle = if ($PSCmdlet.ParameterSetName -eq 'Bytes') {
+                $Document.UseTrueTypeFont($FontBytes)
             }
-            $Document.LoadTrueTypeFont($resolved)
-        }
+            else {
+                $resolved = $ExecutionContext.SessionState.Path.GetUnresolvedProviderPathFromPSPath($Path)
+                if (-not [System.IO.File]::Exists($resolved)) {
+                    throw (New-VellumPdfErrorRecord FileNotFound "Register-VellumPdfFont: font file not found: '$resolved'. Verify the path and try again.")
+                }
+                if ($Document -is [VellumPdf.Layout.Document]) { $Document.LoadTrueTypeFont($resolved) }
+                else { $Document.UseTrueTypeFont([System.IO.File]::ReadAllBytes($resolved)) }
+            }
 
-        # Tag the handle with its owning document so the content cmdlets can
-        # reject cross-document use (which silently breaks font rendering).
-        $handle.PSObject.Properties.Add([psnoteproperty]::new('PSVellumOwner', $Document))
-        $handle
+            # Tag the handle with its owning document so the content cmdlets can
+            # reject cross-document use (which silently breaks font rendering).
+            $handle.PSObject.Properties.Add([psnoteproperty]::new('PSVellumOwner', $Document))
+            $handle
+        }
+        catch {
+            $PSCmdlet.ThrowTerminatingError((Resolve-VellumPdfErrorRecord -ErrorRecord $_ -CommandName 'Register-VellumPdfFont'))
+        }
     }
 }

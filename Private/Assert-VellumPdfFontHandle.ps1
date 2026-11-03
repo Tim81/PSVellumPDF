@@ -16,7 +16,7 @@ function Assert-VellumPdfFontHandle {
         [VellumPdf.Fonts.EmbeddedFontHandle]$FontHandle,
 
         [Parameter(Mandatory)]
-        [VellumPdf.Layout.Document]$Document,
+        [object]$Document,
 
         [Parameter(Mandatory)]
         [string]$CommandName
@@ -24,9 +24,9 @@ function Assert-VellumPdfFontHandle {
 
     $owner = $FontHandle.PSObject.Properties['PSVellumOwner']
     if ($owner -and -not [object]::ReferenceEquals($owner.Value, $Document)) {
-        throw ("${CommandName}: this -FontHandle was registered on a DIFFERENT document. " +
+        throw (New-VellumPdfErrorRecord InvalidArgument ("${CommandName}: this -FontHandle was registered on a DIFFERENT document. " +
             'A font handle is only valid for the document it came from (using it elsewhere ' +
             'produces a PDF whose text cannot render). Call Register-VellumPdfFont on this ' +
-            'document to get a valid handle.')
+            'document to get a valid handle.'))
     }
 }

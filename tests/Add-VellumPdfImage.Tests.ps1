@@ -309,3 +309,80 @@ Describe 'JPEG 2000 / JBIG2 compose with PDF/A-2b' {
         $raw | Should -Match '/JBIG2Decode'
     }
 }
+
+Describe 'Add-VellumPdfImage load options, CCITT and margins' {
+    BeforeAll {
+        $script:gray16 = Join-Path $PSScriptRoot 'assets' 'gray16.png'
+        function script:Save-WithImage([hashtable]$Params, [string]$Name) {
+            $out = Join-Path $TestDrive "$Name.pdf"
+            New-VellumPdfDocument | Add-VellumPdfImage @Params | Save-VellumPdfDocument -Path $out | Out-Null
+            [System.IO.File]::ReadAllText($out, [System.Text.Encoding]::Latin1)
+        }
+    }
+
+    It 'keeps 16-bit PNG depth by default and reduces it with -ReduceToEightBit' {
+        (Save-WithImage @{ Path = $script:gray16 } 'depth16') | Should -Match '/BitsPerComponent\s+16'
+        $reduced = Save-WithImage @{ Path = $script:gray16; ReduceToEightBit = $true } 'depth8'
+        $reduced | Should -Match '/BitsPerComponent\s+8'
+        $reduced | Should -Not -Match '/BitsPerComponent\s+16'
+    }
+
+    It 'embeds JBIG2 natively by default and as a raster with -DecodeToRaster' {
+        $jb2 = Join-Path $PSScriptRoot 'assets' 'sample.jb2'
+        (Save-WithImage @{ Path = $jb2 } 'jb2') | Should -Match '/JBIG2Decode'
+        (Save-WithImage @{ Path = $jb2; DecodeToRaster = $true } 'jb2raster') | Should -Not -Match '/JBIG2Decode'
+    }
+
+    It 'surfaces the engine refusal when JPEG 2000 is asked to decode to a raster' {
+        $doc = New-VellumPdfDocument
+        try {
+            { $doc | Add-VellumPdfImage -Path (Join-Path $PSScriptRoot 'assets' 'sample.jp2') -DecodeToRaster } |
+                Should -Throw '*decode-to-raster is not yet supported*'
+        }
+        finally { $doc.Dispose() }
+    }
+
+    It 'embeds raw CCITT Group 4 data with explicit dimensions' {
+        $g4 = [byte[]](0xC0)   # two all-white rows: one V0 code each
+        $text = Save-WithImage @{ ImageBytes = $g4; Format = 'Ccitt'; Columns = 8; Rows = 2; Width = 40 } 'ccitt'
+        $text | Should -Match '/CCITTFaxDecode'
+    }
+
+    It 'requires -Columns/-Rows for CCITT and refuses them for other formats' {
+        $doc = New-VellumPdfDocument
+        try {
+            { $doc | Add-VellumPdfImage -ImageBytes ([byte[]](0xC0)) -Format Ccitt } | Should -Throw '*needs -Columns and -Rows*'
+            $png = [System.IO.File]::ReadAllBytes($script:gray16)
+            { $doc | Add-VellumPdfImage -ImageBytes $png -Format Png -Columns 8 -Rows 2 } | Should -Throw '*Ccitt only*'
+        }
+        finally { $doc.Dispose() }
+    }
+
+    It 'refuses CCITT-only switches for other formats instead of ignoring them' {
+        $doc = New-VellumPdfDocument
+        try {
+            $png = [System.IO.File]::ReadAllBytes($script:gray16)
+            { $doc | Add-VellumPdfImage -ImageBytes $png -Format Png -BlackIs1 } | Should -Throw '*Ccitt only*'
+            { $doc | Add-VellumPdfImage -ImageBytes $png -Format Png -CcittK 0 } | Should -Throw '*Ccitt only*'
+        }
+        finally { $doc.Dispose() }
+    }
+
+    It 'refuses load options for formats that have none' {
+        $doc = New-VellumPdfDocument
+        try {
+            $png = [System.IO.File]::ReadAllBytes($script:gray16)
+            { $doc | Add-VellumPdfImage -ImageBytes $png -Format Gif -DecodeToRaster } | Should -Throw '*apply to PNG, TIFF*'
+        }
+        finally { $doc.Dispose() }
+    }
+
+    It 'applies left and right margins' {
+        $doc = New-VellumPdfDocument
+        try {
+            $png = [System.IO.File]::ReadAllBytes($script:gray16)
+            { $doc | Add-VellumPdfImage -ImageBytes $png -Format Png -Width 50 -MarginLeft 20 -MarginRight 10 } | Should -Not -Throw
+        }
+        finally { $doc.Dispose() }
+    }
+}

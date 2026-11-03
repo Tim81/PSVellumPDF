@@ -6,7 +6,7 @@ updates:
     schedule:
       interval: weekly
 
-  # VellumPdf and the locked dependency closure (dependencies/packages.lock.json).
+  # VellumPdf package versions in dependencies/Dependencies.csproj (Pkcs floats on its own).
   - package-ecosystem: nuget
     directory: /dependencies
     schedule:

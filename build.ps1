@@ -16,7 +16,7 @@
     Test     - Restore (if lib is missing) then run Pester with code coverage (fails below target).
     Docs     - regenerate docs/ markdown reference from comment-based help (PlatyPS).
     Stage    - assemble the publishable module layout in out/PSVellumPDF
-               (manifest, psm1, Public/, Private/, lib/, LICENSE - no dev files).
+               (manifest, psm1, format data, Public/, Private/, lib/, LICENSE, README - no dev files).
     Clean    - remove ./lib, ./out, and dependencies build output.
 
 .EXAMPLE
@@ -41,7 +41,7 @@ $publishDir = Join-Path $root 'dependencies' 'bin' 'publish'
 
 # Code-coverage floor enforced by the Test task (and CI). Raise toward 100 as
 # feature cmdlets and their tests land (see issue #11).
-$script:CoverageTarget = 70
+$script:CoverageTarget = 85
 
 # Pinned tool versions: CI installs exactly these, so a freshly published (or
 # tampered) PSGallery release cannot silently enter the build.
@@ -50,17 +50,34 @@ $script:PesterVersion = '5.7.1'
 
 function Invoke-Restore {
     Write-Host '==> Publishing VellumPdf dependencies...' -ForegroundColor Cyan
-    # RestoreLockedMode: fail if the resolved package graph deviates from the
-    # committed dependencies/packages.lock.json (supply-chain drift guard).
-    dotnet publish $depProj -c Release -o $publishDir '/p:RestoreLockedMode=true' | Out-Host
+    # No locked restore: System.Security.Cryptography.Pkcs floats to the newest 10.0.x
+    # (see Dependencies.csproj), so there is no lock file to enforce.
+    dotnet publish $depProj -c Release -o $publishDir | Out-Host
     if ($LASTEXITCODE -ne 0) { throw "dotnet publish failed ($LASTEXITCODE)." }
 
     if (Test-Path $libDir) { Remove-Item $libDir -Recurse -Force }
     New-Item -ItemType Directory -Path $libDir | Out-Null
 
-    # Copy only the VellumPdf assemblies; framework assemblies ship with PowerShell 7.6.
-    Get-ChildItem $publishDir -Filter 'VellumPdf*.dll' |
-        Copy-Item -Destination $libDir -Force
+    # Copy only the VellumPdf assemblies plus our own interop shim
+    # (PSVellumPDF.Interop.dll, compiled from dependencies/Interop); framework
+    # and PowerShell assemblies ship with PowerShell 7.6.
+    @(
+        Get-ChildItem $publishDir -Filter 'VellumPdf*.dll'
+        Get-ChildItem $publishDir -Filter 'PSVellumPDF.Interop.dll'
+    ) | Copy-Item -Destination $libDir -Force
+    if (-not (Get-ChildItem $publishDir -Filter 'PSVellumPDF.Interop.dll')) {
+        throw 'PSVellumPDF.Interop.dll was not produced by the dependencies project.'
+    }
+
+    # VellumPdf's NOTICE carries third-party acknowledgements (GIF, Adobe Glyph
+    # List) that its licences require alongside redistributed binaries. It is
+    # packed into every VellumPdf package; take it from the restored Kernel one.
+    $nugetRoot = (dotnet nuget locals global-packages --list | Select-Object -First 1) -replace '^global-packages:\s*', ''
+    $kernelDll = Join-Path $publishDir 'VellumPdf.Kernel.dll'
+    $kernelVersion = ([System.Diagnostics.FileVersionInfo]::GetVersionInfo($kernelDll).ProductVersion -split '[+-]')[0]
+    $notice = Join-Path $nugetRoot 'vellumpdf.kernel' $kernelVersion 'NOTICE'
+    if (-not (Test-Path $notice)) { throw "VellumPdf NOTICE not found at '$notice'." }
+    Copy-Item $notice (Join-Path $libDir 'NOTICE') -Force
 
     $copied = Get-ChildItem $libDir -Filter '*.dll'
     Write-Host "==> lib/ now contains:" -ForegroundColor Green
@@ -96,7 +113,8 @@ function Invoke-Lint {
     }
 
     if ($findings) {
-        $findings | Format-Table Severity, RuleName, ScriptName, Line, Message -AutoSize | Out-Host
+        # One line per finding with file:line; Format-Table truncates columns on narrow CI consoles.
+        $findings | ForEach-Object { '{0} {1} {2}:{3} {4}' -f $_.Severity, $_.RuleName, $_.ScriptPath, $_.Line, $_.Message } | Sort-Object -Unique | Out-Host
         throw "PSScriptAnalyzer reported $($findings.Count) issue(s)."
     }
     Write-Host '==> Lint clean.' -ForegroundColor Green
@@ -157,7 +175,9 @@ function Invoke-DocBuild {
     Import-Module (Join-Path $root 'PSVellumPDF.psd1') -Force
 
     $docsDir = Join-Path $root 'docs'
-    if (Test-Path $docsDir) { Remove-Item $docsDir -Recurse -Force }
+    # PlatyPS writes to <docs>/<module>; leave hand-written files (docs/plans) alone.
+    $generatedDir = Join-Path $docsDir 'PSVellumPDF'
+    if (Test-Path $generatedDir) { Remove-Item $generatedDir -Recurse -Force }
 
     Write-Host '==> Generating markdown command help...' -ForegroundColor Cyan
     $module = Get-Module PSVellumPDF
@@ -172,7 +192,7 @@ function Invoke-DocBuild {
     # Post-process generator artifacts: machine locale and template placeholders
     # (comment-based help has no field that fills the INPUTS/OUTPUTS type
     # descriptions or RELATED LINKS, so PlatyPS leaves {{ Fill ... }} stubs).
-    foreach ($md in Get-ChildItem $docsDir -Recurse -Filter '*.md') {
+    foreach ($md in Get-ChildItem $generatedDir -Recurse -Filter '*.md') {
         $text = Get-Content $md.FullName -Raw
         $text = $text -replace 'Locale: [a-z]{2}-[A-Z]{2}', 'Locale: en-US'
         $text = $text -replace '(?s)## ALIASES\r?\n.*?\{\{Insert list of aliases\}\}\r?\n\r?\n', ''
@@ -194,10 +214,12 @@ function Invoke-Stage {
     # folder, so dev files (tests, build, dependencies, docs) must not be here.
     Copy-Item (Join-Path $root 'PSVellumPDF.psd1') $stageDir
     Copy-Item (Join-Path $root 'PSVellumPDF.psm1') $stageDir
+    Copy-Item (Join-Path $root 'PSVellumPDF.Format.ps1xml') $stageDir
     Copy-Item (Join-Path $root 'Public') $stageDir -Recurse
     Copy-Item (Join-Path $root 'Private') $stageDir -Recurse
     Copy-Item $libDir (Join-Path $stageDir 'lib') -Recurse
     Copy-Item (Join-Path $root 'LICENSE') $stageDir
+    Copy-Item (Join-Path $root 'README.md') $stageDir   # shown on the PowerShell Gallery package page
 
     $manifest = Test-ModuleManifest (Join-Path $stageDir 'PSVellumPDF.psd1') -ErrorAction Stop
     Write-Host "==> Staged $($manifest.Name) $($manifest.Version) -> $stageDir" -ForegroundColor Green

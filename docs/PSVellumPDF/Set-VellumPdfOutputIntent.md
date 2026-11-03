@@ -4,7 +4,7 @@ external help file: PSVellumPDF-Help.xml
 HelpUri: ''
 Locale: en-US
 Module Name: PSVellumPDF
-ms.date: 06-13-2026
+ms.date: 11/02/2026
 PlatyPS schema version: 2024-05-01
 title: Set-VellumPdfOutputIntent
 ---
@@ -20,14 +20,14 @@ Sets a custom ICC output intent on a PDF/A conformant VellumPdf document.
 ### IccProfile (Default)
 
 ```
-Set-VellumPdfOutputIntent [-IccProfilePath] <string> -Document <Document> -ComponentCount <int>
- -OutputConditionIdentifier <string> [-Info <string>] [<CommonParameters>]
+Set-VellumPdfOutputIntent [-IccProfilePath] <string> -Document <Object>
+ -OutputConditionIdentifier <string> [-ComponentCount <int>] [-Info <string>] [<CommonParameters>]
 ```
 
 ### Cmyk
 
 ```
-Set-VellumPdfOutputIntent -Document <Document> -Cmyk [-OutputConditionIdentifier <string>]
+Set-VellumPdfOutputIntent -Document <Object> -Cmyk [-OutputConditionIdentifier <string>]
  [<CommonParameters>]
 ```
 
@@ -44,6 +44,14 @@ REQUIRES PDF/A: the library only writes the output intent for conformant
 documents (it is silently ignored otherwise), so this cmdlet throws when
 the document's Conformance is None - create the document with
 New-VellumPdfDocument -Conformance PdfA2b (or another PDF/A level).
+
+The profile of an -IccProfilePath intent must be a printer, display, scanner or
+colour-space-conversion profile ('prtr', 'mntr', 'scnr', 'spac') of ICC major
+version 4 or lower; an abstract profile or a version 5 profile fails PDF/A
+(ISO 19005-2, 6.2.3) and is refused.
+
+RGB content drawn into a document whose output intent is CMYK fails the
+same validation (6.2.4.3), so the drawing cmdlets warn once per intent.
 
 CMYK CAVEAT: the layout engine renders text and table fills in DeviceRGB.
 A CMYK output intent is intended for documents that also carry CMYK
@@ -101,8 +109,9 @@ HelpMessage: ''
 
 ### -ComponentCount
 
-Number of colour components in the profile: 1 (Gray), 3 (RGB), or
-4 (CMYK).
+Optional.
+The profile's number of colour components (1 Gray, 3 RGB, 4 CMYK) is read
+from the profile itself; if you give it, it must match.
 
 ```yaml
 Type: System.Int32
@@ -112,7 +121,7 @@ Aliases: []
 ParameterSets:
 - Name: IccProfile
   Position: Named
-  IsRequired: true
+  IsRequired: false
   ValueFromPipeline: false
   ValueFromPipelineByPropertyName: false
   ValueFromRemainingArguments: false
@@ -128,7 +137,7 @@ The same
 instance is returned after the output intent is set, enabling chaining.
 
 ```yaml
-Type: VellumPdf.Layout.Document
+Type: System.Object
 DefaultValue: ''
 SupportsWildcards: false
 Aliases: []
@@ -226,7 +235,7 @@ This cmdlet supports the common parameters: -Debug, -ErrorAction, -ErrorVariable
 
 ## INPUTS
 
-### VellumPdf.Layout.Document
+### System.Object
 
 
 ## OUTPUTS
@@ -235,6 +244,9 @@ This cmdlet supports the common parameters: -Debug, -ErrorAction, -ErrorVariable
 
 
 ### VellumPdf.Layout.Document
+
+
+### VellumPdf.Document.PdfDocument
 
 
 ## NOTES

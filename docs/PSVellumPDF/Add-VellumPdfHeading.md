@@ -4,7 +4,7 @@ external help file: PSVellumPDF-Help.xml
 HelpUri: ''
 Locale: en-US
 Module Name: PSVellumPDF
-ms.date: 06-13-2026
+ms.date: 11/02/2026
 PlatyPS schema version: 2024-05-01
 title: Add-VellumPdfHeading
 ---
@@ -22,8 +22,8 @@ Adds a heading to a VellumPdf document.
 ```
 Add-VellumPdfHeading [-Text] <string> -Document <Document> [-Level <int>] [-Font <string>]
  [-FontSize <double>] [-Alignment <string>] [-BookmarkTitle <string>]
- [-FontHandle <EmbeddedFontHandle>] [-MarginTop <double>] [-MarginBottom <double>]
- [<CommonParameters>]
+ [-FontHandle <EmbeddedFontHandle>] [-Color <Object>] [-Leading <double>] [-Language <string>]
+ [-MarginTop <double>] [-MarginBottom <double>] [<CommonParameters>]
 ```
 
 ## DESCRIPTION
@@ -78,6 +78,28 @@ entries; this parameter overrides the bookmark label for non-tagged docs.
 
 ```yaml
 Type: System.String
+DefaultValue: ''
+SupportsWildcards: false
+Aliases: []
+ParameterSets:
+- Name: (All)
+  Position: Named
+  IsRequired: false
+  ValueFromPipeline: false
+  ValueFromPipelineByPropertyName: false
+  ValueFromRemainingArguments: false
+DontShow: false
+AcceptedValues: []
+HelpMessage: ''
+```
+
+### -Color
+
+Heading text colour: an R,G,B triple in 0..1, a hex string ('#3366cc'),
+or a colour name.
+
+```yaml
+Type: System.Object
 DefaultValue: ''
 SupportsWildcards: false
 Aliases: []
@@ -188,13 +210,58 @@ AcceptedValues: []
 HelpMessage: ''
 ```
 
+### -Language
+
+A BCP 47 language tag (e.g.
+'fr') written for this heading; only used in
+tagged documents.
+VellumPdf does not validate the tag.
+
+```yaml
+Type: System.String
+DefaultValue: ''
+SupportsWildcards: false
+Aliases: []
+ParameterSets:
+- Name: (All)
+  Position: Named
+  IsRequired: false
+  ValueFromPipeline: false
+  ValueFromPipelineByPropertyName: false
+  ValueFromRemainingArguments: false
+DontShow: false
+AcceptedValues: []
+HelpMessage: ''
+```
+
+### -Leading
+
+Line height in points; 0 (the default) means 1.2 x the font size.
+
+```yaml
+Type: System.Double
+DefaultValue: 0
+SupportsWildcards: false
+Aliases: []
+ParameterSets:
+- Name: (All)
+  Position: Named
+  IsRequired: false
+  ValueFromPipeline: false
+  ValueFromPipelineByPropertyName: false
+  ValueFromRemainingArguments: false
+DontShow: false
+AcceptedValues: []
+HelpMessage: ''
+```
+
 ### -Level
 
 The heading level from 1 (top-level) to 6 (lowest).
 Controls the PDF
-outline depth and the H1-H6 structure tag in tagged documents.
-Defaults
-to 1.
+outline depth and the H1-H6 structure tag in tagged documents (level 1
+is tagged H1).
+Defaults to 1.
 
 ```yaml
 Type: System.Int32

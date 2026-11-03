@@ -4,7 +4,7 @@ external help file: PSVellumPDF-Help.xml
 HelpUri: ''
 Locale: en-US
 Module Name: PSVellumPDF
-ms.date: 06-13-2026
+ms.date: 11/02/2026
 PlatyPS schema version: 2024-05-01
 title: New-VellumPdfDocument
 ---
@@ -17,13 +17,23 @@ Creates a new VellumPdf layout document.
 
 ## SYNTAX
 
-### __AllParameterSets
+### NamedPage (Default)
 
 ```
-New-VellumPdfDocument [[-Conformance] <string>] [[-PageSize] <string>] [[-DefaultFont] <string>]
- [[-DefaultFontSize] <double>] [[-Language] <string>] [[-Margin] <double>] [[-MarginTop] <double>]
- [[-MarginRight] <double>] [[-MarginBottom] <double>] [[-MarginLeft] <double>] [-Tagged]
- [-UseObjectStreams] [<CommonParameters>]
+New-VellumPdfDocument [-Conformance <string>] [-PageSize <string>] [-DefaultFont <string>]
+ [-DefaultFontSize <double>] [-Tagged] [-Language <string>] [-Margin <double>] [-MarginTop <double>]
+ [-MarginRight <double>] [-MarginBottom <double>] [-MarginLeft <double>] [-UseObjectStreams]
+ [-Culture <Object>] [-InputCulture <Object>] [<CommonParameters>]
+```
+
+### CustomPage
+
+```
+New-VellumPdfDocument -PageWidthMm <double> -PageHeightMm <double> [-Conformance <string>]
+ [-DefaultFont <string>] [-DefaultFontSize <double>] [-Tagged] [-Language <string>]
+ [-Margin <double>] [-MarginTop <double>] [-MarginRight <double>] [-MarginBottom <double>]
+ [-MarginLeft <double>] [-UseObjectStreams] [-Culture <Object>] [-InputCulture <Object>]
+ [<CommonParameters>]
 ```
 
 ## DESCRIPTION
@@ -67,13 +77,34 @@ New-VellumPdfDocument -Margin 30 -MarginLeft 50
 
 ### -Conformance
 
-The PDF/A conformance level for the document.
-Use PdfA2b, PdfA2u, or
-PdfA2a to produce an ISO 19005-2 compliant archive file; None (default)
-produces a standard PDF without conformance requirements.
-Note that PDF/A
-forbids encryption, so -Conformance is incompatible with
-Protect-VellumPdfDocument.
+The conformance level for the document.
+Use PdfA2b, PdfA2u, or PdfA2a to
+produce an ISO 19005-2 compliant archive file, or PdfUA1 for ISO 14289-1
+(PDF/UA-1) accessibility; None (default) produces a standard PDF without
+conformance requirements.
+PDF/UA-1 forces a tagged document.
+To pass the
+preflight (Test-VellumPdfConformance, or Save-VellumPdfDocument -Validate)
+also set -Language, give the document a title with Set-VellumPdfDocumentInfo
+-Title, and give images, charts and barcodes alternate text.
+Both levels
+require embedded fonts: a conformant document therefore draws every base-14
+font name it uses (the document default, -Font on paragraphs, headings,
+tables, lists, text runs, headers and footers) in the metric-compatible
+Liberation font (Helvetica -> Liberation Sans, Times -> Serif, Courier ->
+Mono, with bold and italic variants), embedded once per document; layout is
+unchanged.
+Symbol and ZapfDingbats have no substitute: use -FontHandle
+(Register-VellumPdfFont) for those and for text outside Windows-1252.
+Text
+in embedded fonts is not extracted by Get-VellumPdfText (its reader decodes
+simple fonts only).
+A document without -Conformance keeps the plain base-14
+fonts.
+Hyperlinks (-LinkUri) are not tagged by
+VellumPdf, so a PDF/UA document containing them is not fully conformant.
+Note that PDF/A forbids encryption, so PDF/A is incompatible with
+Protect-VellumPdfDocument; PDF/UA-1 may be encrypted if Extract is kept.
 
 ```yaml
 Type: System.String
@@ -82,7 +113,38 @@ SupportsWildcards: false
 Aliases: []
 ParameterSets:
 - Name: (All)
-  Position: 0
+  Position: Named
+  IsRequired: false
+  ValueFromPipeline: false
+  ValueFromPipelineByPropertyName: false
+  ValueFromRemainingArguments: false
+DontShow: false
+AcceptedValues: []
+HelpMessage: ''
+```
+
+### -Culture
+
+The culture used to turn non-string values into text: table cells, list items and pie-chart
+percentage labels (dates, numbers, and numbers read from strings).
+A culture name ('de-DE') or a
+[cultureinfo] (-Culture (Get-Culture) matches the console); an unknown name is an error.
+Default:
+the invariant culture, so the output is the same on every machine.
+Each of Add-VellumPdfTable,
+Add-VellumPdfList, Add-VellumPdfPieChart (and the page-document counterparts) has its own -Culture
+that overrides this default for one call.
+It is deliberately not derived from -Language: a language
+tag says nothing about how dates and numbers look.
+
+```yaml
+Type: System.Object
+DefaultValue: ''
+SupportsWildcards: false
+Aliases: []
+ParameterSets:
+- Name: (All)
+  Position: Named
   IsRequired: false
   ValueFromPipeline: false
   ValueFromPipelineByPropertyName: false
@@ -107,7 +169,7 @@ SupportsWildcards: false
 Aliases: []
 ParameterSets:
 - Name: (All)
-  Position: 2
+  Position: Named
   IsRequired: false
   ValueFromPipeline: false
   ValueFromPipelineByPropertyName: false
@@ -132,7 +194,35 @@ SupportsWildcards: false
 Aliases: []
 ParameterSets:
 - Name: (All)
-  Position: 3
+  Position: Named
+  IsRequired: false
+  ValueFromPipeline: false
+  ValueFromPipelineByPropertyName: false
+  ValueFromRemainingArguments: false
+DontShow: false
+AcceptedValues: []
+HelpMessage: ''
+```
+
+### -InputCulture
+
+A culture name or [cultureinfo] used to READ numbers that are given as strings in table cells and
+list items (the document default; the table and list cmdlets have a per-call -InputCulture).
+With it,
+a string that consists only of a number is parsed strictly with that culture's decimal and grouping
+separators ('de-DE': '1.234,5' is 1234.5, '1.5' is not a number).
+Without it (the default) the
+separators are detected from the text.
+See Add-VellumPdfTable for the detection rules.
+
+```yaml
+Type: System.Object
+DefaultValue: ''
+SupportsWildcards: false
+Aliases: []
+ParameterSets:
+- Name: (All)
+  Position: Named
   IsRequired: false
   ValueFromPipeline: false
   ValueFromPipelineByPropertyName: false
@@ -156,7 +246,7 @@ SupportsWildcards: false
 Aliases: []
 ParameterSets:
 - Name: (All)
-  Position: 4
+  Position: Named
   IsRequired: false
   ValueFromPipeline: false
   ValueFromPipelineByPropertyName: false
@@ -181,7 +271,7 @@ SupportsWildcards: false
 Aliases: []
 ParameterSets:
 - Name: (All)
-  Position: 5
+  Position: Named
   IsRequired: false
   ValueFromPipeline: false
   ValueFromPipelineByPropertyName: false
@@ -204,7 +294,7 @@ SupportsWildcards: false
 Aliases: []
 ParameterSets:
 - Name: (All)
-  Position: 8
+  Position: Named
   IsRequired: false
   ValueFromPipeline: false
   ValueFromPipelineByPropertyName: false
@@ -227,7 +317,7 @@ SupportsWildcards: false
 Aliases: []
 ParameterSets:
 - Name: (All)
-  Position: 9
+  Position: Named
   IsRequired: false
   ValueFromPipeline: false
   ValueFromPipelineByPropertyName: false
@@ -250,7 +340,7 @@ SupportsWildcards: false
 Aliases: []
 ParameterSets:
 - Name: (All)
-  Position: 7
+  Position: Named
   IsRequired: false
   ValueFromPipeline: false
   ValueFromPipelineByPropertyName: false
@@ -273,8 +363,29 @@ SupportsWildcards: false
 Aliases: []
 ParameterSets:
 - Name: (All)
-  Position: 6
+  Position: Named
   IsRequired: false
+  ValueFromPipeline: false
+  ValueFromPipelineByPropertyName: false
+  ValueFromRemainingArguments: false
+DontShow: false
+AcceptedValues: []
+HelpMessage: ''
+```
+
+### -PageHeightMm
+
+Custom page height in millimetres (1..5080); see -PageWidthMm.
+
+```yaml
+Type: System.Double
+DefaultValue: 0
+SupportsWildcards: false
+Aliases: []
+ParameterSets:
+- Name: CustomPage
+  Position: Named
+  IsRequired: true
   ValueFromPipeline: false
   ValueFromPipelineByPropertyName: false
   ValueFromRemainingArguments: false
@@ -296,9 +407,33 @@ DefaultValue: A4
 SupportsWildcards: false
 Aliases: []
 ParameterSets:
-- Name: (All)
-  Position: 1
+- Name: NamedPage
+  Position: Named
   IsRequired: false
+  ValueFromPipeline: false
+  ValueFromPipelineByPropertyName: false
+  ValueFromRemainingArguments: false
+DontShow: false
+AcceptedValues: []
+HelpMessage: ''
+```
+
+### -PageWidthMm
+
+Custom page width in millimetres (1..5080), used together with
+-PageHeightMm instead of -PageSize.
+For a landscape page make the width
+the larger value.
+
+```yaml
+Type: System.Double
+DefaultValue: 0
+SupportsWildcards: false
+Aliases: []
+ParameterSets:
+- Name: CustomPage
+  Position: Named
+  IsRequired: true
   ValueFromPipeline: false
   ValueFromPipelineByPropertyName: false
   ValueFromRemainingArguments: false

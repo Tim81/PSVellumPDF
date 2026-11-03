@@ -4,7 +4,7 @@ external help file: PSVellumPDF-Help.xml
 HelpUri: ''
 Locale: en-US
 Module Name: PSVellumPDF
-ms.date: 06-13-2026
+ms.date: 11/02/2026
 PlatyPS schema version: 2024-05-01
 title: Set-VellumPdfSignature
 ---
@@ -20,10 +20,13 @@ Stages a PAdES digital signature to be applied when the document is saved.
 ### __AllParameterSets
 
 ```
-Set-VellumPdfSignature [-Certificate] <X509Certificate2> -Document <Document> [-Reason <string>]
+Set-VellumPdfSignature [-Certificate] <X509Certificate2> -Document <Object> [-Reason <string>]
  [-Location <string>] [-ContactInfo <string>] [-SignerName <string>] [-SigningTime <DateTimeOffset>]
  [-TimestampUrl <uri>] [-TimestampTimeout <timespan>] [-TimestampRequestCertificate <bool>]
- [<CommonParameters>]
+ [-Level <string>] [-TimestampClient <ITimestampClient>] [-RevocationClient <IRevocationClient>]
+ [-RevocationTimeout <timespan>] [-SignaturePage <int>] [-SubFilter <string>]
+ [-EstimatedSignatureSize <int>] [-ExternalPrivateKey <AsymmetricAlgorithm>]
+ [-ExternalSigner <IExternalSigner>] [<CommonParameters>]
 ```
 
 ## DESCRIPTION
@@ -52,16 +55,39 @@ instead.
 Calling Set-VellumPdfSignature again before saving replaces the staged
 signature settings, consistent with Set-* semantics.
 
+LEVELS: -Level selects the PAdES baseline level.
+B-B (default without a
+timestamp) and B-T (default with one) are described above.
+B-LT also embeds
+the certificate chain and the OCSP/CRL evidence for it in a /DSS dictionary
+so the signature stays verifiable after the certificates expire; B-LTA adds
+a final document timestamp so the evidence itself is protected.
+B-LT/B-LTA
+need a timestamp and fetch revocation data over the network at save time
+(from the OCSP/CRL addresses in the certificate chain), unless you pass
+your own -RevocationClient.
+They reserve 32 KB for the signature; raise
+-EstimatedSignatureSize if a long chain does not fit.
+
 CERTIFICATE: any [X509Certificate2] with a private key works - from
 Get-PfxCertificate, the cert: drive (Cert:\CurrentUser\My\<thumbprint>),
 or X509CertificateLoader/X509Certificate2 .NET APIs.
-Long-term validation
-(LTV: embedded OCSP/CRL) is not yet provided by the library and is out of
-scope here.
+When the key lives
+elsewhere, pass the public certificate and either -ExternalPrivateKey (a
+key object you can use in-process, such as a CNG or PKCS#11 key) or
+-ExternalSigner (a remote service such as a cloud KMS or HSM).
+An external
+signer is asynchronous: implement IExternalSigner in a compiled type
+(Add-Type) and do not combine it with Add-VellumPdfDrawing.
 
 ## EXAMPLES
 
 ### EXAMPLE 1
+
+# Long-term validation with a timestamp
+$doc | Set-VellumPdfSignature -Certificate $cert -TimestampUrl https://tsa.example.com -Level B-LT
+
+### EXAMPLE 2
 
 $cert = Get-PfxCertificate -FilePath ./signer.pfx
 New-VellumPdfDocument |
@@ -69,7 +95,7 @@ New-VellumPdfDocument |
     Set-VellumPdfSignature -Certificate $cert -Reason 'Approved' |
     Save-VellumPdfDocument -Path ./signed.pdf
 
-### EXAMPLE 2
+### EXAMPLE 3
 
 # Sign a PDF/A-2b archival document with a certificate from the store
 $cert = Get-Item Cert:\CurrentUser\My\1234567890ABCDEF1234567890ABCDEF12345678
@@ -80,7 +106,7 @@ New-VellumPdfDocument -Conformance PdfA2b |
         -ContactInfo 'legal@acme.example' |
     Save-VellumPdfDocument -Path ./contract.pdf
 
-### EXAMPLE 3
+### EXAMPLE 4
 
 # PAdES B-T: add an RFC-3161 timestamp from a TSA (needs network at save)
 $cert = Get-PfxCertificate -FilePath ./signer.pfx
@@ -95,7 +121,8 @@ New-VellumPdfDocument |
 ### -Certificate
 
 The signing certificate.
-Must include a private key (HasPrivateKey).
+Must include a private key (HasPrivateKey) unless
+-ExternalPrivateKey or -ExternalSigner is given.
 Typical sources: Get-PfxCertificate -FilePath ./signer.pfx, or
 Get-Item Cert:\CurrentUser\My\<thumbprint>.
 
@@ -147,7 +174,7 @@ instance is returned after the signature settings are staged, enabling
 chaining.
 
 ```yaml
-Type: VellumPdf.Layout.Document
+Type: System.Object
 DefaultValue: ''
 SupportsWildcards: false
 Aliases: []
@@ -156,6 +183,99 @@ ParameterSets:
   Position: Named
   IsRequired: true
   ValueFromPipeline: true
+  ValueFromPipelineByPropertyName: false
+  ValueFromRemainingArguments: false
+DontShow: false
+AcceptedValues: []
+HelpMessage: ''
+```
+
+### -EstimatedSignatureSize
+
+Bytes reserved for the signature (1024..4194304).
+Default 8192, or 32768
+for B-LT/B-LTA.
+
+```yaml
+Type: System.Int32
+DefaultValue: 0
+SupportsWildcards: false
+Aliases: []
+ParameterSets:
+- Name: (All)
+  Position: Named
+  IsRequired: false
+  ValueFromPipeline: false
+  ValueFromPipelineByPropertyName: false
+  ValueFromRemainingArguments: false
+DontShow: false
+AcceptedValues: []
+HelpMessage: ''
+```
+
+### -ExternalPrivateKey
+
+A private key object (AsymmetricAlgorithm) that signs in-process while
+-Certificate carries only the public part.
+
+```yaml
+Type: System.Security.Cryptography.AsymmetricAlgorithm
+DefaultValue: ''
+SupportsWildcards: false
+Aliases: []
+ParameterSets:
+- Name: (All)
+  Position: Named
+  IsRequired: false
+  ValueFromPipeline: false
+  ValueFromPipelineByPropertyName: false
+  ValueFromRemainingArguments: false
+DontShow: false
+AcceptedValues: []
+HelpMessage: ''
+```
+
+### -ExternalSigner
+
+A VellumPdf.Signing.IExternalSigner that signs the digest remotely
+(cloud KMS, HSM).
+Runs asynchronously.
+
+```yaml
+Type: VellumPdf.Signing.IExternalSigner
+DefaultValue: ''
+SupportsWildcards: false
+Aliases: []
+ParameterSets:
+- Name: (All)
+  Position: Named
+  IsRequired: false
+  ValueFromPipeline: false
+  ValueFromPipelineByPropertyName: false
+  ValueFromRemainingArguments: false
+DontShow: false
+AcceptedValues: []
+HelpMessage: ''
+```
+
+### -Level
+
+PAdES level: B-B, B-T, B-LT or B-LTA (see above).
+Default: B-T when a
+timestamp is configured, otherwise B-B.
+B-T and above require -TimestampUrl
+or -TimestampClient.
+
+```yaml
+Type: System.String
+DefaultValue: ''
+SupportsWildcards: false
+Aliases: []
+ParameterSets:
+- Name: (All)
+  Position: Named
+  IsRequired: false
+  ValueFromPipeline: false
   ValueFromPipelineByPropertyName: false
   ValueFromRemainingArguments: false
 DontShow: false
@@ -207,6 +327,74 @@ AcceptedValues: []
 HelpMessage: ''
 ```
 
+### -RevocationClient
+
+A custom OCSP/CRL source (VellumPdf.Signing.IRevocationClient) for B-LT/B-LTA.
+Default: the built-in HttpRevocationClient, which follows at most three redirects.
+
+```yaml
+Type: VellumPdf.Signing.IRevocationClient
+DefaultValue: ''
+SupportsWildcards: false
+Aliases: []
+ParameterSets:
+- Name: (All)
+  Position: Named
+  IsRequired: false
+  ValueFromPipeline: false
+  ValueFromPipelineByPropertyName: false
+  ValueFromRemainingArguments: false
+DontShow: false
+AcceptedValues: []
+HelpMessage: ''
+```
+
+### -RevocationTimeout
+
+Timeout of the built-in revocation client.
+B-LT/B-LTA only.
+
+```yaml
+Type: System.Nullable`1[System.TimeSpan]
+DefaultValue: ''
+SupportsWildcards: false
+Aliases: []
+ParameterSets:
+- Name: (All)
+  Position: Named
+  IsRequired: false
+  ValueFromPipeline: false
+  ValueFromPipelineByPropertyName: false
+  ValueFromRemainingArguments: false
+DontShow: false
+AcceptedValues: []
+HelpMessage: ''
+```
+
+### -SignaturePage
+
+The 1-based page that carries the invisible signature widget.
+Default 1.
+A
+page past the end of the document makes the save fail.
+
+```yaml
+Type: System.Int32
+DefaultValue: 0
+SupportsWildcards: false
+Aliases: []
+ParameterSets:
+- Name: (All)
+  Position: Named
+  IsRequired: false
+  ValueFromPipeline: false
+  ValueFromPipelineByPropertyName: false
+  ValueFromRemainingArguments: false
+DontShow: false
+AcceptedValues: []
+HelpMessage: ''
+```
+
 ### -SignerName
 
 Optional display name of the signer, recorded as /Name.
@@ -240,6 +428,52 @@ the time independently of this value.
 
 ```yaml
 Type: System.Nullable`1[System.DateTimeOffset]
+DefaultValue: ''
+SupportsWildcards: false
+Aliases: []
+ParameterSets:
+- Name: (All)
+  Position: Named
+  IsRequired: false
+  ValueFromPipeline: false
+  ValueFromPipelineByPropertyName: false
+  ValueFromRemainingArguments: false
+DontShow: false
+AcceptedValues: []
+HelpMessage: ''
+```
+
+### -SubFilter
+
+Pades (default) writes ETSI.CAdES.detached, the PAdES profile.
+Pkcs7 writes
+the legacy adbe.pkcs7.detached, which makes no ETSI claim and keeps a CMS
+signing-time attribute that PAdES omits.
+
+```yaml
+Type: System.String
+DefaultValue: ''
+SupportsWildcards: false
+Aliases: []
+ParameterSets:
+- Name: (All)
+  Position: Named
+  IsRequired: false
+  ValueFromPipeline: false
+  ValueFromPipelineByPropertyName: false
+  ValueFromRemainingArguments: false
+DontShow: false
+AcceptedValues: []
+HelpMessage: ''
+```
+
+### -TimestampClient
+
+A custom RFC 3161 client (VellumPdf.Signing.ITimestampClient) instead of
+-TimestampUrl, for example one that talks to an internal TSA or a test double.
+
+```yaml
+Type: VellumPdf.Signing.ITimestampClient
 DefaultValue: ''
 SupportsWildcards: false
 Aliases: []
@@ -343,7 +577,7 @@ This cmdlet supports the common parameters: -Debug, -ErrorAction, -ErrorVariable
 
 ## INPUTS
 
-### VellumPdf.Layout.Document
+### System.Object
 
 
 ## OUTPUTS
@@ -352,6 +586,9 @@ This cmdlet supports the common parameters: -Debug, -ErrorAction, -ErrorVariable
 
 
 ### VellumPdf.Layout.Document
+
+
+### VellumPdf.Document.PdfDocument
 
 
 ## NOTES

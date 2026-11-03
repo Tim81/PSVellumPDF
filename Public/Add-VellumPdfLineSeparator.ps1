@@ -49,37 +49,42 @@ function Add-VellumPdfLineSeparator {
         [Parameter(Mandatory, ValueFromPipeline)]
         [VellumPdf.Layout.Document]$Document,
 
-        [ValidateRange(0.1, 50)]
+        [ValidateRange(0.1, 50.0)]
         [double]$LineWidth,
 
         # RGB triple (0..1), a hex string ('#3366cc'/'#36c'), or a colour name.
         [object]$Color,
 
-        [ValidateRange(0, 10000)]
+        [ValidateRange(0.0, 10000.0)]
         [double]$MarginTop,
 
-        [ValidateRange(0, 10000)]
+        [ValidateRange(0.0, 10000.0)]
         [double]$MarginBottom
     )
 
     process {
-        Assert-VellumPdfDocumentOpen -Document $Document -CommandName 'Add-VellumPdfLineSeparator'
+        try {
+            Assert-VellumPdfDocumentOpen -Document $Document -CommandName 'Add-VellumPdfLineSeparator'
 
-        $sep = [VellumPdf.Layout.Elements.LineSeparator]::new()
+            $sep = [VellumPdf.Layout.Elements.LineSeparator]::new()
 
-        if ($PSBoundParameters.ContainsKey('LineWidth')) {
-            $sep.LineWidth = $LineWidth
+            if ($PSBoundParameters.ContainsKey('LineWidth')) {
+                $sep.LineWidth = $LineWidth
+            }
+
+            if ($PSBoundParameters.ContainsKey('Color')) {
+                $rgb = ConvertTo-VellumColor $Color -Document $Document -CommandName 'Add-VellumPdfLineSeparator'
+                $sep.Color = [VellumPdf.Layout.Core.ColorRgb]::new($rgb[0], $rgb[1], $rgb[2])
+            }
+
+            Set-VellumPdfElementMargin -Element $sep -Top $MarginTop -Bottom $MarginBottom `
+                -BoundParameters $PSBoundParameters -Document $Document
+
+            [void]$Document.Add($sep)
+            $Document
         }
-
-        if ($PSBoundParameters.ContainsKey('Color')) {
-            $rgb = ConvertTo-VellumColor $Color
-            $sep.Color = [VellumPdf.Layout.Core.ColorRgb]::new($rgb[0], $rgb[1], $rgb[2])
+        catch {
+            $PSCmdlet.ThrowTerminatingError((Resolve-VellumPdfErrorRecord -ErrorRecord $_ -CommandName 'Add-VellumPdfLineSeparator'))
         }
-
-        Set-VellumPdfElementMargin -Element $sep -Top $MarginTop -Bottom $MarginBottom `
-            -BoundParameters $PSBoundParameters
-
-        [void]$Document.Add($sep)
-        $Document
     }
 }

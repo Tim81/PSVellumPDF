@@ -166,7 +166,7 @@ Describe 'Add-VellumPdfTable' {
             { $doc | Add-VellumPdfTable -Row @(, @(@{ Text = 'x'; Font = 'Bogus' })) } |
                 Should -Throw '*not a base-14 font*'
             { $doc | Add-VellumPdfTable -Row @(, @(@{ Text = 'x'; ColSpan = 0 })) } |
-                Should -Throw '*ColSpan must be a positive*'
+                Should -Throw '*ColSpan must be a whole number*'
         }
         finally { $doc.Dispose() }
     }
@@ -216,5 +216,129 @@ Describe 'Add-VellumPdfTable' {
         $doc = New-VellumPdfDocument | Add-VellumPdfTable -Row $rows
         $doc | Should -BeOfType 'VellumPdf.Layout.Document'
         $doc.Dispose()
+    }
+}
+
+Describe 'Add-VellumPdfTable embedded fonts, padding and rich headers' {
+    BeforeAll {
+        $script:fontPath = Join-Path $PSScriptRoot 'assets' 'DejaVuSans.ttf'
+        $script:czech = 'P' + [char]0x0159 + 'ilis'
+        function script:Get-PdfText([string]$Path) {
+            [System.IO.File]::ReadAllText($Path, [System.Text.Encoding]::Latin1)
+        }
+    }
+
+    It 'renders a table in an embedded font without an encoding warning' {
+        $doc = New-VellumPdfDocument -Conformance PdfA2b
+        $handle = Register-VellumPdfFont -Document $doc -Path $script:fontPath
+        $out = Join-Path $TestDrive 'font.pdf'
+        $doc | Add-VellumPdfTable -Header 'Name' -Row @(, @($script:czech)) -FontHandle $handle `
+            -WarningVariable wv |
+            Save-VellumPdfDocument -Path $out | Out-Null
+        @($wv).Count | Should -Be 0
+        Get-PdfText $out | Should -Match '/FontFile2'
+    }
+
+    It 'lets a colour-only cell inherit the table embedded font' {
+        $doc = New-VellumPdfDocument
+        $handle = Register-VellumPdfFont -Document $doc -Path $script:fontPath
+        $out = Join-Path $TestDrive 'inherit.pdf'
+        { $doc | Add-VellumPdfTable -Row @(, @(@{ Text = $script:czech; Color = 'navy' })) -FontHandle $handle |
+            Save-VellumPdfDocument -Path $out } | Should -Not -Throw
+    }
+
+    It 'accepts a per-cell FontHandle and does not warn for that cell' {
+        $doc = New-VellumPdfDocument
+        $handle = Register-VellumPdfFont -Document $doc -Path $script:fontPath
+        $out = Join-Path $TestDrive 'cellfont.pdf'
+        $doc | Add-VellumPdfTable -Row @(, @(@{ Text = $script:czech; FontHandle = $handle }, 'ascii')) `
+            -WarningVariable wv | Save-VellumPdfDocument -Path $out | Out-Null
+        @($wv).Count | Should -Be 0
+    }
+
+    It 'rejects a font handle from another document' {
+        $other = New-VellumPdfDocument
+        $foreign = Register-VellumPdfFont -Document $other -Path $script:fontPath
+        $doc = New-VellumPdfDocument
+        try {
+            { $doc | Add-VellumPdfTable -Row @(, @('a')) -FontHandle $foreign } | Should -Throw '*DIFFERENT document*'
+        }
+        finally { $doc.Dispose(); $other.Dispose() }
+    }
+
+    It 'accepts rich header cells' {
+        $out = Join-Path $TestDrive 'richheader.pdf'
+        New-VellumPdfDocument |
+            Add-VellumPdfTable -Header @('A', @{ Text = 'Total'; Alignment = 'Right'; Background = '#eeeeee' }) `
+                -Row @(, @('1', '2')) |
+            Save-VellumPdfDocument -Path $out | Out-Null
+        Test-Path $out | Should -BeTrue
+    }
+
+    It 'applies -CellPadding and per-cell Padding/Language/Leading' {
+        $out = Join-Path $TestDrive 'padding.pdf'
+        { New-VellumPdfDocument -Tagged -Language en |
+                Add-VellumPdfTable -CellPadding 2, 4 -Row @(, @(@{ Text = 'x'; Padding = 1, 2, 3, 4; Language = 'fr'; Leading = 14 }, 'y')) |
+                Save-VellumPdfDocument -Path $out } | Should -Not -Throw
+    }
+
+    It 'validates padding, leading and link keys' {
+        $doc = New-VellumPdfDocument
+        try {
+            { $doc | Add-VellumPdfTable -Row @(, @('a')) -CellPadding -1 } | Should -Throw '*between 0 and 1000*'
+            { $doc | Add-VellumPdfTable -Row @(, @('a')) -CellPadding 1, 2, 3 } | Should -Throw '*1 (all sides)*'
+            { $doc | Add-VellumPdfTable -Row @(, @(@{ Text = 'a'; Padding = 'wide' })) } | Should -Throw '*between 0 and 1000*'
+            { $doc | Add-VellumPdfTable -Row @(, @(@{ Text = 'a'; Leading = 5000 })) } | Should -Throw '*Leading*'
+            { $doc | Add-VellumPdfTable -Row @(, @(@{ Text = 'a'; LinkUri = 'https://example.com' })) } | Should -Throw '*ignores hyperlinks*'
+            { $doc | Add-VellumPdfTable -Row @(, @(@{ Text = 'a'; FontHandle = 'nope' })) } | Should -Throw '*EmbeddedFontHandle*'
+        }
+        finally { $doc.Dispose() }
+    }
+}
+
+Describe 'Add-VellumPdfTable without a header' {
+    It 'derives the column count from the first row, not from a phantom header cell' {
+        $doc = New-VellumPdfDocument
+        try {
+            $doc | Add-VellumPdfTable -Row @(, @('a', 'b', 'c')) -ColumnWidth 10, 0, 60 -WarningVariable wv | Out-Null
+            @($wv).Count | Should -Be 0
+        }
+        finally { $doc.Dispose() }
+    }
+}
+
+Describe 'Add-VellumPdfTable with several header rows' {
+    BeforeAll { . (Join-Path $PSScriptRoot 'TestHelpers.ps1') }
+
+    It 'draws every header row, including a spanning cell, above the data' {
+        $out = Join-Path $TestDrive 'multihead.pdf'
+        New-VellumPdfDocument |
+            Add-VellumPdfTable -Header @('Region', @{ Text = 'Sales'; ColSpan = 2; Alignment = 'Center' }), @('', 'Q1', 'Q2') `
+                -Row @(, @('North', '10', '20')) -HeaderBackground '#dddddd' |
+            Save-VellumPdfDocument -Path $out | Out-Null
+        $c = Get-PdfContentText $out
+        foreach ($t in 'Region', 'Sales', 'Q1', 'Q2', 'North') { $c | Should -Match "\($t\) Tj" }
+        # Header rows come before the data row in drawing order.
+        $c.IndexOf('(Q2) Tj') | Should -BeLessThan $c.IndexOf('(North) Tj')
+    }
+
+    It 'repeats all leading header rows on the next page' {
+        $out = Join-Path $TestDrive 'repeat.pdf'
+        $rows = 1..120 | ForEach-Object { , @("row$_", "$_") }
+        New-VellumPdfDocument |
+            Add-VellumPdfTable -Header @('NameHead', 'ValHead'), @('sub1', 'sub2') -Row $rows |
+            Save-VellumPdfDocument -Path $out | Out-Null
+        $c = Get-PdfContentText $out
+        ([regex]::Matches($c, '\(NameHead\) Tj')).Count | Should -BeGreaterOrEqual 2
+        ([regex]::Matches($c, '\(sub2\) Tj')).Count | Should -BeGreaterOrEqual 2
+    }
+
+    It 'still takes a single flat header row, and refuses a mix of entries and rows' {
+        $doc = New-VellumPdfDocument
+        try {
+            { $doc | Add-VellumPdfTable -Header 'A', 'B' -Row @(, @('1', '2')) } | Should -Not -Throw
+            { $doc | Add-VellumPdfTable -Header 'A', @('B', 'C') -Row @(, @('1', '2')) } | Should -Throw '*mixes plain entries and row arrays*'
+        }
+        finally { $doc.Dispose() }
     }
 }

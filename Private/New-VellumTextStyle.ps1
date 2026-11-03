@@ -25,8 +25,19 @@ function New-VellumTextStyle {
 
         # Line leading (extra vertical space between lines), in points.
         [ValidateRange(0, 1000)]
-        [double]$Leading
+        [double]$Leading,
+
+        # The flow document the style is for. In a conformant document (PDF/A, PDF/UA-1) a base-14
+        # -Font is replaced by the embedded Liberation substitute (see Get-VellumPdfEmbeddedStandard14).
+        [VellumPdf.Layout.Document]$Document,
+
+        # Names the cmdlet in the error raised when a base-14 font has no embeddable substitute.
+        [string]$CommandName = 'New-VellumTextStyle'
     )
+
+    if ($Font -and -not $FontHandle -and $Document -and (Get-VellumPdfConformanceRequirement -Document $Document).NeedsEmbeddedFonts) {
+        $FontHandle = Get-VellumPdfEmbeddedStandard14 -Document $Document -Font $Font -CommandName $CommandName
+    }
 
     $wantsColor   = $PSBoundParameters.ContainsKey('Color')
     $wantsLeading = $PSBoundParameters.ContainsKey('Leading')
@@ -47,16 +58,7 @@ function New-VellumTextStyle {
     $LinkUri = if ($PSBoundParameters.ContainsKey('LinkUri')) { $LinkUri.Trim() } else { '' }
     $wantsLink = $LinkUri -ne ''
     if ($wantsLink) {
-        $normalized = $LinkUri -replace '[\s\p{Cc}\p{Cf}]', ''
-        $scheme = [regex]::Match($normalized, '^(?<s>[a-zA-Z][a-zA-Z0-9+.-]*):').Groups['s'].Value
-        if ($scheme.ToLowerInvariant() -notin @('http', 'https', 'mailto')) {
-            $what = if ($scheme) { "scheme '$scheme'" } else { 'a relative or scheme-less URI' }
-            throw ("-LinkUri uses $what; only http, https, and mailto URLs are allowed in " +
-                "generated documents (got '$LinkUri').")
-        }
-        # Store the normalised value so embedded whitespace/control/format chars
-        # never reach the /URI action (a valid URL has none of them anyway).
-        $LinkUri = $normalized
+        $LinkUri = Test-VellumPdfLinkUri -Uri $LinkUri
     }
 
     if (-not $Font -and -not $PSBoundParameters.ContainsKey('FontSize') -and -not $FontHandle `

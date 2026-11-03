@@ -6,6 +6,296 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [2.0.0] - 2026-11-02
+
+Built on **VellumPdf 2.3.3** (was 1.5.4). A major release: the engine changed how
+a few things render and validate, and several long-standing wrapper bugs are fixed
+in ways that change output. Upgrade notes are in the README.
+
+### Breaking
+- **Heading levels**: `Add-VellumPdfHeading -Level 1` is now tagged `H1` and is a
+  top-level outline entry. The engine counts levels from zero and the module passed
+  1..6 straight through, so level 1 was tagged `H2` (and so on).
+- **`-MarginBottom`** now adds space before the next element on paragraphs, headings,
+  lists and tables. VellumPdf's bottom margin only limits the element's own box, so
+  the parameter had no visible effect. The space is carried to the next element's
+  top margin and consumed once.
+- **Lists** nested deeper than one child level are refused (`Add-VellumPdfList`).
+  The engine renders one level and silently dropped the text of deeper items; the
+  module previously accepted 64 levels.
+- **A document can be saved once.** Layout runs inside the save, a second save is
+  refused by the engine, and a save that failed can leave state that makes a retry
+  write a different file. `Save-VellumPdfDocument` now says so plainly for a second
+  save (with `-KeepOpen`) and after a failure.
+- **Encoding warnings** follow Windows-1252. The base-14 fonts now encode
+  `€ ‚ ƒ „ … † ‡ ˆ ‰ Š ‹ Œ Ž ‘ ’ “ ” • – — ˜ ™ š › œ ž Ÿ`, which no longer warn; text
+  widths changed with the new encoding, so lines can wrap differently.
+- **Encryption** (`Protect-VellumPdfDocument`): an empty `-OwnerPassword` beside a
+  user password is refused (such a file opened with full owner access and no
+  password), as is encryption with `-UseObjectStreams`. Encrypted files differ at
+  the byte level: the `/P` permission value always sets the reserved bits, and
+  `-EncryptMetadata:$false` now really leaves the XMP metadata unencrypted.
+- **Signing**: PAdES signatures no longer carry a CMS `signing-time` attribute (the
+  claimed time stays in the signature dictionary's `/M`), and only the two defined
+  sub-filters are accepted.
+- **Engine rendering changes** visible in existing documents: table margins are no
+  longer applied twice (tables with a left/top margin move), the column count comes
+  from the widest row, header/footer text wider than the page is cut at a word
+  boundary and honours its colour, and links are written with the Print flag.
+- **Errors always stop the cmdlet.** Every public cmdlet raises its errors as terminating errors, so
+  `-ErrorAction SilentlyContinue`/`Ignore` can no longer let a cmdlet carry on after a failed check
+  (previously `Save-VellumPdfDocument -Validate` was skipped, conflicting colours were both written, and
+  an unknown path command looped for ever). Wrap the call in `try`/`catch` to handle an error.
+- **The document default font reaches every element.** With `New-VellumPdfDocument -DefaultFont/-DefaultFontSize`,
+  list items, table cells, header and footer bands and `New-VellumPdfTextRun` runs used Helvetica 12; they now
+  use the default (11 pt Helvetica when none is set), so existing documents change size.
+- **Piped file objects bind to `-LiteralPath`** in `Get-VellumPdfInfo`, `Get-VellumPdfText`,
+  `Test-VellumPdfConformance`, `Export-VellumPdfImage` and `Unprotect-VellumPdfDocument`; `-Path` no longer binds
+  by property name (so `report[1].pdf` from `Get-ChildItem` works). Strings piped in still bind to `-Path`.
+- **Stricter input**: page coordinates and sizes must be finite and within +-14,400 pt (the largest page); language
+  tags must be BCP 47; alternate text must not be empty or whitespace; `Set-VellumPdfOutputIntent` reads the colour
+  space from the ICC profile and refuses a mismatching `-ComponentCount`; barcode captions are off by default in
+  PDF/UA as well as PDF/A (a non-embedded font fails PDF/UA).
+- **`Export-VellumPdfImage`** writes CCITT as TIFF and JBIG2 as a standalone file (see Fixed), and skips images that
+  have no file format (for example raw CMYK) with a warning instead of writing headerless `.bin` files.
+- **Installation**: the module loads `VellumPdf.Kernel/Layout/Reader/Signing/
+  Barcodes/Conformance/Fonts.Standard14` and `PSVellumPDF.Interop`. The loader
+  checks their identity (version 2.0.0.0, strong-name token `b2757187a6d18ae5`),
+  so a stale 1.x `lib/` fails at import with the fix instead of a type-load error.
+
+- **Reader cmdlets report a bad file and go on** (`Get-VellumPdfInfo`, `Get-VellumPdfText`,
+  `Test-VellumPdfConformance`, `Export-VellumPdfImage`, `Unprotect-VellumPdfDocument`): a file that is missing,
+  unreadable, malformed or locked is a non-terminating error with the file as `TargetObject`, and the remaining files
+  are still processed. Scripts that relied on `try`/`catch` must add `-ErrorAction Stop`. Files are read one at a
+  time instead of all up front. `Test-VellumPdfConformance -Quiet` returns `$false` for a file it could not check.
+- **Plain hashtable table rows are refused** by `Add-VellumPdfTable` when they have more than one key: a plain
+  `@{}` has no defined key order, so the columns came out shuffled. Use `[ordered]@{...}` or `[pscustomobject]`.
+- **`Add-VellumPdfTextBox` throws** when its text would run below the bottom of the page (it drew off the page
+  silently); `-MaxHeight` still cuts the text off.
+- **Conformant flow documents embed their fonts**: with `-Conformance` PDF/A or PDF/UA-1, base-14 font names are
+  replaced by the embedded, metric-compatible Liberation fonts (as page documents already did), so these files now
+  pass the font-embedding checks without `-FontHandle`. Layout is unchanged. Text in embedded fonts is not
+  extracted by `Get-VellumPdfText`. Symbol and ZapfDingbats have no substitute and need `-FontHandle`.
+- **Right- and centre-aligned text with `-CharSpacing`** aligns on its visible glyphs: the spacing after the last
+  character is no longer counted, so right-aligned text ends exactly at `-X`.
+
+- **Numbers in table cells and list items**: a string that is only a number (`1.444,50`, `1,976.08`, `66443,85`)
+  is read as a decimal and drawn with the cell's format and culture; with the invariant default and no format,
+  `1.444,50` is drawn as `1444.50`. Both separator conventions are detected; an ambiguous value such as `1,234` is
+  resolved from the other values in the column or list, then from `-InputCulture`, and otherwise left as typed with
+  one warning. `-NoNumberParsing` (or a cell's `Parse = $false`) draws strings exactly as given; header cells are
+  never parsed.
+- **Pie-chart legend percentages** use the invariant culture (`33.3 %`) instead of the machine's culture; pass
+  `-Culture` to choose one.
+- **Error ids**: the reader cmdlets' per-file ids `PdfFileNotFound`, `PdfFileReadError` and `PdfInputError` (new in
+  this release's development) are `PSVellumPDF.FileNotFound`, `PSVellumPDF.FileReadError`, `PSVellumPDF.InvalidPdf`,
+  `PSVellumPDF.PasswordRequired` and `PSVellumPDF.InputError`; `Export-VellumPdfImage`'s `ImageFileExists` is
+  `PSVellumPDF.FileExists`.
+
+### Added
+- **New flow-document cmdlets**: `Add-VellumPdfPieChart` (slices or pipeline data,
+  colour-blind-safe palette, legend, alternate text), `Add-VellumPdfBarcode`
+  (QR, Micro QR, Data Matrix, Aztec, PDF417, Code 128, Code 39, EAN-13/8, UPC-A/E,
+  ITF-14; GS1; Structured Append and Macro PDF417 via `-SplitInto`),
+  `Add-VellumPdfDrawing` (a script block receives the VellumPdf canvas) and
+  `Add-VellumPdfElement` (any `IRenderer`).
+- **Page-based documents**: `New-VellumPdfPageDocument`, `Add-VellumPdfPage`,
+  `Add-VellumPdfShape`, `Add-VellumPdfText`, `Add-VellumPdfGradient`,
+  `Add-VellumPdfPageImage`, `Add-VellumPdfPageBarcode`, `Invoke-VellumPdfCanvas`,
+  `Add-VellumPdfFormField`, `Add-VellumPdfLink`, `Add-VellumPdfOutlineEntry`,
+  `Add-VellumPdfPath` (lines and curves from path data or points, nonzero or even-odd
+  fill), `Use-VellumPdfClip` (clip any drawing to a rectangle, ellipse or path),
+  `Add-VellumPdfTextBox` (wrapped, centred, right-aligned or justified text in a
+  column) and `Set-VellumPdfPageBand` (repeated header/footer, `Page {page} of
+  {pages}`). Includes AcroForm fields, links to other pages, collapsible bookmarks, page
+  rotation, linearized ("fast web view") output and byte-for-byte reproducible
+  files (`-DocumentId`, `-Timestamp`). `Set-VellumPdfDocumentInfo`,
+  `Set-VellumPdfOutputIntent`, `Register-VellumPdfFont`, `Protect-VellumPdfDocument`,
+  `Set-VellumPdfSignature` and `Save-VellumPdfDocument` work on both kinds.
+- **Conformance**: `Test-VellumPdfConformance` validates any PDF against PDF/A-2b/2u/2a
+  or PDF/UA-1 in-process, and `Save-VellumPdfDocument -Validate` refuses to write a
+  non-compliant file. New-VellumPdfDocument gains `-Conformance PdfUA1`.
+- **Signing**: `Set-VellumPdfSignature -Level B-B|B-T|B-LT|B-LTA`, `-TimestampClient`,
+  `-RevocationClient`/`-RevocationTimeout`, `-SignaturePage`, `-SubFilter`,
+  `-EstimatedSignatureSize`, `-ExternalPrivateKey` and `-ExternalSigner` (cloud
+  KMS / HSM); `examples/09-kms-signing.ps1` shows a compiled signer with ECDSA
+  signature conversion. Script-block signers are not offered: the engine calls the
+  signer on thread-pool threads, where a script block cannot run.
+- **Experimental readers** (VellumPdf.Reader is a preview package): `Get-VellumPdfInfo`,
+  `Get-VellumPdfText`, `Export-VellumPdfImage`, `Unprotect-VellumPdfDocument`.
+- **Embedded fonts everywhere**: `-FontHandle` on `Add-VellumPdfTable`,
+  `Add-VellumPdfList`, `Set-VellumPdfHeader`/`Footer`, so tables, lists and bands
+  can be Unicode and PDF/A. Table cells also take `FontHandle`, `Leading`,
+  `Padding` and `Language`; `-Header` accepts rich cells; `-CellPadding`.
+- **Text options**: `Add-VellumPdfHeading -Color -Leading -Language`,
+  `Add-VellumPdfParagraph -Language`, `Add-VellumPdfList -Color -Leading -Language`
+  and per-item style keys, `Set-VellumPdfHeader`/`Footer -Color -Height`.
+- **Document**: custom page sizes (`-PageWidthMm`/`-PageHeightMm`, up to 5080 mm).
+- **Save**: `Save-VellumPdfDocument -Stream`, `-AsByteArray`, `-PassThru`, `-Force`,
+  `-Validate`. After a save the engine's own diagnostics are reported (characters
+  replaced by `?`, truncated header/footer text) and attached to the returned file
+  as `TextEncodingWarnings` and `BandTruncations`.
+- **Images**: `Add-VellumPdfImage -Format Ccitt` (raw fax data with `-Columns`/`-Rows`
+  and options), `-ReduceToEightBit`, `-DecodeToRaster`, `-MarginLeft`/`-MarginRight`.
+- **Tagged page documents**: `New-VellumPdfPageDocument -Tagged`, `-Conformance PdfA2a` and
+  `PdfUA1`. Text carries a structure role (`Add-VellumPdfText -Role P|H1-H6|Span|Caption`,
+  `-Language`), shapes and gradients are artifacts (or Figures with `-AltText`), images
+  and barcodes need `-AltText` or `-Decorative`, and `Invoke-VellumPdfCanvas` drawing is an
+  artifact (`-NoMarkedContent` to take over). Links and form fields cannot be tagged by
+  VellumPdf; the cmdlets warn once. A PDF/UA-1 page document without them passes the
+  preflight.
+- `Add-VellumPdfText`: `-CharSpacing`, `-WordSpacing`, `-Rise`, `-HorizontalScale`
+  (alignment accounts for them). `Add-VellumPdfShape`: `-LineCap`, `-LineJoin`, `-MiterLimit`.
+- `Add-VellumPdfTable -Header` accepts several rows (an array per row); the leading header
+  rows repeat on every page.
+- Reader: resource limits (`-MaxDecodedStreamBytes`, `-MaxDiagnostics`, `-MaxFormXObjectDepth`,
+  `-ReconstructionBudgetMultiplier`) on the reading cmdlets, object numbers on diagnostics,
+  and `Get-VellumPdfInfo` reports catalog features (`Catalog.IsTagged`, `HasForm`, ...).
+- Barcodes: PDF417 `-RowHeight`/`-PreferredAspectRatio`, Macro PDF417 metadata
+  (`-MacroFileName/-Sender/-Addressee/-Timestamp/-FileSize/-Checksum`), and
+  `Get-VellumPdfBarcodeMatrix` returns a 2-D symbol's module grid as data.
+- `Get-VellumPdfConformanceCoverage` lists which checks the in-process preflight performs.
+- `Add-VellumPdfShape`: an `Arc` shape and ICC-based colour (`-IccProfilePath` with
+  `-FillIcc`/`-StrokeIcc`; the profile is embedded once per page and its component
+  count is read from the file).
+- About 35 more CSS colour names; `-ColumnWidth 0` means auto.
+- `PSVellumPDF.Interop`: a small C# shim for what PowerShell cannot call directly
+  (span-taking canvas operators) and the renderer behind `Add-VellumPdfDrawing`.
+  Display formats for preflight results and PDF info.
+- Image loading and the Windows-1252 table now live in one private helper each. CI uses
+  PowerShell 7.6.9. Examples 05-08, new validation samples (charts, page documents, PDF/UA,
+  linearized, forms), veraPDF PDF/UA-1 and qpdf linearization checks in CI, and an
+  engine-surface test that fails by name when a VellumPdf upgrade removes anything
+  the module uses. `tools/Get-VellumPdfApiSurface.py` diffs two engine releases.
+
+### Added (review follow-up)
+- **Page documents**: `Add-VellumPdfPath` (path data or points, nonzero/even-odd fill), `Use-VellumPdfClip`,
+  `Use-VellumPdfTransform` (rotate, scale, move a drawing), `Add-VellumPdfTextBox` (wrapped, justified text),
+  `Set-VellumPdfPageBand` (repeated header/footer, page numbers), `Add-VellumPdfPageTable` and
+  `Add-VellumPdfPageList` (tables and lists tagged as real Table/TR/TH/TD and L/LI/Lbl/LBody), and
+  `Use-VellumPdfStructure` (group tagged content under Sect, Div, Art ...). `-Rotation` on `Add-VellumPdfText` and
+  `Add-VellumPdfPageImage`; `-FillGray`/`-StrokeGray` on shapes and paths.
+- `Measure-VellumPdfText`: text width in a base-14 or embedded font, with missing and unencodable characters.
+- `Get-VellumPdfInfo -IncludeSignatureContents` returns the CMS bytes of each signature, so a script can verify it.
+- `Export-VellumPdfImage` file objects carry Page, Encoding, Width, Height, BitsPerComponent, ColorSpace,
+  ComponentCount, IsInline, IsStencilMask and HasSoftMask.
+- Warnings for characters an embedded font has no glyph for (they draw as empty boxes and fail PDF/A).
+- `examples/09-kms-signing.ps1` (a KMS/HSM signer) and `examples/10-paths-clipping-and-text-boxes.ps1`.
+
+### Fixed
+- **Embedded fonts and word spacing**: `Add-VellumPdfText -WordSpacing` had no effect with an embedded font (and
+  therefore in PDF/A and PDF/UA documents), so aligned text ended in the wrong place; the words are now placed
+  individually.
+- **Tables** align cells by grid column when they use `ColSpan`/`RowSpan` (`-ColumnAlignment`, `-ColumnWidth` count).
+- **Export-VellumPdfImage**: CCITT fax data is wrapped in a TIFF (pixel-identical to the PDF's rendering), and JBIG2
+  segments are joined with their shared segments into a standard sequential file. Limitation: VellumPdf's own
+  JBIG2 loader reads only the 8-byte ID string, so these standard files cannot be embedded again with
+  `Add-VellumPdfPageImage`.
+- `Invoke-VellumPdfCanvas` refuses to save a document whose script block saved more graphics states than it restored.
+- A clip scope's `-Page` is the page its drawing goes to; a text box no longer splits on no-break spaces and honours
+  `-MaxHeight` exactly; page bands warn when they run off the page; `-LineCap`/`-LineJoin` accept any letter case;
+  table and pie data tolerate missing properties; `Save-VellumPdfDocument` leaked a task object with `-ExternalSigner`.
+- **Failures keep the structure tree consistent**: content tagged before a `Use-VellumPdfStructure` block, a table or
+  a list failed no longer ends up with MCIDs that no structure element owns (a corrupt ParentTree that
+  `-Validate` did not notice); table cell colours are checked before anything is drawn.
+- **`Add-VellumPdfParagraph -Run`** no longer swaps an embedded font for Helvetica when the run sets `-FontHandle`
+  but no `-FontSize`; unpaired UTF-16 surrogates and the Symbol/ZapfDingbats fonts (no width table in VellumPdf) are
+  refused with a cmdlet-named error where text is measured; `-Page` beyond the page count is named for tables and
+  lists; `Use-VellumPdfTransform -Scale` is limited to 0.000001 ... 1,000,000; Group 3 CCITT without end-of-line
+  codes is exported as TIFF compression 2 (one-dimensional byte-aligned data) or skipped, never as an undecodable
+  file; a hostile JBIG2 header can no longer abort the export; `-RowHeader` marks only grid column 0;
+  page tables and lists write no colour operator unless a colour was given (DeviceRGB fails PDF/A with a CMYK
+  intent) and the table is no longer quadratic in rows; numbered lists widen the marker column and label more
+  than 26 children aa, ab ...; values no longer leak between documents piped to one call.
+- Pie chart `-StrokeColor` and `-MarginTop`/`-MarginBottom` had no effect (the cmdlet's
+  bound parameters were read from inside a script block, where they are empty).
+- `Add-VellumPdfElement` now honours the space a previous `-MarginBottom` left (an
+  invisible spacer is inserted before the element).
+- `Get-VellumPdfText` on a PDF with no pages returned an error instead of nothing;
+  `-DestTop` of `Add-VellumPdfLink`/`Add-VellumPdfOutlineEntry` must be finite.
+- Options that were silently ignored are now applied or refused: stroke options beside
+  a fill in `Add-VellumPdfShape`, `-X/-Y/-Width/-Height/-Page` with a Radio field, the
+  CCITT-only image switches on other formats, and a wildcard `-Path` that matches
+  several files in `Unprotect-VellumPdfDocument`.
+- B-LT/B-LTA revocation lookups use a per-signature HTTP client that follows at most
+  three redirects, instead of the engine's process-wide shared client.
+- Table without `-Header`: the column-count check no longer counts a phantom header.
+
+### Added (second review)
+- **Culture and formats**: `-Culture` (a name such as `de-DE` or a `[cultureinfo]`) on `New-VellumPdfDocument` and
+  `New-VellumPdfPageDocument` sets how numbers and dates are written; the same parameter on `Add-VellumPdfTable`,
+  `Add-VellumPdfPageTable`, `Add-VellumPdfList`, `Add-VellumPdfPageList` and `Add-VellumPdfPieChart` overrides it for
+  one call. The default is the invariant culture, so output does not depend on the machine.
+- .NET format strings: `-ColumnFormat` (tables, one per column, beside `-ColumnAlignment`), `-Format` (lists) and
+  `-LabelFormat` (pie charts, default `P1`); a table cell or list item may carry its own `Format`. The format
+  decides the layout and the culture the separators: `-ColumnFormat 'N2' -Culture de-DE` writes `1.234,50`.
+- `-InputCulture` (documents and the table/list cmdlets) reads number strings strictly in that culture instead of
+  detecting the convention.
+- **Stable error ids**: errors carry an id in `FullyQualifiedErrorId`, a typed exception and a category
+  (`PSVellumPDF.FileNotFound`, `.InvalidArgument`, `.PasswordRequired`, `.InvalidPdf`, `.NotConformant`,
+  `.FileReadError`, `.InputError`, `.FileExists`, and `PSVellumPDF.<Cmdlet>` for anything else); message texts are
+  unchanged. See "Errors" in the README.
+
+### Fixed (second review)
+- `Add-VellumPdfList` with `-FontHandle` and a list item that contains itself crashed the PowerShell process
+  (stack overflow); it now reports the nesting-depth error.
+- `Add-VellumPdfPageList` added an empty sub-item under every hashtable item without `Children`; items may now be
+  objects with `Text`/`Children`, and an item without text is an error. A large `-FontSize` no longer fails on the
+  `-Indent` range.
+- `Add-VellumPdfPageTable` failed on a row fully covered by RowSpans (`@()`) and left half a table behind; such a
+  row is drawn and keeps an empty `TR`. `-Row` may be empty or omitted when `-Header` is given (also for
+  `Add-VellumPdfTable`). A non-numeric `ColSpan`/`RowSpan` gives a clear error.
+- Lower-case `Use-VellumPdfStructure -Type sect` and `-Role h1` passed validation but broke the save; they are
+  written with the standard spelling.
+- `Set-VellumPdfSignature -Level b-t` (lower case) failed with a .NET error.
+- A tab in page text (`Add-VellumPdfText`, `Add-VellumPdfTextBox`, page-band templates, `Measure-VellumPdfText`)
+  drew glyph 0, which PDF/A forbids, or vanished; it is drawn as four spaces.
+- NaN and infinity are refused in colours and in table/list `FontSize`/`Leading` (they wrote `NaN` into the PDF).
+- `Add-VellumPdfDrawing` script blocks use the variable values from when they were added (a loop variable no longer
+  reads its last value; a function's locals are still there at save time), and a block that saves and restores the
+  graphics state unevenly fails the save. `Invoke-VellumPdfCanvas` also detects unbalanced `BT`/`ET` and marked
+  content (`BMC`/`BDC`/`EMC`).
+- `Add-VellumPdfFormField -Selected` matched without regard to case but wrote the caller's spelling, so no option
+  showed as selected; it writes the option's own spelling (case-only duplicates are ambiguous and refused).
+- A text run without font or size wrote an empty link annotation (and failed PDF/UA).
+- Drawing on a page document after `Save-VellumPdfDocument -KeepOpen` is refused (it could never be saved); the
+  messages no longer call a page document a layout document. `Add-VellumPdfPage -Count N -PassThru` returns all
+  new pages.
+- RGB colour or an RGB image in a PDF/A document whose output intent is CMYK warns once (the file fails
+  6.2.4.3); replacing a CMYK intent with an RGB one clears the CMYK state; output-intent profiles with a device
+  class other than printer/monitor/scanner/colour space, or ICC version 5, are refused (PDF/A 6.2.3).
+- `Export-VellumPdfImage` gives unique file names across all inputs of one call (`report-p1-i1-2.png`), so
+  same-named PDFs no longer overwrite each other's images.
+- `Export-VellumPdfImage` and `Unprotect-VellumPdfDocument` have `-AllowReconstruction` (their error message
+  suggested it, and `-ReconstructionBudgetMultiplier` did nothing without it).
+- Reader cmdlets bind piped objects with a `Path` property to `-Path` and objects with `FullName` (for example
+  `Select-Object FullName`) to `-LiteralPath`.
+- Tests and CI: the whole suite runs under de-DE as well (two tests were culture-dependent); checks that need qpdf,
+  pdftoppm or ImageMagick report as skipped instead of passing without checking; the veraPDF PDF/UA-1 run on tagged
+  page documents now fails the build, and new PDF/A-2u and PDF/A-2a samples are validated with veraPDF.
+
+### Security
+- VellumPdf 2.2 fixed `OwnerPassword = ""` with a user password producing a file that
+  opens without any password; the module now refuses the combination up front and
+  you should re-encrypt such files made with 1.x.
+- NuGet flagged `System.Security.Cryptography.Pkcs` 10.0.12 (required by VellumPdf.Signing
+  2.3.3) with two advisories. The dependency project now references Pkcs as `10.0.*`, so
+  every restore takes the newest 10.0.x (10.0.14 today), and the warnings are gone. The
+  module never ships that assembly: at run time signing uses the copy bundled with
+  PowerShell, which a module cannot override.
+
+### Notes
+- `dependencies/packages.lock.json` and locked-mode restore were removed so Pkcs can float;
+  restores are no longer bit-for-bit reproducible (the VellumPdf versions stay exact).
+- VellumPdf.Layout draws no labels on pie charts and does not tag hyperlinks:
+  `-Legend` adds a table, and a PDF/UA document containing `-LinkUri` is not fully
+  conformant (the module warns once).
+- Links and form fields in a tagged page document are untagged (VellumPdf cannot tag
+  annotations), so such a document is not fully PDF/UA-conformant.
+- The in-process preflight does not look at fonts used only by form fields.
+- `docs/PSVellumPDF/` is generated by `./build.ps1 Docs` (PlatyPS, from the
+  PowerShell Gallery) and should be regenerated before publishing.
+
 ## [1.3.1] - 2026-06-14
 
 Hardening of the 1.3.0 features. No new parameters.

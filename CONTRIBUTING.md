@@ -8,7 +8,7 @@
 ## Workflow
 
 ```powershell
-./build.ps1 Restore   # fetch VellumPdf DLLs into ./lib (locked NuGet restore)
+./build.ps1 Restore   # fetch VellumPdf DLLs into ./lib (NuGet restore)
 ./build.ps1 Lint      # PSScriptAnalyzer gate - must be clean
 ./build.ps1 Test      # Pester with code coverage - must pass, >= 70%
 ./build.ps1 Docs      # regenerate docs/ after changing comment-based help
@@ -41,7 +41,7 @@ pull request, plus conformance validation (qpdf, veraPDF) of generated samples.
 
 Bump `ModuleVersion` in `PSVellumPDF.psd1` (and `PrivateData.PSData.Prerelease`
 for rc tags - SemVer 1.0.0 format, e.g. `rc1` not `rc.1`), update the
-VellumPdf `PackageReference` + `dependencies/packages.lock.json` if upstream
+VellumPdf `PackageReference` in `dependencies/Dependencies.csproj` if upstream
 moved, move CHANGELOG Unreleased notes under the new version, then
 `gh release create v<version>`. The release workflow validates the tag against
 the manifest and publishes via `Publish-PSResource`.

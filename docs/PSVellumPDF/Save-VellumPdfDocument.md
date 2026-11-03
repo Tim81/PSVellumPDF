@@ -4,7 +4,7 @@ external help file: PSVellumPDF-Help.xml
 HelpUri: ''
 Locale: en-US
 Module Name: PSVellumPDF
-ms.date: 06-13-2026
+ms.date: 11/02/2026
 PlatyPS schema version: 2024-05-01
 title: Save-VellumPdfDocument
 ---
@@ -17,10 +17,24 @@ Writes a VellumPdf document to a .pdf file and disposes it.
 
 ## SYNTAX
 
-### __AllParameterSets
+### Path (Default)
 
 ```
-Save-VellumPdfDocument [-Path] <string> -Document <Document> [-KeepOpen] [-WhatIf] [-Confirm]
+Save-VellumPdfDocument [-Path] <string> -Document <Object> [-Validate] [-KeepOpen] [-PassThru]
+ [-Force] [-WhatIf] [-Confirm] [<CommonParameters>]
+```
+
+### Stream
+
+```
+Save-VellumPdfDocument -Document <Object> -Stream <Stream> [-Validate] [-KeepOpen] [-PassThru]
+ [-WhatIf] [-Confirm] [<CommonParameters>]
+```
+
+### Bytes
+
+```
+Save-VellumPdfDocument -Document <Object> -AsByteArray [-Validate] [-KeepOpen] [-WhatIf] [-Confirm]
  [<CommonParameters>]
 ```
 
@@ -34,10 +48,23 @@ disposes it after the save attempt (success or failure) because saving is
 the terminal step of a build pipeline, and marks it so later cmdlet calls
 against the stale document fail with a clear error.
 Use -KeepOpen to keep
-the document alive for further edits, in which case you are responsible
+the document alive for inspection, in which case you are responsible
 for calling $doc.Dispose() yourself.
+Every document is single-use: saving it
+a second time is refused, and so is adding content to it (-KeepOpen is for
+inspecting a saved document, not for drawing more).
+After a FAILED save the document
+must be rebuilt (the engine can leave state from the failed attempt, so a
+retry could write a different file).
 With -WhatIf nothing is saved and the
 document is left open.
+
+After a successful save the engine's own diagnostics are reported:
+characters the base-14 fonts could not encode (written as '?') produce one
+warning, and a header or footer cut to fit the page produces one warning
+each.
+The same information is attached to the returned file object as
+the TextEncodingWarnings and BandTruncations properties.
 
 If the pipeline is aborted BEFORE this cmdlet runs (for example by an
 error in an earlier Add-VellumPdf* call, or -WarningAction Stop turning
@@ -56,6 +83,27 @@ On success an existing file at -Path is overwritten.
 $doc | Save-VellumPdfDocument -Path ./out.pdf
 
 ## PARAMETERS
+
+### -AsByteArray
+
+Return the PDF as a byte[] instead of writing a file.
+
+```yaml
+Type: System.Management.Automation.SwitchParameter
+DefaultValue: False
+SupportsWildcards: false
+Aliases: []
+ParameterSets:
+- Name: Bytes
+  Position: Named
+  IsRequired: true
+  ValueFromPipeline: false
+  ValueFromPipelineByPropertyName: false
+  ValueFromRemainingArguments: false
+DontShow: false
+AcceptedValues: []
+HelpMessage: ''
+```
 
 ### -Confirm
 
@@ -90,7 +138,7 @@ Use -KeepOpen to suppress
 disposal.
 
 ```yaml
-Type: VellumPdf.Layout.Document
+Type: System.Object
 DefaultValue: ''
 SupportsWildcards: false
 Aliases: []
@@ -106,14 +154,37 @@ AcceptedValues: []
 HelpMessage: ''
 ```
 
+### -Force
+
+Create the parent directory of -Path when it does not exist (without it a
+missing directory is an error).
+
+```yaml
+Type: System.Management.Automation.SwitchParameter
+DefaultValue: False
+SupportsWildcards: false
+Aliases: []
+ParameterSets:
+- Name: Path
+  Position: Named
+  IsRequired: false
+  ValueFromPipeline: false
+  ValueFromPipelineByPropertyName: false
+  ValueFromRemainingArguments: false
+DontShow: false
+AcceptedValues: []
+HelpMessage: ''
+```
+
 ### -KeepOpen
 
 When specified, the document is not disposed after saving.
 The caller is
 responsible for calling $doc.Dispose() when finished.
 Useful when the
-same document object must be inspected or further manipulated after the
-file is written.
+same document object must be inspected after the file is written.
+The
+document cannot be saved a second time.
 
 ```yaml
 Type: System.Management.Automation.SwitchParameter
@@ -122,6 +193,37 @@ SupportsWildcards: false
 Aliases: []
 ParameterSets:
 - Name: (All)
+  Position: Named
+  IsRequired: false
+  ValueFromPipeline: false
+  ValueFromPipelineByPropertyName: false
+  ValueFromRemainingArguments: false
+DontShow: false
+AcceptedValues: []
+HelpMessage: ''
+```
+
+### -PassThru
+
+Return the live document instead of the written file, and keep it open
+(implies -KeepOpen).
+The caller disposes it.
+The document still cannot be
+saved a second time; use it to read TextEncodingWarnings or BandTruncations.
+
+```yaml
+Type: System.Management.Automation.SwitchParameter
+DefaultValue: False
+SupportsWildcards: false
+Aliases: []
+ParameterSets:
+- Name: Stream
+  Position: Named
+  IsRequired: false
+  ValueFromPipeline: false
+  ValueFromPipelineByPropertyName: false
+  ValueFromRemainingArguments: false
+- Name: Path
   Position: Named
   IsRequired: false
   ValueFromPipeline: false
@@ -146,9 +248,60 @@ DefaultValue: ''
 SupportsWildcards: false
 Aliases: []
 ParameterSets:
-- Name: (All)
+- Name: Path
   Position: 0
   IsRequired: true
+  ValueFromPipeline: false
+  ValueFromPipelineByPropertyName: false
+  ValueFromRemainingArguments: false
+DontShow: false
+AcceptedValues: []
+HelpMessage: ''
+```
+
+### -Stream
+
+Write the PDF to this writable stream instead of a file (for example a
+response or blob stream).
+The PDF is rendered in memory first, so a failure
+never leaves a partial PDF in the stream.
+Nothing is returned.
+
+```yaml
+Type: System.IO.Stream
+DefaultValue: ''
+SupportsWildcards: false
+Aliases: []
+ParameterSets:
+- Name: Stream
+  Position: Named
+  IsRequired: true
+  ValueFromPipeline: false
+  ValueFromPipelineByPropertyName: false
+  ValueFromRemainingArguments: false
+DontShow: false
+AcceptedValues: []
+HelpMessage: ''
+```
+
+### -Validate
+
+Run the in-process preflight (see Test-VellumPdfConformance) on the rendered
+PDF against the document's own conformance level (PdfA2b/2u/2a/PdfUA1) and
+fail with the first findings - writing nothing - when it is not compliant.
+The document is then unusable, like after any failed save.
+Not available
+for encrypted documents.
+
+```yaml
+Type: System.Management.Automation.SwitchParameter
+DefaultValue: False
+SupportsWildcards: false
+Aliases: []
+ParameterSets:
+- Name: (All)
+  Position: Named
+  IsRequired: false
   ValueFromPipeline: false
   ValueFromPipelineByPropertyName: false
   ValueFromRemainingArguments: false
@@ -188,15 +341,25 @@ This cmdlet supports the common parameters: -Debug, -ErrorAction, -ErrorVariable
 
 ## INPUTS
 
-### VellumPdf.Layout.Document
+### System.Object
 
 
 ## OUTPUTS
 
-### System.IO.FileInfo for the written file.
+### System.IO.FileInfo for the written file (VellumPdf.Layout.Document with
+-PassThru)
 
 
 ### System.IO.FileInfo
+
+
+### System.Byte
+
+
+### VellumPdf.Layout.Document
+
+
+### VellumPdf.Document.PdfDocument
 
 
 ## NOTES
