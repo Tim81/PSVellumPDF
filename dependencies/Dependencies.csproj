@@ -40,7 +40,7 @@
     <PackageReference Include="System.Security.Cryptography.Pkcs" Version="10.0.*" />
     <!-- Compile-time only: ScriptBlock for ScriptBlockRenderer. The host (pwsh)
          supplies the real assembly at run time, so never copy it into lib/. -->
-    <PackageReference Include="System.Management.Automation" Version="7.6.2" ExcludeAssets="runtime" />
+    <PackageReference Include="System.Management.Automation" Version="7.7.0" ExcludeAssets="runtime" />
   </ItemGroup>
 
 </Project>
