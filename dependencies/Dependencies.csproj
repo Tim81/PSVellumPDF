@@ -29,8 +29,8 @@
     <PackageReference Include="VellumPdf.Signing" Version="2.3.3" />
     <!-- VellumPdf.Reader comes in transitively via VellumPdf.Signing (LTV) and Conformance. -->
     <PackageReference Include="VellumPdf.Barcodes" Version="2.3.3" />
-    <PackageReference Include="VellumPdf.Conformance" Version="2.3.3" />
-    <PackageReference Include="VellumPdf.Reader" Version="2.3.3" />
+    <PackageReference Include="VellumPdf.Conformance" Version="2.3.4" />
+    <PackageReference Include="VellumPdf.Reader" Version="2.3.4" />
     <PackageReference Include="VellumPdf.Fonts.Standard14" Version="2.3.3" />
     <!-- Always the newest Pkcs 10.0.x. VellumPdf.Signing pulls in an exact (older) version
          transitively; this direct reference wins, so restore warnings about known
