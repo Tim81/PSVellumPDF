@@ -31,7 +31,7 @@
     <PackageReference Include="VellumPdf.Barcodes" Version="2.3.3" />
     <PackageReference Include="VellumPdf.Conformance" Version="2.3.3" />
     <PackageReference Include="VellumPdf.Reader" Version="2.3.3" />
-    <PackageReference Include="VellumPdf.Fonts.Standard14" Version="2.3.3" />
+    <PackageReference Include="VellumPdf.Fonts.Standard14" Version="2.3.4" />
     <!-- Always the newest Pkcs 10.0.x. VellumPdf.Signing pulls in an exact (older) version
          transitively; this direct reference wins, so restore warnings about known
          advisories in that old version go away as soon as a fixed release exists. It is a
